@@ -1,0 +1,9 @@
+.venv/
+.dpm-home/
+.dpm-trace.json
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+docs/REAL-UPDATE-SMOKE.md
+docs/TECHNICAL-NOTES.md
