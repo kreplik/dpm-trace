@@ -379,14 +379,21 @@ def daml_test_command(
 def daml_child_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     """Environment for spawning daml/damlc.
 
-    When dpm runs this plugin it exports DPM_RESOLUTION_FILE, a resolution context
-    scoped to the dpm-trace component. A child daml/damlc would wrongly apply it to
-    the package under test ("Failed to find DPM package resolution"), so we drop it
-    and let daml resolve the target package on its own.
+    - Drops DPM_RESOLUTION_FILE. When dpm runs this plugin it exports that
+      resolution context scoped to the dpm-trace component; a child daml/damlc
+      would wrongly apply it to the package under test ("Failed to find DPM
+      package resolution"). Dropping it lets daml resolve the target itself.
+    - Forces a UTF-8 locale when the inherited one is not UTF-8. `daml test`
+      writes Unicode box-drawing characters into its transaction HTML, and under
+      a C/POSIX locale (common in CI) damlc aborts with
+      "commitAndReleaseBuffer: invalid argument (invalid character)".
     """
     env = dict(os.environ)
-    for key in ("DPM_RESOLUTION_FILE",):
-        env.pop(key, None)
+    env.pop("DPM_RESOLUTION_FILE", None)
+    effective_ctype = env.get("LC_ALL") or env.get("LC_CTYPE") or env.get("LANG") or ""
+    if "utf" not in effective_ctype.lower():
+        env["LANG"] = "C.UTF-8"
+        env["LC_ALL"] = "C.UTF-8"
     if extra:
         env.update(extra)
     return env
