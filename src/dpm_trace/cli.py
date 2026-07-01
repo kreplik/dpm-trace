@@ -530,10 +530,13 @@ def run_test(args: argparse.Namespace) -> int:
     txns_dir = work / "transactions"
     table_dir = work / "tables"
     try:
-        # Attempt 1: full outputs (results + transaction trees/stats). `daml test`
-        # writes Unicode box-drawing characters into the transaction HTML and can
-        # abort before producing JUnit under a non-UTF-8 locale, so the trees are
-        # best-effort: if JUnit is missing we retry for results only.
+        # `daml test` writes Unicode box-drawing characters into transaction HTML.
+        # daml_child_env() forces a UTF-8 locale, which handles the known abort
+        # ("commitAndReleaseBuffer: invalid argument") under a C/POSIX locale, so
+        # the full run (JUnit + trees + tables) is expected to produce JUnit. The
+        # retry below is a belt-and-suspenders fallback for any *other* JUnit-
+        # generation failure; it is logged to stderr (not silent) so a real
+        # compile failure is not masked and the fallback firing stays observable.
         command, env = daml_test_command(args, root, junit_path, txns_dir, table_dir)
         completed = subprocess.run(
             command, cwd=str(root), env=env,
@@ -541,6 +544,11 @@ def run_test(args: argparse.Namespace) -> int:
         )
         trees_available = junit_path.exists()
         if not trees_available:
+            print(
+                "warning: first `daml test` run produced no JUnit; retrying without "
+                "transaction/table output (trees will be unavailable).",
+                file=sys.stderr,
+            )
             command, env = daml_test_command(args, root, junit_path)
             completed = subprocess.run(
                 command, cwd=str(root), env=env,

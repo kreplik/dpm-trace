@@ -8,6 +8,7 @@ can be driven directly by lit.
 from __future__ import annotations
 
 import sys
+import os
 import tempfile
 from pathlib import Path
 
@@ -22,6 +23,7 @@ def main() -> int:
         SourceIndex,
         _eval_replay,
         completion_source_diagnostics,
+        daml_child_env,
         parse_junit,
         register_component_in_manifest,
         strip_canton_error_decoration,
@@ -108,6 +110,27 @@ def main() -> int:
     check(bool(full), "completion_source_diagnostics should resolve the Sample fixture")
     check(len(one) <= 1, f"completion cap=1 should return at most 1: {len(one)}")
     check(one_capped, f"completion cap=1 should flag capping when full had {len(full)}")
+
+    # 4d. daml_child_env forces a UTF-8 locale under a non-UTF-8 inherited locale
+    #     and drops DPM_RESOLUTION_FILE. This is the root-cause fix that makes the
+    #     `daml test` Unicode-retry fallback expected-dead; regression-test it so
+    #     a future change cannot silently drop the locale guard.
+    saved = {k: os.environ.get(k) for k in ("LANG", "LC_ALL", "LC_CTYPE", "DPM_RESOLUTION_FILE")}
+    try:
+        os.environ["LANG"] = "C"
+        os.environ["LC_ALL"] = "C"
+        os.environ.pop("LC_CTYPE", None)
+        os.environ["DPM_RESOLUTION_FILE"] = "/tmp/should-be-dropped"
+        env = daml_child_env()
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    check("DPM_RESOLUTION_FILE" not in env, "daml_child_env did not drop DPM_RESOLUTION_FILE")
+    check("utf" in env.get("LANG", "").lower(), f"daml_child_env did not force a UTF-8 LANG under C locale: {env.get('LANG')}")
+    check("utf" in env.get("LC_ALL", "").lower(), f"daml_child_env did not force a UTF-8 LC_ALL under C locale: {env.get('LC_ALL')}")
 
     # 5. install-plugin: the component registers under `components:` (before `assistant:`).
     manifest = Path(tempfile.mkstemp(suffix=".yaml")[1])
