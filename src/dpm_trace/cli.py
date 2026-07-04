@@ -248,6 +248,7 @@ def submit_main(argv: list[str]) -> int:
     parser.add_argument("--command-id", help="Command id. Defaults to dpm-trace-submit-<uuid>.")
     parser.add_argument("--user-id", help="Ledger API user id for the submission.")
     parser.add_argument("--allow-fail", action="store_true", help="Do not error on a rejected submission; print the rejection and exit 0.")
+    parser.add_argument("--full", "-v", "--verbose", action="store_true", help="Show full completion trace on failure instead of the compact summary.")
     parser.add_argument("--print-json", action="store_true", help="Print the full submit-and-wait response.")
     parser.add_argument("--log-file", action="append", default=[], help="Operator/participant log file to search for failure correlation. Repeatable.")
     parser.add_argument("--max-source-locations", type=int, default=5, help="Maximum source diagnostics to resolve for a failed submission. Defaults to 5.")
@@ -292,7 +293,8 @@ def run_submit(args: argparse.Namespace) -> int:
             completion = attach_log_matches(args, completion)
             source_index = source_index_from_args(args, None)
             max_locs = getattr(args, "max_source_locations", 5)
-            print_completion_trace(completion, color, source_index=source_index, max_source_locations=max_locs)
+            compact = not getattr(args, "full", False)
+            print_completion_trace(completion, color, source_index=source_index, max_source_locations=max_locs, request=request, compact=compact)
         return 0 if getattr(args, "allow_fail", False) else 1
 
     if args.print_json:
@@ -2191,8 +2193,59 @@ def print_completion_trace(
     color: Color,
     source_index: SourceIndex | None = None,
     max_source_locations: int = 5,
+    request: dict[str, Any] | None = None,
+    compact: bool = False,
 ) -> None:
     status_code, message = completion_status_fields(completion)
+    command_id = pick(completion, "commandId", "command_id") or "-"
+    offset = pick(completion, "offset") or "-"
+    source_matches, capped = completion_source_diagnostics(completion, source_index, max_source_locations)
+    log_matches = completion.get("logMatches") or []
+
+    if compact and request is not None:
+        status_str = str(status_code) if status_code else "FAILED"
+        print(color.apply("✗ submission failed", "red", "bold") + f"  {status_str}")
+        if message:
+            print(f'  {color.apply(repr(str(message)), "yellow")}')
+        print("")
+
+        col = 52
+        print(f"  {'Command':<{col}} (what you sent)")
+        commands_list = request.get("commands") or []
+        if isinstance(commands_list, dict):
+            commands_list = commands_list.get("commands") or []
+        for cmd in commands_list[:3]:
+            print(f"    {_format_command_summary(cmd)}")
+        act_as = request.get("actAs") or []
+        act_as_str = ", ".join(short_party(str(p)) for p in act_as[:2])
+        print(f"    act-as {act_as_str}    command id {short(command_id, 20)}    offset {offset}")
+        print("")
+
+        if source_matches:
+            print(f"  {'Where':<{col}} (best match first)")
+            entity_hint = _entity_from_request(request)
+            print(textwrap.indent(_render_loc_inline(source_matches[0], source_index, color, entity_hint=entity_hint), "    "))
+            rest = source_matches[1:]
+            if rest or capped:
+                also = [f"{_short_source_path(r, source_index)}:{r.line} [{_label_tag(r.label)}]" for r in rest[:2]]
+                extra = (len(rest) - len(also)) + (1 if capped else 0)
+                suffix = f"  (+{extra} more; --full to expand)" if extra > 0 else "  (--full to expand)"
+                print(f"    also: {', '.join(also)}{suffix}")
+            print("")
+
+        if log_matches:
+            first = log_matches[0]
+            file_ref = f"{first.get('file')}:{first.get('line')}"
+            matched_by = _log_matched_by(completion)
+            term_str = f"  matched by {matched_by}" if matched_by else ""
+            more = "  (--full for context)" if len(log_matches) > 1 else ""
+            print(f"  Logs   {file_ref}{term_str}{more}")
+            print("")
+
+        print("  Next")
+        print(f"    dpm trace compare --command-id {command_id} --prepared <prepared.json>")
+        return
+
     update_id = pick(completion, "updateId", "update_id")
     committed = bool(update_id)
     failed = status_code not in (None, "OK", 0, "0") and not committed
@@ -2203,7 +2256,7 @@ def print_completion_trace(
     print(f"  command id: {pick(completion, 'commandId', 'command_id') or lookup.get('commandId') or '-'}")
     print(f"  submission: {pick(completion, 'submissionId', 'submission_id') or '-'}")
     print(f"  update id:  {short(str(update_id or '-'), 80)}")
-    print(f"  offset:     {pick(completion, 'offset') or '-'}")
+    print(f"  offset:     {offset}")
     print(f"  status:     {status_code if status_code is not None else '-'}")
     print(f"  message:    {message or '-'}")
     if lookup:
@@ -2211,7 +2264,6 @@ def print_completion_trace(
         print(f"  source:     {completion.get('source') or '-'}")
     if not update_id:
         print("  trace:      no committed transaction tree is available for this completion")
-    source_matches, capped = completion_source_diagnostics(completion, source_index, max_source_locations)
     if source_matches:
         print("")
         print(color.apply("Source diagnostics", "cyan", "bold"))
@@ -2219,7 +2271,6 @@ def print_completion_trace(
             print(indent_text(render_source_diagnostic(loc, source_index, color)))
         if capped:
             print(f"  {color.apply('(capped at ' + str(len(source_matches)) + ' locations; pass --max-source-locations to raise)', 'gray')}")
-    log_matches = completion.get("logMatches") or []
     if log_matches:
         print("")
         print(color.apply("Log matches", "cyan", "bold"))
@@ -2290,6 +2341,105 @@ def completion_source_needles(message: str) -> list[str]:
         if candidate not in cleaned:
             cleaned.append(candidate)
     return cleaned
+
+
+def _label_tag(label: str) -> str:
+    if "damlc inspect" in label or "debug" in label.lower():
+        return "debug-info"
+    return "text match"
+
+
+def _loc_label_display(label: str) -> str:
+    if not label or label == "local source":
+        return ""
+    if label.startswith("damlc inspect: "):
+        return label[len("damlc inspect: "):]
+    return label
+
+
+def _short_source_path(loc: SourceLocation, source_index: SourceIndex | None) -> str:
+    if source_index:
+        for root in source_index.roots:
+            if loc.path.startswith(root + "/"):
+                return loc.path[len(root) + 1:]
+    return Path(loc.path).name
+
+
+def _log_matched_by(completion: dict[str, Any]) -> str:
+    terms = set(completion.get("logMatchTerms") or [])
+    for field, name in (
+        ("commandId", "command id"),
+        ("command_id", "command id"),
+        ("traceId", "trace id"),
+        ("submissionId", "submission id"),
+        ("submission_id", "submission id"),
+        ("updateId", "update id"),
+        ("update_id", "update id"),
+    ):
+        val = completion.get(field)
+        if val and str(val) in terms:
+            return name
+    status = completion.get("status")
+    if isinstance(status, dict):
+        for field, name in (("traceId", "trace id"), ("correlationId", "correlation id")):
+            val = status.get(field)
+            if val and str(val) in terms:
+                return name
+    return "trace id" if terms else ""
+
+
+def _format_command_summary(cmd: dict[str, Any]) -> str:
+    exercise = pick(cmd, "ExerciseCommand", "exerciseCommand")
+    create = pick(cmd, "CreateCommand", "createCommand")
+    if exercise:
+        tmpl = short_template(str(exercise.get("templateId") or "")) or "?"
+        choice = exercise.get("choice") or "?"
+        cid = short(str(exercise.get("contractId") or ""), 10)
+        args = exercise.get("choiceArgument") or {}
+        args_str = "  ".join(f"{k}={format_scalar(v)}" for k, v in list(args.items())[:3]) if isinstance(args, dict) else ""
+        return f"exercise {tmpl}:{choice} on {cid}  {args_str}".rstrip()
+    if create:
+        tmpl = short_template(str(create.get("templateId") or "")) or "?"
+        args = create.get("createArguments") or {}
+        args_str = "  ".join(f"{k}={format_scalar(v)}" for k, v in list(args.items())[:3]) if isinstance(args, dict) else ""
+        return f"create {tmpl}  {args_str}".rstrip()
+    return repr(cmd)
+
+
+def _entity_from_request(request: dict[str, Any]) -> tuple[str, str] | None:
+    for cmd in (request.get("commands") or []):
+        ex = pick(cmd, "ExerciseCommand", "exerciseCommand")
+        if ex:
+            tmpl = short_template(str(ex.get("templateId") or "")) or ""
+            choice = ex.get("choice") or ""
+            if tmpl and choice:
+                return "choice", f"{tmpl}.{choice}"
+    return None
+
+
+def _render_loc_inline(
+    loc: SourceLocation,
+    source_index: SourceIndex | None,
+    color: Color,
+    entity_hint: tuple[str, str] | None = None,
+) -> str:
+    path_disp = _short_source_path(loc, source_index)
+    header = f"{path_disp}:{loc.line}"
+    entity = entity_hint or (source_index.entity_containing(loc.path, loc.line) if source_index else None)
+    if entity:
+        kind, name = entity
+        tag = _label_tag(loc.label)
+        header += f"  in {kind} {name}   [{tag}]"
+    else:
+        tag = _label_tag(loc.label)
+        desc = _loc_label_display(loc.label)
+        header += f"  {desc}   [{tag}]" if desc else f"   [{tag}]"
+    header_line = color.apply(header, "cyan")
+    if source_index is None:
+        return header_line
+    snippet_text = source_index.snippet(loc, radius=2)
+    code_lines = "\n".join(snippet_text.splitlines()[1:])
+    return f"{header_line}\n{code_lines}"
 
 
 def render_source_diagnostic(loc: SourceLocation, source_index: SourceIndex | None, color: Color) -> str:
@@ -3662,6 +3812,19 @@ class SourceIndex:
                 break
             result.append(SourceLine(loc.path, idx, text))
         return result
+
+    def entity_containing(self, path: str, line: int) -> tuple[str, str] | None:
+        """Return (kind, label) of the innermost choice/template whose definition contains line."""
+        best: tuple[int, str, str] | None = None
+        for loc in self.choices.values():
+            if loc.path == path and 0 < loc.line <= line:
+                if best is None or loc.line > best[0]:
+                    best = (loc.line, "choice", loc.label)
+        for loc in self.templates.values():
+            if loc.path == path and 0 < loc.line <= line:
+                if best is None or loc.line > best[0]:
+                    best = (loc.line, "template", loc.label)
+        return (best[1], best[2]) if best else None
 
     def has_sources(self) -> bool:
         return bool(self.templates or self.choices or self.files)
