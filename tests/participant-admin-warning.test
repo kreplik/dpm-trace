@@ -1,0 +1,16 @@
+# Checks that `dpm trace submit` warns when no --user-id or --token is given
+# and the ledger URL points to a non-local host.  The warning is emitted before
+# any network attempt, so the connection failure does not suppress it.
+# The negative case (localhost) must produce no warning.
+#
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli prepare --ledger-url http://remote.example.com:9999 --act-as Alice --template T:T > %t 2>&1 || true
+# RUN: FileCheck --check-prefix=REMOTE %s < %t
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli prepare --ledger-url http://localhost:9999 --act-as Alice --template T:T > %t 2>&1 || true
+# RUN: FileCheck --check-prefix=LOCAL %s < %t
+
+# REMOTE: warning: using default user ID with non-local participant 'remote.example.com'
+# REMOTE: pass --user-id or --token
+# REMOTE: error:
+
+# LOCAL-NOT: warning:
+# LOCAL: error:
