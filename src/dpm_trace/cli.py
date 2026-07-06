@@ -453,6 +453,7 @@ def compare_main(argv: list[str]) -> int:
     parser.add_argument("--log-file", action="append", default=[], help="Operator/application log file to attach and correlate. Repeatable.")
     add_common_connection_args(parser)
     parser.add_argument("--act-as", action="append", default=[], help="Submitting party for completion lookup. Repeatable.")
+    parser.add_argument("--full", "-v", "--verbose", action="store_true", help="Show full verbose comparison output instead of the compact summary.")
     parser.add_argument("--print-json", action="store_true", help="Print machine-readable comparison JSON.")
     parser.add_argument("--max-source-locations", type=int, default=5, help="Maximum source diagnostics to resolve for a prepared-vs-completion diff. Defaults to 5.")
     args = parser.parse_args(argv)
@@ -1570,7 +1571,8 @@ def run_compare(args: argparse.Namespace) -> int:
     if args.print_json:
         print(json.dumps(comparison, indent=2, sort_keys=True))
         return 0
-    print_comparison(comparison, color, source_index=source_index_from_args(args, None), max_source_locations=getattr(args, "max_source_locations", 5))
+    compact = not getattr(args, "full", False)
+    print_comparison(comparison, color, source_index=source_index_from_args(args, None), max_source_locations=getattr(args, "max_source_locations", 5), compact=compact)
     return 0
 
 
@@ -1939,8 +1941,8 @@ def compare_traces(left: NormalizedTrace, right: NormalizedTrace) -> dict[str, A
         "diff": {
             "eventCounts": {"left": state_diff_counts(left), "right": state_diff_counts(right)},
             "rootEvents": {
-                "left": [event_compare_row(left.events_by_id[event_id]) for event_id in left.root_event_ids if event_id in left.events_by_id],
-                "right": [event_compare_row(right.events_by_id[event_id]) for event_id in right.root_event_ids if event_id in right.events_by_id],
+                "left": [event_compare_row(left.events_by_id[eid], left.events_by_id) for eid in left.root_event_ids if eid in left.events_by_id],
+                "right": [event_compare_row(right.events_by_id[eid], right.events_by_id) for eid in right.root_event_ids if eid in right.events_by_id],
             },
             "templatesOnlyInLeft": sorted(event_templates(left) - event_templates(right)),
             "templatesOnlyInRight": sorted(event_templates(right) - event_templates(left)),
@@ -1972,7 +1974,7 @@ def prepared_summary_for_compare(prepared: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def event_compare_row(ev: TraceEvent) -> dict[str, Any]:
+def event_compare_row(ev: TraceEvent, events_by_id: dict[str, TraceEvent] | None = None) -> dict[str, Any]:
     value = None
     value_label = None
     if ev.kind == "create":
@@ -1981,6 +1983,12 @@ def event_compare_row(ev: TraceEvent) -> dict[str, Any]:
     elif ev.kind == "exercise":
         value = ev.argument
         value_label = "argument"
+    children: list[dict[str, Any]] = []
+    if events_by_id:
+        for child_id in ev.child_event_ids:
+            child = events_by_id.get(child_id)
+            if child:
+                children.append(event_compare_row(child, events_by_id))
     return {
         "eventId": ev.event_id,
         "kind": ev.kind,
@@ -1994,6 +2002,7 @@ def event_compare_row(ev: TraceEvent) -> dict[str, Any]:
         "observers": ev.observers,
         "witnesses": ev.witnesses,
         "actingParties": ev.acting_parties,
+        "children": children,
     }
 
 
@@ -2038,13 +2047,14 @@ def print_comparison(
     color: Color,
     source_index: SourceIndex | None = None,
     max_source_locations: int = 5,
+    compact: bool = True,
 ) -> None:
     kind = comparison.get("kind")
     if kind == "update-vs-update":
-        print_update_comparison(comparison, color)
+        print_update_comparison(comparison, color, compact=compact)
         return
     if kind == "prepared-vs-update":
-        print_prepared_update_comparison(comparison, color)
+        print_prepared_update_comparison(comparison, color, compact=compact)
         return
     if kind == "prepared-vs-completion":
         print_prepared_completion_comparison(comparison, color, source_index=source_index, max_source_locations=max_source_locations)
@@ -2061,51 +2071,242 @@ def print_comparison(
     print(indent_json(comparison.get("diff") or {}))
 
 
-def print_update_comparison(comparison: dict[str, Any], color: Color) -> None:
+def _compact_event_label(row: dict[str, Any]) -> str:
+    kind = str(row.get("kind") or "event")
+    template = short_template(row.get("template")) or "-"
+    choice = row.get("choice")
+    if choice:
+        return f"{kind} {template}.{choice}"
+    return f"{kind} {template}"
+
+
+def _event_value_annotation(lv: Any, rv: Any) -> str:
+    if isinstance(lv, dict) and isinstance(rv, dict):
+        for key in sorted(set(lv) | set(rv)):
+            if comparable_value(lv.get(key)) != comparable_value(rv.get(key)):
+                a = compact_value(lv.get(key, "<missing>"))
+                b = compact_value(rv.get(key, "<missing>"))
+                return f"{key}: {a} → {b}"
+    return "values differ"
+
+
+def _count_event_diffs(
+    left_rows: list[dict[str, Any]],
+    right_rows: list[dict[str, Any]],
+) -> tuple[int, int, int]:
+    n_value = n_only_a = n_only_b = 0
+    n = max(len(left_rows), len(right_rows)) if (left_rows or right_rows) else 0
+    for i in range(n):
+        lr = left_rows[i] if i < len(left_rows) else None
+        rr = right_rows[i] if i < len(right_rows) else None
+        if lr and rr:
+            if event_compare_key(lr) == event_compare_key(rr):
+                if comparable_value(lr.get("value")) != comparable_value(rr.get("value")):
+                    n_value += 1
+            else:
+                n_only_a += 1
+                n_only_b += 1
+        elif lr:
+            n_only_a += 1
+        else:
+            n_only_b += 1
+    return n_value, n_only_a, n_only_b
+
+
+def _print_event_row_compact(
+    lr: dict[str, Any] | None,
+    rr: dict[str, Any] | None,
+    color: Color,
+    indent: str,
+    col: int,
+) -> None:
+    if lr and rr:
+        if event_compare_key(lr) == event_compare_key(rr):
+            lv = lr.get("value")
+            rv = rr.get("value")
+            if comparable_value(lv) == comparable_value(rv):
+                n = len(lv) if isinstance(lv, dict) else 0
+                ann = f"({n} fields match)" if n else ""
+                print(f"{indent}{color.apply('=', 'green')} {_compact_event_label(lr):<{col}} {ann}")
+            else:
+                ann = _event_value_annotation(lv, rv)
+                print(f"{indent}{color.apply('~', 'yellow')} {_compact_event_label(lr):<{col}} {ann}")
+            lc = lr.get("children") or []
+            rc = rr.get("children") or []
+            if lc or rc:
+                _print_event_rows_compact(lc, rc, color, indent + "  ", col)
+        else:
+            print(f"{indent}{color.apply('-', 'red')} {_compact_event_label(lr):<{col}} only in A")
+            for child in (lr.get("children") or []):
+                _print_event_row_compact(child, None, color, indent + "  ", col)
+            print(f"{indent}{color.apply('+', 'green')} {_compact_event_label(rr):<{col}} only in B")
+            for child in (rr.get("children") or []):
+                _print_event_row_compact(None, child, color, indent + "  ", col)
+    elif lr:
+        print(f"{indent}{color.apply('-', 'red')} {_compact_event_label(lr):<{col}} only in A")
+        for child in (lr.get("children") or []):
+            _print_event_row_compact(child, None, color, indent + "  ", col)
+    elif rr:
+        print(f"{indent}{color.apply('+', 'green')} {_compact_event_label(rr):<{col}} only in B")
+        for child in (rr.get("children") or []):
+            _print_event_row_compact(None, child, color, indent + "  ", col)
+
+
+def _print_event_rows_compact(
+    left_rows: list[dict[str, Any]],
+    right_rows: list[dict[str, Any]],
+    color: Color,
+    indent: str,
+    col: int = 50,
+) -> None:
+    n = max(len(left_rows), len(right_rows)) if (left_rows or right_rows) else 0
+    for i in range(n):
+        _print_event_row_compact(
+            left_rows[i] if i < len(left_rows) else None,
+            right_rows[i] if i < len(right_rows) else None,
+            color,
+            indent,
+            col,
+        )
+
+
+def print_update_comparison(comparison: dict[str, Any], color: Color, compact: bool = True) -> None:
     left = comparison.get("left") or {}
     right = comparison.get("right") or {}
     diff = comparison.get("diff") or {}
-    counts = diff.get("eventCounts") or {}
-    left_counts = counts.get("left") or {}
-    right_counts = counts.get("right") or {}
     root_events = diff.get("rootEvents") or {}
-    left_roots = root_events.get("left") or []
-    right_roots = root_events.get("right") or []
-    templates_left = diff.get("templatesOnlyInLeft") or []
-    templates_right = diff.get("templatesOnlyInRight") or []
-    left_root_keys = [event_exact_key(row) for row in left_roots if isinstance(row, dict)]
-    right_root_keys = [event_exact_key(row) for row in right_roots if isinstance(row, dict)]
-    has_differences = (
-        left_counts != right_counts
-        or left_root_keys != right_root_keys
-        or bool(templates_left)
-        or bool(templates_right)
-    )
+    left_roots = [r for r in (root_events.get("left") or []) if isinstance(r, dict)]
+    right_roots = [r for r in (root_events.get("right") or []) if isinstance(r, dict)]
 
-    print(color.apply("DPM trace comparison", "bold"))
-    print("  kind:   update-vs-update")
-    print(f"  result: {comparison_result(has_differences, color)}")
-    print("")
-
-    print(color.apply("Updates", "cyan", "bold"))
-    print(f"  baseline:  {trace_compare_summary(left)}")
-    print(f"  candidate: {trace_compare_summary(right)}")
-    print("")
-
-    print(color.apply("Event counts", "cyan", "bold"))
-    print_count_diff(left_counts, right_counts, color)
-    print("")
-
-    print(color.apply("Root events", "cyan", "bold"))
-    print_event_diff(left_roots, right_roots, color)
-    if templates_left or templates_right:
+    if not compact:
+        counts = diff.get("eventCounts") or {}
+        left_counts = counts.get("left") or {}
+        right_counts = counts.get("right") or {}
+        templates_left = diff.get("templatesOnlyInLeft") or []
+        templates_right = diff.get("templatesOnlyInRight") or []
+        left_root_keys = [event_exact_key(row) for row in left_roots]
+        right_root_keys = [event_exact_key(row) for row in right_roots]
+        has_differences = (
+            left_counts != right_counts
+            or left_root_keys != right_root_keys
+            or bool(templates_left)
+            or bool(templates_right)
+        )
+        print(color.apply("DPM trace comparison", "bold"))
+        print("  kind:   update-vs-update")
+        print(f"  result: {comparison_result(has_differences, color)}")
         print("")
-        print(color.apply("Template differences", "cyan", "bold"))
-        print_template_list("only in baseline", templates_left)
-        print_template_list("only in candidate", templates_right)
+        print(color.apply("Updates", "cyan", "bold"))
+        print(f"  baseline:  {trace_compare_summary(left)}")
+        print(f"  candidate: {trace_compare_summary(right)}")
+        print("")
+        print(color.apply("Event counts", "cyan", "bold"))
+        print_count_diff(left_counts, right_counts, color)
+        print("")
+        print(color.apply("Root events", "cyan", "bold"))
+        print_event_diff(left_roots, right_roots, color)
+        if templates_left or templates_right:
+            print("")
+            print(color.apply("Template differences", "cyan", "bold"))
+            print_template_list("only in baseline", templates_left)
+            print_template_list("only in candidate", templates_right)
+        return
+
+    n_value, n_only_a, n_only_b = _count_event_diffs(left_roots, right_roots)
+    has_differences = n_value > 0 or n_only_a > 0 or n_only_b > 0
+
+    if has_differences:
+        total = n_value + n_only_a + n_only_b
+        parts: list[str] = []
+        if n_value:
+            parts.append(f"{n_value} value")
+        if n_only_a:
+            parts.append(f"{n_only_a} only-in-A")
+        if n_only_b:
+            parts.append(f"{n_only_b} only-in-B")
+        diffs = "differences" if total != 1 else "difference"
+        hdr = color.apply("✗", "red", "bold") + f" {total} {diffs} ({', '.join(parts)})"
+    else:
+        hdr = color.apply("✓", "green", "bold") + " no differences"
+    print(f"{hdr}     kind: update-vs-update")
+    print("")
+
+    left_id = short(str(left.get("updateId") or "-"), 12)
+    right_id = short(str(right.get("updateId") or "-"), 12)
+    print(f"  A  update {left_id}  @ offset {left.get('offset') or '-'}   (baseline)")
+    print(f"  B  update {right_id}  @ offset {right.get('offset') or '-'}   (candidate)")
+    print("")
+
+    print("  Events")
+    _print_event_rows_compact(left_roots, right_roots, color, indent="    ")
+    print("")
+
+    read_as = list_str(left.get("readAs") or right.get("readAs") or [])
+    sync = left.get("recordTime") or right.get("recordTime")
+    ctx_parts: list[str] = []
+    if read_as:
+        ctx_parts.append("read-as " + ", ".join(short_party(p) for p in read_as[:2]))
+    if sync:
+        ctx_parts.append(f"sync {sync}")
+    if ctx_parts:
+        print(f"  Context   {'   '.join(ctx_parts)}")
 
 
-def print_prepared_update_comparison(comparison: dict[str, Any], color: Color) -> None:
+def _count_command_event_diffs(
+    command_rows: list[dict[str, Any]],
+    root_rows: list[dict[str, Any]],
+) -> tuple[int, int, int]:
+    n_value = n_only_a = n_only_b = 0
+    n = max(len(command_rows), len(root_rows)) if (command_rows or root_rows) else 0
+    for i in range(n):
+        cmd = command_rows[i] if i < len(command_rows) else None
+        root = root_rows[i] if i < len(root_rows) else None
+        if cmd and root:
+            if command_event_key(cmd) == event_compare_key(root):
+                if comparable_value(cmd.get("value")) != comparable_value(root.get("value")):
+                    n_value += 1
+            else:
+                n_only_a += 1
+                n_only_b += 1
+        elif cmd:
+            n_only_a += 1
+        else:
+            n_only_b += 1
+    return n_value, n_only_a, n_only_b
+
+
+def _print_command_event_rows_compact(
+    command_rows: list[dict[str, Any]],
+    root_rows: list[dict[str, Any]],
+    color: Color,
+    indent: str,
+    col: int = 50,
+) -> None:
+    n = max(len(command_rows), len(root_rows)) if (command_rows or root_rows) else 0
+    for i in range(n):
+        cmd = command_rows[i] if i < len(command_rows) else None
+        root = root_rows[i] if i < len(root_rows) else None
+        if cmd and root:
+            if command_event_key(cmd) == event_compare_key(root):
+                cv = cmd.get("value")
+                rv = root.get("value")
+                if comparable_value(cv) == comparable_value(rv):
+                    n_fields = len(cv) if isinstance(cv, dict) else 0
+                    ann = f"({n_fields} fields match)" if n_fields else ""
+                    print(f"{indent}{color.apply('=', 'green')} {_compact_event_label(cmd):<{col}} {ann}")
+                else:
+                    ann = _event_value_annotation(cv, rv)
+                    print(f"{indent}{color.apply('~', 'yellow')} {_compact_event_label(cmd):<{col}} {ann}")
+            else:
+                print(f"{indent}{color.apply('-', 'red')} {_compact_event_label(cmd):<{col}} only in A")
+                print(f"{indent}{color.apply('+', 'green')} {_compact_event_label(root):<{col}} only in B")
+        elif cmd:
+            print(f"{indent}{color.apply('-', 'red')} {_compact_event_label(cmd):<{col}} only in A")
+        elif root:
+            print(f"{indent}{color.apply('+', 'green')} {_compact_event_label(root):<{col}} only in B")
+
+
+def print_prepared_update_comparison(comparison: dict[str, Any], color: Color, compact: bool = True) -> None:
     prepared = comparison.get("left") or {}
     update = comparison.get("right") or {}
     diff = comparison.get("diff") or {}
@@ -2113,50 +2314,89 @@ def print_prepared_update_comparison(comparison: dict[str, Any], color: Color) -
     roots = diff.get("rootEvents") or []
     command_rows = [row for row in commands if isinstance(row, dict)]
     root_rows = [row for row in roots if isinstance(row, dict)]
-    first_command = command_rows[0] if command_rows else None
-    first_root = root_rows[0] if root_rows else None
     has_differences = prepared_update_has_differences(command_rows, root_rows)
 
-    print(color.apply("DPM trace comparison", "bold"))
-    print("  kind:   prepared-vs-update")
-    print(f"  result: {comparison_result(has_differences, color)}")
-    print("")
+    if not compact:
+        first_command = command_rows[0] if command_rows else None
+        first_root = root_rows[0] if root_rows else None
+        print(color.apply("DPM trace comparison", "bold"))
+        print("  kind:   prepared-vs-update")
+        print(f"  result: {comparison_result(has_differences, color)}")
+        print("")
+        print(color.apply("Operation", "cyan", "bold"))
+        print(f"  prepared:  {command_row_text(first_command) if first_command else '-'}")
+        print(f"  committed: {event_row_text(first_root) if first_root else '-'}")
+        print(f"  shape:     {operation_shape_summary(first_command, first_root, color)}")
+        print("")
+        print(color.apply("Field diff", "cyan", "bold"))
+        if not command_rows and not root_rows:
+            print("  no commands")
+        else:
+            for index in range(max(len(command_rows), len(root_rows))):
+                cmd = command_rows[index] if index < len(command_rows) else None
+                root = root_rows[index] if index < len(root_rows) else None
+                if cmd and root and command_event_key(cmd) == event_compare_key(root):
+                    print(f"  [{index}] {command_row_text(cmd)}")
+                    print_argument_field_diff(cmd, root, color)
+                    print_party_fields(root)
+                elif cmd:
+                    print(f"  [{index}] command only: {command_row_text(cmd)}")
+                else:
+                    print(f"  [{index}] event only:   {event_row_text(root)}")
+        print("")
+        print(color.apply("Context", "cyan", "bold"))
+        print(f"  command id: {prepared.get('commandId') or '-'}")
+        if prepared.get("preparedTransactionHash"):
+            print(f"  prep hash:  {short(str(prepared.get('preparedTransactionHash')), 80)}")
+        print(f"  update:     {short(str(update.get('updateId') or '-'), 80)}")
+        print(f"  offset:     {update.get('offset') or '-'}")
+        print(f"  act-as:     {party_list_summary(prepared.get('actAs') or [])}")
+        print(f"  read-as:    {party_list_summary(update.get('readAs') or [])}")
+        print("")
+        print(color.apply("Committed state diff", "cyan", "bold"))
+        print_count_diff(diff.get("stateDiff") or {}, None, color)
+        return
 
-    print(color.apply("Operation", "cyan", "bold"))
-    print(f"  prepared:  {command_row_text(first_command) if first_command else '-'}")
-    print(f"  committed: {event_row_text(first_root) if first_root else '-'}")
-    print(f"  shape:     {operation_shape_summary(first_command, first_root, color)}")
-    print("")
-
-    print(color.apply("Field diff", "cyan", "bold"))
-    if not command_rows and not root_rows:
-        print("  no commands")
+    # Compact path
+    n_value, n_only_a, n_only_b = _count_command_event_diffs(command_rows, root_rows)
+    if has_differences:
+        total = n_value + n_only_a + n_only_b
+        parts: list[str] = []
+        if n_value:
+            parts.append(f"{n_value} value")
+        if n_only_a:
+            parts.append(f"{n_only_a} only-in-A")
+        if n_only_b:
+            parts.append(f"{n_only_b} only-in-B")
+        diffs = "differences" if total != 1 else "difference"
+        hdr = color.apply("✗", "red", "bold") + f" {total} {diffs} ({', '.join(parts)})"
     else:
-        for index in range(max(len(command_rows), len(root_rows))):
-            cmd = command_rows[index] if index < len(command_rows) else None
-            root = root_rows[index] if index < len(root_rows) else None
-            if cmd and root and command_event_key(cmd) == event_compare_key(root):
-                print(f"  [{index}] {command_row_text(cmd)}")
-                print_argument_field_diff(cmd, root, color)
-                print_party_fields(root)
-            elif cmd:
-                print(f"  [{index}] command only: {command_row_text(cmd)}")
-            else:
-                print(f"  [{index}] event only:   {event_row_text(root)}")
+        hdr = color.apply("✓", "green", "bold") + " no differences"
+    print(f"{hdr}     kind: prepared-vs-update")
     print("")
 
-    print(color.apply("Context", "cyan", "bold"))
-    print(f"  command id: {prepared.get('commandId') or '-'}")
-    if prepared.get("preparedTransactionHash"):
-        print(f"  prep hash:  {short(str(prepared.get('preparedTransactionHash')), 80)}")
-    print(f"  update:     {short(str(update.get('updateId') or '-'), 80)}")
-    print(f"  offset:     {update.get('offset') or '-'}")
-    print(f"  act-as:     {party_list_summary(prepared.get('actAs') or [])}")
-    print(f"  read-as:    {party_list_summary(update.get('readAs') or [])}")
+    cmd_id = short(str(prepared.get("commandId") or "-"), 20)
+    update_id = short(str(update.get("updateId") or "-"), 12)
+    print(f"  A  command {cmd_id}   (prepared)")
+    print(f"  B  update {update_id}  @ offset {update.get('offset') or '-'}   (committed)")
     print("")
 
-    print(color.apply("Committed state diff", "cyan", "bold"))
-    print_count_diff(diff.get("stateDiff") or {}, None, color)
+    print("  Events")
+    _print_command_event_rows_compact(command_rows, root_rows, color, indent="    ")
+    print("")
+
+    act_as = list_str(prepared.get("actAs") or [])
+    read_as = list_str(update.get("readAs") or [])
+    ctx_parts: list[str] = []
+    if act_as:
+        ctx_parts.append("act-as " + ", ".join(short_party(p) for p in act_as[:2]))
+    if read_as:
+        ctx_parts.append("read-as " + ", ".join(short_party(p) for p in read_as[:2]))
+    sync = update.get("recordTime")
+    if sync:
+        ctx_parts.append(f"sync {sync}")
+    if ctx_parts:
+        print(f"  Context   {'   '.join(ctx_parts)}")
 
 
 def print_prepared_completion_comparison(
