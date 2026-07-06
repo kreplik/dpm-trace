@@ -1,0 +1,14 @@
+# Compact prepared-vs-completion comparison: failed and committed cases.
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-fail.json --color never | FileCheck %s --check-prefix=FAIL
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-ok.json --color never | FileCheck %s --check-prefix=OK
+
+# FAIL: ✗ completion failed — FAILED_PRECONDITION{{.*}}kind: prepared-vs-completion
+# FAIL: A  command{{.*}}(prepared)
+# FAIL: B  completion dpm-trace-fail-001{{.*}}offset 99{{.*}}FAILED_PRECONDITION
+# FAIL: 'count must be non-negative'
+# FAIL: Context{{.*}}submission{{.*}}sync 2026-06-28T10:00:55Z
+
+# OK: ✓ completion committed{{.*}}kind: prepared-vs-completion
+# OK: A  command{{.*}}(prepared)
+# OK: B  completion dpm-trace-ok-001{{.*}}update{{.*}}offset 101
+# OK: Context{{.*}}submission{{.*}}sync 2026-06-28T10:00:55Z

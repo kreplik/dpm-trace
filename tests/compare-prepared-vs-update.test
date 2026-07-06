@@ -1,0 +1,9 @@
+# Compact prepared-vs-update comparison: matching fixtures produce no differences.
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --update %root/tests/fixtures/compare/trace-a.json --color never | FileCheck %s
+
+# CHECK: ✓ no differences     kind: prepared-vs-update
+# CHECK: A  command{{.*}}(prepared)
+# CHECK: B  update{{.*}}@ offset 101{{.*}}(committed)
+# CHECK: Events
+# CHECK: = create Counter:Counter{{.*}}fields match
+# CHECK: Context{{.*}}act-as{{.*}}read-as

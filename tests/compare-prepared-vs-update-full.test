@@ -1,0 +1,18 @@
+# Exercises print_prepared_update_comparison: per-field argument diffs and
+# party fields (acting, signatories, witnesses) from the committed event with full output.
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --update %root/tests/fixtures/compare/trace-a.json --color never --full | FileCheck %s
+
+# CHECK: DPM trace comparison
+# CHECK: kind:   prepared-vs-update
+# CHECK: result: no visible differences
+# CHECK: Field diff
+# CHECK: [0] CREATE Counter:Counter
+# CHECK: arguments:
+# CHECK: (matches)
+# CHECK: count: 0
+# CHECK: owner:{{.*}}Alice
+# CHECK: acting:{{.*}}Alice
+# CHECK: signatories:{{.*}}Alice
+# CHECK: witnesses:{{.*}}Alice
+# CHECK: Context
+# CHECK: command id: dpm-trace-prepare-001

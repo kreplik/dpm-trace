@@ -1,0 +1,12 @@
+# Compact update-vs-update comparison: two different fixture traces showing
+# only-in-A / only-in-B events and child event indentation.
+# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare %root/tests/fixtures/compare/trace-a.json %root/tests/fixtures/compare/trace-b.json --color never | FileCheck %s
+
+# CHECK: ✗{{.*}}differences{{.*}}1 only-in-A, 1 only-in-B{{.*}}kind: update-vs-update
+# CHECK: A  update{{.*}}@ offset 101{{.*}}(baseline)
+# CHECK: B  update{{.*}}@ offset 202{{.*}}(candidate)
+# CHECK: Events
+# CHECK: - create Counter:Counter{{.*}}only in A
+# CHECK: + exercise Token:Token{{.*}}only in B
+# CHECK: + create Token:Token{{.*}}only in B
+# CHECK: Context{{.*}}read-as{{.*}}sync
