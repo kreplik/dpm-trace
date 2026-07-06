@@ -2057,7 +2057,7 @@ def print_comparison(
         print_prepared_update_comparison(comparison, color, compact=compact)
         return
     if kind == "prepared-vs-completion":
-        print_prepared_completion_comparison(comparison, color, source_index=source_index, max_source_locations=max_source_locations)
+        print_prepared_completion_comparison(comparison, color, source_index=source_index, max_source_locations=max_source_locations, compact=compact)
         return
 
     print(color.apply("DPM trace comparison", "bold"))
@@ -2404,6 +2404,7 @@ def print_prepared_completion_comparison(
     color: Color,
     source_index: SourceIndex | None = None,
     max_source_locations: int = 5,
+    compact: bool = True,
 ) -> None:
     prepared = comparison.get("left") or {}
     completion = comparison.get("right") or {}
@@ -2411,6 +2412,44 @@ def print_prepared_completion_comparison(
     status_code = completion.get("statusCode")
     committed = bool(diff.get("committedUpdateAvailable"))
     failed = status_code not in (None, "OK", 0, "0") and not committed
+
+    if compact:
+        cmd_id = prepared.get("commandId") or "-"
+        completion_cmd_id = completion.get("commandId") or "-"
+        update_id = short(str(completion.get("updateId") or ""), 12) or "-"
+        offset = completion.get("offset") or "-"
+        submission_id = completion.get("submissionId") or "-"
+        message = completion.get("message")
+
+        if failed:
+            hdr = color.apply("✗", "red", "bold") + f" completion failed — {status_code or 'FAILED'}"
+        elif committed:
+            hdr = color.apply("✓", "green", "bold") + " completion committed"
+        else:
+            hdr = color.apply("?", "yellow", "bold") + " completion pending"
+        print(f"{hdr}     kind: prepared-vs-completion")
+        print("")
+
+        print(f"  A  command {short(cmd_id, 20)}   (prepared)")
+        if committed:
+            print(f"  B  completion {short(completion_cmd_id, 20)}   update {update_id}   offset {offset}")
+        else:
+            print(f"  B  completion {short(completion_cmd_id, 20)}   offset {offset}   {status_code or '-'}")
+        print("")
+
+        if message and failed:
+            print(f"  {color.apply(repr(str(message)), 'yellow')}")
+            print("")
+
+        ctx_parts: list[str] = []
+        if submission_id and submission_id != "-":
+            ctx_parts.append(f"submission {short(submission_id, 20)}")
+        sync = completion.get("synchronizerTime")
+        if sync:
+            ctx_parts.append(f"sync {sync}")
+        if ctx_parts:
+            print(f"  Context   {'   '.join(ctx_parts)}")
+        return
 
     print(color.apply("DPM trace comparison", "bold"))
     print("  kind:   prepared-vs-completion")
