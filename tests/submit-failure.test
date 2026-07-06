@@ -1,0 +1,15 @@
+# Exercises the compact submit failure output: print_failed_submission with
+# source diagnostics, simulating what run_submit does on a rejected submission.
+# RUN: %python %root/tests/check-submit-failure.py | FileCheck %s
+
+# CHECK: ✗ submission failed  FAILED_PRECONDITION
+# CHECK: 'count must be non-negative'
+# CHECK: Command{{.*}}(what you sent)
+# CHECK: create Asset:Asset
+# CHECK: act-as Alice::{{.*}}command id dpm-trace-fail-001
+# CHECK: Where{{.*}}(best match first)
+# CHECK: Sample.daml:{{[0-9]+}}{{.*}}[text match]
+# CHECK: > {{[0-9]+}} |{{.*}}count must be non-negative
+# CHECK: Logs{{.*}}canton-fixture.log:{{[0-9]+}}{{.*}}matched by
+# CHECK: Next
+# CHECK: dpm trace compare --command-id dpm-trace-fail-001
