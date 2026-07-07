@@ -1,0 +1,16 @@
+# Verbose submit failure output via --full: full completion trace with
+# source diagnostics showing file paths, snippets, and basis labels.
+# RUN: %python %root/tests/check-submit-failure.py --full | FileCheck %s
+
+# CHECK: DPM trace completion
+# CHECK: result:     completion failed
+# CHECK: command id: dpm-trace-fail-001
+# CHECK: submission: dpm-trace-fixture-sub-fail-001
+# CHECK: offset:     99
+# CHECK: status:     FAILED_PRECONDITION
+# CHECK: message:    count must be non-negative
+# CHECK: Source diagnostics
+# CHECK: Sample.daml:{{[0-9]+}}
+# CHECK: > {{[0-9]+}} |{{.*}}count must be non-negative
+# CHECK: Log matches
+# CHECK: canton-fixture.log

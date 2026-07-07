@@ -18,3 +18,11 @@ template Vault
       do
         assertMsg "sample boundary violated" (amount <= balance)
         pure ()
+
+    choice Decrement : ContractId Vault
+      with
+        value : Int
+      controller owner
+      do
+        assertMsg "count must be non-negative" (balance - value >= 0)
+        create this with balance = balance - value

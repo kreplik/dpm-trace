@@ -1,0 +1,15 @@
+# Submit failure output when source is located via simulated damlc inspect data.
+# Seeding inspect_modules/module_files exercises the [debug-info] label path
+# without requiring the damlc toolchain.
+# RUN: %python %root/tests/check-submit-failure.py --debug-info | FileCheck %s
+
+# CHECK: ✗ submission failed  FAILED_PRECONDITION
+# CHECK: 'count must be non-negative'
+# CHECK: Command{{.*}}(what you sent)
+# CHECK: create Asset:Asset
+# CHECK: Where{{.*}}(best match first)
+# CHECK: Sample.daml:{{[0-9]+}}{{.*}}[debug-info]
+# CHECK: > {{[0-9]+}} |{{.*}}count must be non-negative
+# CHECK: Logs{{.*}}canton-fixture.log:{{[0-9]+}}{{.*}}matched by
+# CHECK: Next
+# CHECK: dpm trace compare --command-id dpm-trace-fail-001
