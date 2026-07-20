@@ -1,0 +1,7 @@
+# Exercises command-building helpers without any network calls:
+# parse_scalar coercion, parse_arg_assignments, command_arguments (--arg overlay
+# on --args-json / --args-file), normalize_commands_json shape variants,
+# explicit_js_command (create vs exercise), and prepare_user_id default user-id logic.
+# RUN: %python %root/tests/check-command-build.py %root | FileCheck %s
+
+# CHECK: dpm trace command-build checks passed
