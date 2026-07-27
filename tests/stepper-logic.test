@@ -1,0 +1,6 @@
+# Daml-independent: exercises Stepper._preorder, show_tree, Breakpoint.matches,
+# and step_variables against an inline fixture, so it runs without a Canton node
+# or Daml toolchain. run() is never invoked.
+# RUN: %python %root/tests/check-stepper.py %root | FileCheck %s
+
+# CHECK: dpm trace stepper checks passed
