@@ -516,6 +516,8 @@ def test_main(argv: list[str]) -> int:
     parser.add_argument("--no-unittests", action="store_true", help="With --init, do not scaffold the unittests/ package.")
     parser.add_argument("--no-ci", action="store_true", help="With --init, do not scaffold the GitHub Actions workflow.")
     parser.add_argument("--verbose", action="store_true", help="Verbose integration output: show per-test commands and the Canton log tail on failure.")
+    parser.add_argument("--sequencer-type", choices=["bft", "non-bft"], default="bft",
+                        help="Canton sequencer type for --integration. Defaults to bft.")
     args = parser.parse_args(argv)
     try:
         return run_test(args)
@@ -647,7 +649,7 @@ def run_integration_tests(args: argparse.Namespace) -> int:
         seq_pub, seq_admin, med_admin = ports[:3]
         participant_ports = [tuple(ports[3 + 3 * i: 6 + 3 * i]) for i in range(num_participants)]
         participant_urls = [f"http://127.0.0.1:{trio[2]}" for trio in participant_ports]
-        (work / "canton.conf").write_text(canton_config_text(seq_pub, seq_admin, med_admin, participant_ports))
+        (work / "canton.conf").write_text(canton_config_text(seq_pub, seq_admin, med_admin, participant_ports, getattr(args, "sequencer_type", "bft")))
         (work / "bootstrap.canton").write_text(canton_bootstrap_text(dar, placements, num_participants))
 
         endpoints = ", ".join(f"participant{i + 1} :{participant_ports[i][2]}" for i in range(num_participants))
@@ -731,6 +733,7 @@ def canton_config_text(
     seq_admin: int,
     med_admin: int,
     participant_ports: list[tuple[int, int, int]],
+    sequencer_type: str = "bft",
 ) -> str:
     blocks = []
     for index, (p_admin, p_ledger, p_http) in enumerate(participant_ports, start=1):
@@ -743,14 +746,14 @@ def canton_config_text(
             f"    }}"
         )
     participants = "\n".join(blocks)
+    seq_type_line = "      sequencer.type = BFT\n" if sequencer_type == "bft" else ""
     return f"""canton {{
   sequencers {{
     sequencer1 {{
       storage.type = memory
       public-api.port = {seq_pub}
       admin-api.port = {seq_admin}
-      sequencer.type = BFT
-    }}
+{seq_type_line}    }}
   }}
   mediators {{
     mediator1 {{
