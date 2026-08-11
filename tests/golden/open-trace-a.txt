@@ -1,0 +1,29 @@
+$ dpm trace open tests/fixtures/compare/trace-a.json --color never
+--- exit: 0
+--- stdout:
+Trace artifact
+  schema:       dpm-trace/trace-artifact/v0
+  update:       update-fixture-trace-a-0001
+  kind:         committed-update
+  source:       ledger-json-api
+  read-as:      Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
+  events:       1
+Canton trace
+  update:       update-fixture-trace-a-0001
+  source:       ledger-json-api (http://localhost:7575/v2/updates/update-by-id)
+  offset:       101
+  record time:  2024-01-15T10:00:55Z
+  synchronizer: synchronizer::sync0000000000000000000000000000000000000000000001
+  read-as:      Alice (Alice::aaaaaaaa...000001)
+  visibility:   Authorized participant projection. Private data outside these party rights is not available.
+  events:       +1 create, >0 exercise, x0 archive
+  parties:
+    Alice = Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
+
+Trace
+`-- [#1:0] CREATE Counter:Counter
+    |-- contract: 00aabbcc001122334455667788990011aabbcc001122334455667788990011aa
+    |-- actors: Alice
+    |-- signatories: Alice
+    |-- witnesses: Alice
+    `-- payload: { owner: Alice, count: 0 }

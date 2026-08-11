@@ -1,0 +1,4 @@
+$ python tests/check-test-report.py <root>
+--- exit: 0
+--- stdout:
+dpm trace test parser/mapping checks passed

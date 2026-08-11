@@ -1,0 +1,37 @@
+$ dpm trace open tests/fixtures/compare/trace-b.json --color never
+--- exit: 0
+--- stdout:
+Trace artifact
+  schema:       dpm-trace/trace-artifact/v0
+  update:       update-fixture-trace-b-0002
+  kind:         committed-update
+  source:       ledger-json-api
+  read-as:      Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
+  events:       2
+Canton trace
+  update:       update-fixture-trace-b-0002
+  source:       ledger-json-api (http://localhost:7575/v2/updates/update-by-id)
+  offset:       202
+  record time:  2024-01-15T10:01:55Z
+  synchronizer: synchronizer::sync0000000000000000000000000000000000000000000001
+  read-as:      Alice (Alice::aaaaaaaa...000001)
+  visibility:   Authorized participant projection. Private data outside these party rights is not available.
+  events:       +1 create, >1 exercise, x0 archive
+  parties:
+    Alice = Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
+    Bob = Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002
+
+Trace
+`-- [#2:0] EXERCISE Token:Token.Transfer
+    |-- contract: 00ccddee001122334455667788990011ccddee001122334455667788990011cc
+    |-- consuming: true
+    |-- actors: Alice
+    |-- signatories: Alice
+    |-- observers: Bob
+    |-- witnesses: Alice, Bob
+    |-- argument: { newOwner: Bob }
+    `-- [#2:1] CREATE Token:Token
+        |-- contract: 00ccddee001122334455667788990011ccddee001122334455667788990022dd
+        |-- signatories: Bob
+        |-- witnesses: Alice, Bob
+        `-- payload: { owner: Bob }

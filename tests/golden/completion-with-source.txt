@@ -1,0 +1,22 @@
+$ dpm trace --completion-file examples/failed-with-source.completion.json --daml-yaml tests/fixtures/source-pkg/daml.yaml --color never
+--- exit: 0
+--- stdout:
+DPM trace completion
+  result:     completion failed
+  command id: dpm-trace-demo-withdraw-too-much
+  submission: dpm-trace-demo-submission
+  update id:  -
+  offset:     42
+  status:     FAILED_PRECONDITION
+  message:    Insufficient balance
+  trace:      no committed transaction tree is available for this completion
+
+Source diagnostics
+  <root>/tests/fixtures/source-pkg/FailureDemo.daml:20:18
+  basis: local source
+    18 |           abort "Withdrawal amount must be positive"
+    19 |         else if amount > balance then
+  > 20 |           abort "Insufficient balance"
+                          ^
+    21 |         else
+    22 |           create this with balance = balance - amount

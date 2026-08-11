@@ -1,0 +1,11 @@
+$ dpm trace compare --prepared tests/fixtures/compare/prepared.json --completion-file tests/fixtures/compare/completion-fail.json --color never
+--- exit: 0
+--- stdout:
+✗ completion failed — FAILED_PRECONDITION     kind: prepared-vs-completion
+
+  A  command dpm-trace-prepare...   (prepared)
+  B  completion dpm-trace-fail-001   offset 99   FAILED_PRECONDITION
+
+  'count must be non-negative'
+
+  Context   submission dpm-trace-fixture...   sync 2026-06-28T10:00:55Z

@@ -1,0 +1,12 @@
+$ dpm trace compare --prepared tests/fixtures/compare/prepared.json --update tests/fixtures/compare/trace-a.json --color never
+--- exit: 0
+--- stdout:
+✓ no differences     kind: prepared-vs-update
+
+  A  command dpm-trace-prepare...   (prepared)
+  B  update update-fi...  @ offset 101   (committed)
+
+  Events
+    = create Counter:Counter                             (2 fields match)
+
+  Context   act-as Alice::aaaaaaaa...000001   read-as Alice::aaaaaaaa...000001   sync 2024-01-15T10:00:55Z

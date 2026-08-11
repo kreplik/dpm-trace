@@ -1,0 +1,127 @@
+$ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/trace-b.json --print-json
+--- exit: 0
+--- stdout:
+{
+  "diff": {
+    "eventCounts": {
+      "left": {
+        "archive": 0,
+        "create": 1,
+        "exercise": 0,
+        "other": 0
+      },
+      "right": {
+        "archive": 0,
+        "create": 1,
+        "exercise": 1,
+        "other": 0
+      }
+    },
+    "rootEvents": {
+      "left": [
+        {
+          "actingParties": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          ],
+          "children": [],
+          "choice": null,
+          "contractId": "00aabbcc001122334455667788990011aabbcc0011223...",
+          "eventId": "#1:0",
+          "kind": "create",
+          "observers": [],
+          "result": null,
+          "signatories": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          ],
+          "template": "pkg1aabb:Counter:Counter",
+          "value": {
+            "count": 0,
+            "owner": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          },
+          "valueLabel": "payload",
+          "witnesses": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          ]
+        }
+      ],
+      "right": [
+        {
+          "actingParties": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          ],
+          "children": [
+            {
+              "actingParties": [],
+              "children": [],
+              "choice": null,
+              "contractId": "00ccddee001122334455667788990011ccddee0011223...",
+              "eventId": "#2:1",
+              "kind": "create",
+              "observers": [],
+              "result": null,
+              "signatories": [
+                "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+              ],
+              "template": "pkg2ccdd:Token:Token",
+              "value": {
+                "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+              },
+              "valueLabel": "payload",
+              "witnesses": [
+                "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+                "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+              ]
+            }
+          ],
+          "choice": "Transfer",
+          "contractId": "00ccddee001122334455667788990011ccddee0011223...",
+          "eventId": "#2:0",
+          "kind": "exercise",
+          "observers": [
+            "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+          ],
+          "result": null,
+          "signatories": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+          ],
+          "template": "pkg2ccdd:Token:Token",
+          "value": {
+            "newOwner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+          },
+          "valueLabel": "argument",
+          "witnesses": [
+            "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+            "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+          ]
+        }
+      ]
+    },
+    "templatesOnlyInLeft": [
+      "pkg1aabb:Counter:Counter"
+    ],
+    "templatesOnlyInRight": [
+      "pkg2ccdd:Token:Token"
+    ]
+  },
+  "kind": "update-vs-update",
+  "left": {
+    "events": 1,
+    "offset": "101",
+    "readAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "recordTime": "2024-01-15T10:00:55Z",
+    "source": "ledger-json-api",
+    "updateId": "update-fixture-trace-a-0001"
+  },
+  "right": {
+    "events": 2,
+    "offset": "202",
+    "readAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "recordTime": "2024-01-15T10:01:55Z",
+    "source": "ledger-json-api",
+    "updateId": "update-fixture-trace-b-0002"
+  }
+}
