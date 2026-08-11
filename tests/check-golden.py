@@ -36,14 +36,16 @@ CASES: dict[str, list[str]] = {
     "open-trace-b-json": ["open", "tests/fixtures/compare/trace-b.json", "--print-json"],
 
     # ── trace: reassignment rendering ────────────────────────────────────────
+    # Captured from a real two-synchronizer Canton, not hand-written. These stay
+    # skipped until the reassignment branch merges.
     "open-reassign-unassign": [
-        "open", "tests/fixtures/reassignment/unassign-artifact.json", "--color", "never",
+        "open", "tests/fixtures/reassignment/real-unassign-artifact.json", "--color", "never",
     ],
     "open-reassign-assign": [
-        "open", "tests/fixtures/reassignment/assign-artifact.json", "--color", "never",
+        "open", "tests/fixtures/reassignment/real-assign-artifact.json", "--color", "never",
     ],
     "open-reassign-assign-json": [
-        "open", "tests/fixtures/reassignment/assign-artifact.json", "--print-json",
+        "open", "tests/fixtures/reassignment/real-assign-artifact.json", "--print-json",
     ],
 
     # ── compare: prepared vs completion ──────────────────────────────────────
@@ -110,7 +112,7 @@ CASES: dict[str, list[str]] = {
 
     # ── usage / error surfaces ───────────────────────────────────────────────
     "open-missing-file": ["open", "tests/fixtures/does-not-exist.json"],
-    "open-not-an-artifact": ["open", "tests/fixtures/reassignment/assign-update.json"],
+    "open-not-an-artifact": ["open", "tests/fixtures/reassignment/real-assign-update.json"],
 }
 
 # Driver scripts that exercise code paths the CLI cannot reach offline --
