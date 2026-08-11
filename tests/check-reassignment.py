@@ -99,6 +99,38 @@ def main() -> int:
     check("one event", len(single.events_by_id) == 1, len(single.events_by_id))
     check("kind is assign", list(single.events_by_id.values())[0].kind == "assign")
 
+    # ── real Canton captures ──────────────────────────────────────────────────
+    # Recorded from Canton 3.5 with two synchronizers and an explicit
+    # unassign/assign. The wrapper keys and envelope differ from the synthetic
+    # fixtures above, which is why both shapes are covered: an earlier version
+    # of this parser handled only the synthetic names and produced untyped
+    # events against a real ledger while every test still passed.
+    section("real Canton capture: unassign")
+    real_un = load("real-unassign-update.json", [])
+    run = list(real_un.events_by_id.values())[0]
+    check("kind is unassign", run.kind == "unassign", run.kind)
+    check("template", (run.template or "").endswith(":Iou:Iou"), run.template)
+    check("contract id", bool(run.contract_id), run.contract_id)
+    check("source is sync-a", (run.source_synchronizer or "").startswith("sync-a::"), run.source_synchronizer)
+    check("target is sync-b", (run.target_synchronizer or "").startswith("sync-b::"), run.target_synchronizer)
+    check("counter", run.reassignment_counter == 1, run.reassignment_counter)
+    check("submitter", (run.submitter or "").startswith("Alice::"), run.submitter)
+    check("reassignment id", bool(run.reassignment_id), run.reassignment_id)
+    check("top-level synchronizer is source",
+          (real_un.synchronizer_id or "").startswith("sync-a::"), real_un.synchronizer_id)
+
+    section("real Canton capture: assign")
+    real_as = load("real-assign-update.json", [])
+    ras = list(real_as.events_by_id.values())[0]
+    check("kind is assign", ras.kind == "assign", ras.kind)
+    check("template from nested created", (ras.template or "").endswith(":Iou:Iou"), ras.template)
+    check("payload from nested created", isinstance(ras.payload, dict) and "amount" in ras.payload, ras.payload)
+    check("signatories from nested created", len(ras.signatories) == 1, ras.signatories)
+    check("observers from nested created", len(ras.observers) == 1, ras.observers)
+    check("counter", ras.reassignment_counter == 1, ras.reassignment_counter)
+    check("top-level synchronizer is target",
+          (real_as.synchronizer_id or "").startswith("sync-b::"), real_as.synchronizer_id)
+
     # ── labels and counts ─────────────────────────────────────────────────────
     section("labels and counts")
     check("assign label", event_kind_label("assign") == "ASSIGN", event_kind_label("assign"))

@@ -40,6 +40,11 @@ PROJECT_BOUNDARY_MARKERS = (".git", "daml.yaml", "component.yaml")
 # reassignment variants come first: an AssignedEvent nests a CreatedEvent, so
 # matching "assigned" before "createdEvent" keeps it labeled as a reassignment.
 EVENT_VARIANT_KINDS = (
+    # What the JSON Ledger API actually emits (verified against Canton 3.5).
+    # The two names are not parallel, and JsUnassignedEvent wraps its payload in
+    # a {"value": ...} envelope while JsAssignmentEvent inlines its fields.
+    ("JsUnassignedEvent", "unassign"),
+    ("JsAssignmentEvent", "assign"),
     ("unassigned", "unassign"),
     ("UnassignedEvent", "unassign"),
     ("unassignedEvent", "unassign"),
@@ -3597,6 +3602,10 @@ def normalize_event(event_id: str, event_raw: dict[str, Any]) -> TraceEvent:
             kind = "unassign"
         elif "assign" in explicit:
             kind = "assign"
+
+    # Some JSON API variants wrap their payload in a {"value": ...} envelope.
+    if kind != "event" and isinstance(variant.get("value"), dict):
+        variant = variant["value"]
 
     # An AssignedEvent carries the reassigned contract in a nested CreatedEvent;
     # look there for template/payload/stakeholders, and in the event itself for

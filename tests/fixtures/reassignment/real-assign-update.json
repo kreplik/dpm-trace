@@ -1,0 +1,62 @@
+{
+    "update": {
+        "Reassignment": {
+            "value": {
+                "updateId": "12203f07f6c7086379239e81b3ff344123a7ffd5e07a4cf70910672532610729fa4f",
+                "commandId": "8ac5fb2a-441b-4ab6-a867-3539002dc21d",
+                "workflowId": "",
+                "offset": 33,
+                "events": [
+                    {
+                        "JsAssignmentEvent": {
+                            "source": "sync-a::1220e19b470d09961acb2d17952d25309995415fa17cf09a2d60002a7fa25328e486",
+                            "target": "sync-b::1220b13f96ccbe9db7875e1d6f72af00c2dfb2cb880912d8ee0ddee87e494d7a98a1",
+                            "reassignmentId": "0012200ce3d189576eed2c5bfeb7e4ee84162e6bd9b7a406e2341d110a892300c7deba",
+                            "submitter": "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+                            "reassignmentCounter": 1,
+                            "createdEvent": {
+                                "offset": 33,
+                                "nodeId": 0,
+                                "contractId": "00e89575764e68ce627d51fa4f136402cc3320fce88707c58a20c08ddab8768a84ca121220e2579de7823a7d707f22460321a41e6ad0363c24b91d9005600a3f696656fbf7",
+                                "templateId": "4dffebf4008e845e37f602fa2d54fd596a8b605af564239fc62948c39fdb79e2:Iou:Iou",
+                                "contractKey": null,
+                                "contractKeyHash": "",
+                                "createArgument": {
+                                    "payer": "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+                                    "owner": "Bob::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+                                    "amount": {
+                                        "value": "100.0000000000",
+                                        "currency": "USD"
+                                    },
+                                    "viewers": []
+                                },
+                                "createdEventBlob": "CgMyLjESwQQKRQDolXV2TmjOYn1R+k8TZALMMyD86IcHxYogwI3auHaKhMoSEiDiV53ngjp9cH8iRgMhpB5q0DY8JLkdkAVgCj9pZlb79xIOQ2FudG9uRXhhbXBsZXMaTApANGRmZmViZjQwMDhlODQ1ZTM3ZjYwMmZhMmQ1NGZkNTk2YThiNjA1YWY1NjQyMzlmYzYyOTQ4YzM5ZmRiNzllMhIDSW91GgNJb3UizAFqyQEKTwpNOktBbGljZTo6MTIyMDI4OWFlZDcyMDIwNGYzYjg4Y2QwZWE5ODlhMDQ2ZmQzYjQ2ZjQ3ZTNiZGE3M2Q2MGYzZGUwMThjM2FmYWU2Y2IKTQpLOklCb2I6OjEyMjAyODlhZWQ3MjAyMDRmM2I4OGNkMGVhOTg5YTA0NmZkM2I0NmY0N2UzYmRhNzNkNjBmM2RlMDE4YzNhZmFlNmNiCiEKH2odChIKEDIOMTAwLjAwMDAwMDAwMDAKBwoFQgNVU0QKBAoCWgAqS0FsaWNlOjoxMjIwMjg5YWVkNzIwMjA0ZjNiODhjZDBlYTk4OWEwNDZmZDNiNDZmNDdlM2JkYTczZDYwZjNkZTAxOGMzYWZhZTZjYjJJQm9iOjoxMjIwMjg5YWVkNzIwMjA0ZjNiODhjZDBlYTk4OWEwNDZmZDNiNDZmNDdlM2JkYTczZDYwZjNkZTAxOGMzYWZhZTZjYjk28p7lxFgGAEIqCiYKJAgBEiDcwUA2ShAdWYq4gpd8crCrfgKUzhJlJdXuaQAgC9dLxhAe",
+                                "interfaceViews": [],
+                                "witnessParties": [
+                                    "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+                                ],
+                                "signatories": [
+                                    "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+                                ],
+                                "observers": [
+                                    "Bob::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+                                ],
+                                "createdAt": "2026-08-11T12:49:09.497398Z",
+                                "packageName": "CantonExamples",
+                                "representativePackageId": "4dffebf4008e845e37f602fa2d54fd596a8b605af564239fc62948c39fdb79e2",
+                                "acsDelta": true
+                            }
+                        }
+                    }
+                ],
+                "traceContext": {
+                    "traceparent": "00-bb8fd82d75d7a716eac056161480be91-1fd9ba359bc3f816-03",
+                    "tracestate": null
+                },
+                "recordTime": "2026-08-11T12:49:10.994311Z",
+                "synchronizerId": "sync-b::1220b13f96ccbe9db7875e1d6f72af00c2dfb2cb880912d8ee0ddee87e494d7a98a1",
+                "paidTrafficCost": 0
+            }
+        }
+    }
+}
