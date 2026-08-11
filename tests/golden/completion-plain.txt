@@ -1,0 +1,12 @@
+$ dpm trace --completion-file examples/failed-with-source.completion.json --color never
+--- exit: 0
+--- stdout:
+DPM trace completion
+  result:     completion failed
+  command id: dpm-trace-demo-withdraw-too-much
+  submission: dpm-trace-demo-submission
+  update id:  -
+  offset:     42
+  status:     FAILED_PRECONDITION
+  message:    Insufficient balance
+  trace:      no committed transaction tree is available for this completion

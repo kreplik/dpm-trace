@@ -1,0 +1,14 @@
+$ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/trace-b.json --color never
+--- exit: 0
+--- stdout:
+✗ 2 differences (1 only-in-A, 1 only-in-B)     kind: update-vs-update
+
+  A  update update-fi...  @ offset 101   (baseline)
+  B  update update-fi...  @ offset 202   (candidate)
+
+  Events
+    - create Counter:Counter                             only in A
+    + exercise Token:Token.Transfer                      only in B
+      + create Token:Token                                 only in B
+
+  Context   read-as Alice::aaaaaaaa...000001   sync 2024-01-15T10:00:55Z

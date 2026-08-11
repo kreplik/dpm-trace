@@ -1,0 +1,9 @@
+$ dpm trace compare --prepared tests/fixtures/compare/prepared.json --completion-file tests/fixtures/compare/completion-ok.json --color never
+--- exit: 0
+--- stdout:
+✓ completion committed     kind: prepared-vs-completion
+
+  A  command dpm-trace-prepare...   (prepared)
+  B  completion dpm-trace-ok-001   update update-fi...   offset 101
+
+  Context   submission dpm-trace-fixture...   sync 2026-06-28T10:00:55Z

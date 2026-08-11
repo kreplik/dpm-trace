@@ -1,0 +1,107 @@
+$ dpm trace open tests/fixtures/compare/trace-b.json --print-json
+--- exit: 0
+--- stdout:
+{
+  "createdAt": "<timestamp>",
+  "kind": "committed-update",
+  "packages": {
+    "available": false,
+    "darPaths": [],
+    "debugInfoPaths": [],
+    "missingDarPaths": [],
+    "missingDebugInfoPaths": [],
+    "packageIds": [
+      "pkg2ccdd"
+    ],
+    "status": "package ids captured; package/source metadata must be supplied by local project or registry"
+  },
+  "participant": {
+    "ledgerUrl": "http://localhost:7575",
+    "readAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "scanUrl": null
+  },
+  "privacy": {
+    "missingPrivateDataPolicy": "private data outside this participant projection is not present in the artifact",
+    "readAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "scope": "Authorized participant projection."
+  },
+  "schema": "dpm-trace/trace-artifact/v0",
+  "trace": {
+    "eventsById": {
+      "#2:0": {
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "argument": {
+          "newOwner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        },
+        "childEventIds": [
+          "#2:1"
+        ],
+        "choice": "Transfer",
+        "consuming": true,
+        "contractId": "00ccddee001122334455667788990011ccddee001122334455667788990011cc",
+        "eventId": "#2:0",
+        "kind": "exercise",
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "payload": null,
+        "result": null,
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "template": "pkg2ccdd:Token:Token",
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ]
+      },
+      "#2:1": {
+        "actingParties": [],
+        "argument": null,
+        "childEventIds": [],
+        "choice": null,
+        "consuming": null,
+        "contractId": "00ccddee001122334455667788990011ccddee001122334455667788990022dd",
+        "eventId": "#2:1",
+        "kind": "create",
+        "observers": [],
+        "payload": {
+          "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        },
+        "result": null,
+        "signatories": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "template": "pkg2ccdd:Token:Token",
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ]
+      }
+    },
+    "offset": "202",
+    "projection": {
+      "notGlobal": true,
+      "note": "Authorized participant projection. Private data outside these party rights is not available.",
+      "participantScoped": true,
+      "readAs": [
+        "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+      ],
+      "source": "ledger-json-api"
+    },
+    "recordTime": "2024-01-15T10:01:55Z",
+    "rootEventIds": [
+      "#2:0"
+    ],
+    "source": "ledger-json-api",
+    "sourceUrl": "http://localhost:7575/v2/updates/update-by-id",
+    "synchronizerId": "synchronizer::sync0000000000000000000000000000000000000000000001",
+    "updateId": "update-fixture-trace-b-0002"
+  }
+}

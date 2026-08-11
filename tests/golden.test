@@ -1,0 +1,12 @@
+# Byte-for-byte output check over the committed fixtures. Unlike the FileCheck
+# suites, which assert selected lines, this compares complete stdout, stderr and
+# exit codes against tests/golden/*.txt -- so an unreviewed rendering change
+# fails here even when every CHECK still matches.
+#
+# Re-record after an intentional change and review the diff:
+#   python tests/check-golden.py . --update
+#
+# Set DPM_TRACE_BIN to run the same cases against another implementation.
+# RUN: %python %root/tests/check-golden.py %root | FileCheck %s
+
+# CHECK: golden output checks passed

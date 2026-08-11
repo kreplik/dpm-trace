@@ -1,0 +1,6 @@
+$ dpm trace open tests/fixtures/does-not-exist.json
+--- exit: 1
+--- stdout:
+
+--- stderr:
+error: [Errno 2] No such file or directory: '<root>/tests/fixtures/does-not-exist.json'

@@ -1,0 +1,35 @@
+$ dpm trace compare --prepared tests/fixtures/compare/prepared.json --update tests/fixtures/compare/trace-a.json --color never --full
+--- exit: 0
+--- stdout:
+DPM trace comparison
+  kind:   prepared-vs-update
+  result: no visible differences
+
+Operation
+  prepared:  CREATE Counter:Counter
+  committed: CREATE Counter:Counter (00aabbcc001122334455667788990011aabbcc0011223...)
+  shape:     matches
+
+Field diff
+  [0] CREATE Counter:Counter
+    arguments:
+      (matches)
+        count: 0
+        owner: Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
+    acting:      Alice::aaaaaaaa...000001
+    signatories: Alice::aaaaaaaa...000001
+    witnesses:   Alice::aaaaaaaa...000001
+
+Context
+  command id: dpm-trace-prepare-001
+  prep hash:  aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899
+  update:     update-fixture-trace-a-0001
+  offset:     101
+  act-as:     Alice::aaaaaaaa...000001
+  read-as:    Alice::aaaaaaaa...000001
+
+Committed state diff
+  create   1
+  exercise 0
+  archive  0
+  other    0

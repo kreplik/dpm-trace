@@ -1,0 +1,71 @@
+$ python tests/check-command-build.py <root>
+--- exit: 0
+--- stdout:
+
+parse_scalar
+────────────────────────────────────────
+  null → None                                          PASS
+  true → True                                          PASS
+  false → False                                        PASS
+  42 → int 42                                          PASS  got=42
+  -7 → int -7                                          PASS  got=-7
+  3.14 → float                                         PASS  got=3.14
+  JSON object                                          PASS  got={'a': 1}
+  JSON array                                           PASS  got=[1, 2]
+  plain string                                         PASS  got='hello'
+  mixed str not int                                    PASS  got='123abc'
+
+parse_arg_assignments
+────────────────────────────────────────
+  count coerced to int                                 PASS  got=5
+  name stays string                                    PASS  got='Alice'
+  flag coerced to bool                                 PASS  got=True
+  missing = raises                                     PASS
+  empty key raises                                     PASS
+
+command_arguments
+────────────────────────────────────────
+  no flags → empty dict                                PASS
+  --args-json parsed                                   PASS  got={'owner': 'Alice', 'count': 0}
+  --arg overlays --args-json key                       PASS  got={'owner': 'Alice', 'count': 7}
+  --arg preserves base keys                            PASS  got={'owner': 'Alice', 'count': 7}
+  --arg only: null coercion                            PASS  got={'x': None, 'y': False}
+  --arg only: false coercion                           PASS  got={'x': None, 'y': False}
+  --args-json + --args-file raises                     PASS
+  --arg on non-dict base raises                        PASS
+
+normalize_commands_json
+────────────────────────────────────────
+  list passthrough                                     PASS  got=1
+  bare dict wrapped in list                            PASS  got=1
+  wrapper object unwrapped                             PASS  got=1
+  scalar raises                                        PASS
+  int raises                                           PASS
+
+explicit_js_command
+────────────────────────────────────────
+  create: top-level key                                PASS  got=['CreateCommand']
+  create: templateId                                   PASS
+  create: createArguments from --args-json             PASS
+  exercise: top-level key                              PASS  got=['ExerciseCommand']
+  exercise: templateId                                 PASS
+  exercise: contractId                                 PASS
+  exercise: choice                                     PASS
+  exercise: choiceArgument                             PASS
+  exercise without --contract-id raises                PASS
+  exercise without --choice raises                     PASS
+
+prepare_user_id
+────────────────────────────────────────
+  localhost → participant_admin, no warning            PASS  got='participant_admin'
+  127.0.0.1 → participant_admin, no warning            PASS  got='participant_admin'
+  remote host emits warning                            PASS
+  warning names the host                               PASS
+  remote still returns participant_admin               PASS
+  explicit --user-id returned as-is                    PASS  got='my-user'
+  token present → None (no user-id injected)           PASS
+  token_file present → None                            PASS
+
+dpm trace command-build checks passed
+--- stderr:
+warning: using default user ID with non-local participant 'remote.example.com'; pass --user-id or --token.

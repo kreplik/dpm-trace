@@ -1,0 +1,90 @@
+$ python tests/check-compare.py <root>
+--- exit: 0
+--- stdout:
+
+update-vs-update
+────────────────────────────────────────
+  kind                                        PASS  update-vs-update
+  left.updateId                               PASS  update-fixture-trace-a-0001
+  right.updateId                              PASS  update-fixture-trace-b-0002
+  left.events                                 PASS  1
+  right.events                                PASS  2
+  left counts  (create=1,exercise=0)          PASS  create=1, exercise=0
+  right counts (create=1,exercise=1)          PASS  create=1, exercise=1
+  templatesOnlyInLeft  has Counter            PASS  ['pkg1aabb:Counter:Counter']
+  templatesOnlyInRight has Token              PASS  ['pkg2ccdd:Token:Token']
+  Counter not in templatesOnlyInRight         PASS
+  Token    not in templatesOnlyInLeft         PASS
+  left  roots[0].kind                         PASS  create
+  right roots[0].kind                         PASS  exercise
+  right roots[0].choice                       PASS  Transfer
+
+prepared-vs-update
+────────────────────────────────────────
+  kind                                        PASS  prepared-vs-update
+  left.commandId                              PASS  dpm-trace-prepare-001
+  left.committed                              PASS  False
+  left.commands                               PASS  1
+  left.preparedTxHash                         PASS  aabbccddeeff0011...
+  right.updateId                              PASS  update-fixture-trace-a-0001
+  right.events                                PASS  1
+  commandCount.prepared                       PASS  1
+  commandCount.rootEvents                     PASS  1
+  stateDiff.create                            PASS  1
+  stateDiff.exercise                          PASS  0
+  stateDiff.archive                           PASS  0
+  commands[0].kind                            PASS  create
+  commands[0].template                        PASS  pkg1aabb:Counter:Counter
+  rootEvents[0].kind                          PASS  create
+
+prepared-vs-completion (failed)
+────────────────────────────────────────
+  kind                                        PASS  prepared-vs-completion
+  left.commandId                              PASS  dpm-trace-prepare-001
+  left.committed                              PASS  False
+  right.commandId                             PASS  dpm-trace-fail-001
+  right.statusCode                            PASS  FAILED_PRECONDITION
+  right.message                               PASS  count must be non-negative
+  right.updateId absent                       PASS  (absent)
+  committedUpdateAvailable                    PASS  False
+
+prepared-vs-completion (committed)
+────────────────────────────────────────
+  kind                                        PASS  prepared-vs-completion
+  right.commandId                             PASS  dpm-trace-ok-001
+  right.statusCode                            PASS  OK
+  right.updateId present                      PASS  update-fixture-trace-a-0001
+  committedUpdateAvailable                    PASS  True
+
+--print-json shape stability
+────────────────────────────────────────
+  update-vs-update keys                       PASS  ['diff', 'kind', 'left', 'right']
+  prepared-vs-update keys                     PASS  ['diff', 'kind', 'left', 'right']
+  prepared-vs-completion keys                 PASS  ['diff', 'kind', 'left', 'right']
+
+cli output — update-vs-update
+────────────────────────────────────────
+  kind: update-vs-update                      PASS  kind: update-vs-update
+  only in A                                   PASS  only in A
+  Counter:Counter                             PASS  Counter:Counter
+  Token:Token                                 PASS  Token:Token
+
+cli output — prepared-vs-update
+────────────────────────────────────────
+  kind: prepared-vs-update                    PASS  kind: prepared-vs-update
+  no differences                              PASS  no differences
+  Counter:Counter                             PASS  Counter:Counter
+  (prepared)                                  PASS  (prepared)
+
+cli output — prepared-vs-completion (fail)
+──────────────────────────────────────────
+  kind: prepared-vs-completion                PASS  kind: prepared-vs-completion
+  completion failed                           PASS  completion failed
+  status code                                 PASS  FAILED_PRECONDITION
+  error message                               PASS  count must be non-negative
+
+cli output — prepared-vs-completion (ok)
+────────────────────────────────────────
+  completion committed                        PASS  completion committed
+
+dpm trace compare checks passed

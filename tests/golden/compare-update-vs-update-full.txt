@@ -1,0 +1,26 @@
+$ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/trace-b.json --color never --full
+--- exit: 0
+--- stdout:
+DPM trace comparison
+  kind:   update-vs-update
+  result: visible differences found
+
+Updates
+  baseline:  update-fixture-trace-a-0001, offset 101, 1 events, read-as Alice::aaaaaaaa...000001
+  candidate: update-fixture-trace-b-0002, offset 202, 2 events, read-as Alice::aaaaaaaa...000001
+
+Event counts
+  create     1 -> 1   same
+  exercise   0 -> 1   +1
+  archive    0 -> 0   same
+  other      0 -> 0   same
+
+Root events
+  [0] baseline:  CREATE Counter:Counter (00aabbcc001122334455667788990011aabbcc0011223...)
+      candidate: EXERCISE Token:Token.Transfer (00ccddee001122334455667788990011ccddee0011223...)
+
+Template differences
+  only in baseline:
+    - Counter:Counter
+  only in candidate:
+    - Token:Token
