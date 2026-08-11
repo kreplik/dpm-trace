@@ -1,0 +1,43 @@
+{
+  "reassignment": {
+    "updateId": "update-reassign-assign-0002",
+    "commandId": "cmd-reassign-0001",
+    "workflowId": "",
+    "offset": 4243,
+    "recordTime": "2024-01-15T10:01:10Z",
+    "events": [
+      {
+        "assigned": {
+          "nodeId": 0,
+          "source": "sync-a::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "target": "sync-b::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002",
+          "reassignmentId": "reassign-0001",
+          "submitter": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "reassignmentCounter": 1,
+          "createdEvent": {
+            "offset": 4243,
+            "nodeId": 0,
+            "contractId": "00aabbcc001122334455667788990011aabbcc001122334455667788990011aa",
+            "templateId": "pkg1aabb:Asset:Asset",
+            "packageName": "asset",
+            "createArgument": {
+              "issuer": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+              "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002",
+              "name": "GOLD",
+              "quantity": 100
+            },
+            "signatories": [
+              "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+            ],
+            "observers": [
+              "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+            ],
+            "witnessParties": [
+              "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

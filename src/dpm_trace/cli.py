@@ -36,6 +36,31 @@ PREPARED_ARTIFACT_SCHEMA = "dpm-trace/prepared-artifact/v0"
 # parent workspace cannot inject ledger/participant settings into an unrelated
 # subproject. An explicit --config bypasses the boundary.
 PROJECT_BOUNDARY_MARKERS = (".git", "daml.yaml", "component.yaml")
+# Ledger API event variant wrappers, mapped to normalized event kinds. The
+# reassignment variants come first: an AssignedEvent nests a CreatedEvent, so
+# matching "assigned" before "createdEvent" keeps it labeled as a reassignment.
+EVENT_VARIANT_KINDS = (
+    # What the JSON Ledger API actually emits (verified against Canton 3.5).
+    # The two names are not parallel, and JsUnassignedEvent wraps its payload in
+    # a {"value": ...} envelope while JsAssignmentEvent inlines its fields.
+    ("JsUnassignedEvent", "unassign"),
+    ("JsAssignmentEvent", "assign"),
+    ("unassigned", "unassign"),
+    ("UnassignedEvent", "unassign"),
+    ("unassignedEvent", "unassign"),
+    ("assigned", "assign"),
+    ("AssignedEvent", "assign"),
+    ("assignedEvent", "assign"),
+    ("created", "create"),
+    ("CreatedEvent", "create"),
+    ("createdEvent", "create"),
+    ("exercised", "exercise"),
+    ("ExercisedEvent", "exercise"),
+    ("exercisedEvent", "exercise"),
+    ("archived", "archive"),
+    ("ArchivedEvent", "archive"),
+    ("archivedEvent", "archive"),
+)
 
 
 @dataclass
@@ -54,6 +79,12 @@ class TraceEvent:
     payload: Any = None
     argument: Any = None
     result: Any = None
+    # Reassignment (assign/unassign) metadata. Empty for transaction events.
+    source_synchronizer: str | None = None
+    target_synchronizer: str | None = None
+    reassignment_id: str | None = None
+    reassignment_counter: int | None = None
+    submitter: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -1980,7 +2011,7 @@ def prepared_summary_for_compare(prepared: dict[str, Any]) -> dict[str, Any]:
 def event_compare_row(ev: TraceEvent, events_by_id: dict[str, TraceEvent] | None = None) -> dict[str, Any]:
     value = None
     value_label = None
-    if ev.kind == "create":
+    if ev.kind in ("create", "assign"):
         value = ev.payload
         value_label = "payload"
     elif ev.kind == "exercise":
@@ -2005,6 +2036,9 @@ def event_compare_row(ev: TraceEvent, events_by_id: dict[str, TraceEvent] | None
         "observers": ev.observers,
         "witnesses": ev.witnesses,
         "actingParties": ev.acting_parties,
+        "sourceSynchronizer": ev.source_synchronizer,
+        "targetSynchronizer": ev.target_synchronizer,
+        "reassignmentCounter": ev.reassignment_counter,
         "children": children,
     }
 
@@ -2032,7 +2066,7 @@ def command_compare_row(command: dict[str, Any]) -> dict[str, Any]:
 
 
 def state_diff_counts(trace: NormalizedTrace) -> dict[str, int]:
-    counts = {"create": 0, "exercise": 0, "archive": 0, "other": 0}
+    counts = {"create": 0, "exercise": 0, "archive": 0, "assign": 0, "unassign": 0, "other": 0}
     for ev in trace.events_by_id.values():
         if ev.kind in counts:
             counts[ev.kind] += 1
@@ -2793,12 +2827,16 @@ def party_list_summary(value: Any) -> str:
 
 
 def print_count_diff(left: dict[str, Any], right: dict[str, Any] | None, color: Color) -> None:
-    for key in ("create", "exercise", "archive", "other"):
+    for key in ("create", "exercise", "archive", "assign", "unassign", "other"):
         left_value = int(left.get(key) or 0)
+        right_value = int(right.get(key) or 0) if right is not None else 0
+        # Reassignment rows are absent from most traces; only show them when one
+        # side actually has them, so existing transaction output is unchanged.
+        if key in ("assign", "unassign") and not left_value and not right_value:
+            continue
         if right is None:
             print(f"  {key:<8} {left_value}")
             continue
-        right_value = int(right.get(key) or 0)
         marker = count_marker(left_value, right_value, color)
         print(f"  {key:<8} {left_value:>3} -> {right_value:<3} {marker}")
 
@@ -2932,6 +2970,13 @@ def print_party_fields(root: dict[str, Any]) -> None:
         print(f"    observers:   {party_list_summary(obs)}")
     if wit:
         print(f"    witnesses:   {party_list_summary(wit)}")
+    source = root.get("sourceSynchronizer")
+    target = root.get("targetSynchronizer")
+    if source or target:
+        print(f"    reassignment:{short(source, 40)} -> {short(target, 40)}")
+        counter = root.get("reassignmentCounter")
+        if counter is not None:
+            print(f"    counter:     {counter}")
 
 
 def prepared_committed_field_diffs(prepared: Any, committed: Any) -> list[str]:
@@ -2995,6 +3040,8 @@ def event_kind_label(kind: str) -> str:
         "create": "CREATE",
         "exercise": "EXERCISE",
         "archive": "ARCHIVE",
+        "assign": "ASSIGN",
+        "unassign": "UNASSIGN",
     }.get(kind, kind.upper())
 
 
@@ -3460,7 +3507,11 @@ def normalize_trace(
     if not update_id:
         raise ValueError("could not find update_id/updateId in response")
 
-    events_raw = pick(tx, "events_by_id", "eventsById", "events") or {}
+    events_raw = pick(tx, "events_by_id", "eventsById", "events")
+    if events_raw is None:
+        # Single-event reassignment shape: {"reassignment": {"event": {...}}}.
+        single = pick(tx, "event")
+        events_raw = [single] if isinstance(single, dict) else {}
     events_by_id = normalize_events_map(events_raw)
 
     root_event_ids = list_str(pick(tx, "root_event_ids", "rootEventIds") or [])
@@ -3496,14 +3547,14 @@ def normalize_trace(
 
 def unwrap_transaction(raw: dict[str, Any]) -> dict[str, Any]:
     data = raw.get("data", raw)
-    for key in ("transaction", "Transaction", "TransactionTree", "update", "Update"):
+    for key in ("transaction", "Transaction", "TransactionTree", "reassignment", "Reassignment", "update", "Update"):
         if isinstance(data, dict) and isinstance(data.get(key), dict):
             return unwrap_transaction(data[key])
     if isinstance(data, dict) and isinstance(data.get("value"), dict):
         return unwrap_transaction(data["value"])
     if isinstance(data, dict) and ("events_by_id" in data or "eventsById" in data):
         return data
-    if isinstance(data, dict) and "events" in data:
+    if isinstance(data, dict) and ("events" in data or "event" in data):
         return data
     return data if isinstance(data, dict) else raw
 
@@ -3534,17 +3585,7 @@ def normalize_events_map(events_raw: Any) -> dict[str, TraceEvent]:
 def normalize_event(event_id: str, event_raw: dict[str, Any]) -> TraceEvent:
     variant = event_raw
     kind = "event"
-    for candidate, normalized in (
-        ("created", "create"),
-        ("CreatedEvent", "create"),
-        ("createdEvent", "create"),
-        ("exercised", "exercise"),
-        ("ExercisedEvent", "exercise"),
-        ("exercisedEvent", "exercise"),
-        ("archived", "archive"),
-        ("ArchivedEvent", "archive"),
-        ("archivedEvent", "archive"),
-    ):
+    for candidate, normalized in EVENT_VARIANT_KINDS:
         if isinstance(event_raw.get(candidate), dict):
             variant = event_raw[candidate]
             kind = normalized
@@ -3557,25 +3598,63 @@ def normalize_event(event_id: str, event_raw: dict[str, Any]) -> TraceEvent:
             kind = "exercise"
         elif "archive" in explicit:
             kind = "archive"
+        elif "unassign" in explicit:
+            kind = "unassign"
+        elif "assign" in explicit:
+            kind = "assign"
 
-    resolved_event_id = str(pick(variant, "event_id", "eventId", "node_id", "nodeId") or event_id)
+    # Some JSON API variants wrap their payload in a {"value": ...} envelope.
+    if kind != "event" and isinstance(variant.get("value"), dict):
+        variant = variant["value"]
+
+    # An AssignedEvent carries the reassigned contract in a nested CreatedEvent;
+    # look there for template/payload/stakeholders, and in the event itself for
+    # the reassignment metadata.
+    sources = [variant]
+    nested_created = pick(variant, "created_event", "createdEvent")
+    if isinstance(nested_created, dict):
+        sources.append(nested_created)
+
+    def field_of(*keys: str) -> Any:
+        for source in sources:
+            value = pick(source, *keys)
+            if value is not None:
+                return value
+        return None
+
+    # nodeId 0 is a real id, so fall back on absence rather than falsiness --
+    # reassignment events are commonly the only node in their update.
+    resolved = field_of("event_id", "eventId", "node_id", "nodeId")
+    resolved_event_id = str(resolved) if resolved is not None and resolved != "" else str(event_id)
     return TraceEvent(
         event_id=resolved_event_id,
         kind=kind,
-        template=template_name(pick(variant, "template_id", "templateId")),
-        contract_id=pick(variant, "contract_id", "contractId"),
-        choice=pick(variant, "choice"),
-        consuming=pick(variant, "consuming"),
-        acting_parties=list_str(pick(variant, "acting_parties", "actingParties") or []),
-        witnesses=list_str(pick(variant, "witness_parties", "witnessParties", "witnesses") or []),
-        signatories=list_str(pick(variant, "signatories") or []),
-        observers=list_str(pick(variant, "observers") or []),
-        child_event_ids=list_str(pick(variant, "child_event_ids", "childEventIds") or []),
-        payload=pick(variant, "create_arguments", "createArguments", "create_argument", "createArgument", "payload"),
-        argument=pick(variant, "choice_argument", "choiceArgument", "exercise_argument", "exerciseArgument", "argument"),
-        result=pick(variant, "exercise_result", "exerciseResult", "result"),
+        template=template_name(field_of("template_id", "templateId")),
+        contract_id=field_of("contract_id", "contractId"),
+        choice=field_of("choice"),
+        consuming=field_of("consuming"),
+        acting_parties=list_str(field_of("acting_parties", "actingParties") or []),
+        witnesses=list_str(field_of("witness_parties", "witnessParties", "witnesses") or []),
+        signatories=list_str(field_of("signatories") or []),
+        observers=list_str(field_of("observers") or []),
+        child_event_ids=list_str(field_of("child_event_ids", "childEventIds") or []),
+        payload=field_of("create_arguments", "createArguments", "create_argument", "createArgument", "payload"),
+        argument=field_of("choice_argument", "choiceArgument", "exercise_argument", "exerciseArgument", "argument"),
+        result=field_of("exercise_result", "exerciseResult", "result"),
+        source_synchronizer=pick(variant, "source", "source_synchronizer", "sourceSynchronizer"),
+        target_synchronizer=pick(variant, "target", "target_synchronizer", "targetSynchronizer"),
+        reassignment_id=pick(variant, "reassignment_id", "reassignmentId", "unassign_id", "unassignId"),
+        reassignment_counter=as_int(pick(variant, "reassignment_counter", "reassignmentCounter")),
+        submitter=pick(variant, "submitter"),
         raw=event_raw,
     )
+
+
+def as_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def infer_roots(events_by_id: dict[str, TraceEvent]) -> list[str]:
@@ -3626,17 +3705,7 @@ def link_range_children(events_by_id: dict[str, TraceEvent]) -> None:
 
 
 def event_variant(event_raw: dict[str, Any]) -> dict[str, Any]:
-    for key in (
-        "created",
-        "CreatedEvent",
-        "createdEvent",
-        "exercised",
-        "ExercisedEvent",
-        "exercisedEvent",
-        "archived",
-        "ArchivedEvent",
-        "archivedEvent",
-    ):
+    for key, _kind in EVENT_VARIANT_KINDS:
         value = event_raw.get(key)
         if isinstance(value, dict):
             return value
@@ -3707,7 +3776,7 @@ def print_pretty_trace(trace: NormalizedTrace, color: Color, source_index: "Sour
 
 
 def state_diff_summary(trace: NormalizedTrace, color: Color) -> str:
-    counts = {"create": 0, "exercise": 0, "archive": 0, "event": 0}
+    counts = {"create": 0, "exercise": 0, "archive": 0, "assign": 0, "unassign": 0, "event": 0}
     for ev in trace.events_by_id.values():
         counts[ev.kind if ev.kind in counts else "event"] += 1
     parts = [
@@ -3715,6 +3784,10 @@ def state_diff_summary(trace: NormalizedTrace, color: Color) -> str:
         color.apply(f">{counts['exercise']} exercise", "yellow"),
         color.apply(f"x{counts['archive']} archive", "red"),
     ]
+    if counts["unassign"]:
+        parts.append(color.apply(f"<{counts['unassign']} unassign", "magenta"))
+    if counts["assign"]:
+        parts.append(color.apply(f">{counts['assign']} assign", "magenta"))
     if counts["event"]:
         parts.append(color.apply(f"{counts['event']} other", "blue"))
     return ", ".join(parts)
@@ -3725,6 +3798,8 @@ def event_color(kind: str) -> str:
         "create": "green",
         "exercise": "yellow",
         "archive": "red",
+        "assign": "magenta",
+        "unassign": "magenta",
     }.get(kind, "blue")
 
 
@@ -3765,14 +3840,9 @@ def print_event_tree(
 
 
 def event_title(ev: TraceEvent, color: Color) -> str:
-    kind = ev.kind.upper()
-    kind_style = {
-        "create": "green",
-        "exercise": "yellow",
-        "archive": "red",
-    }.get(ev.kind, "blue")
+    kind_style = event_color(ev.kind)
     target = event_target(ev)
-    marker = {"create": "CREATE", "exercise": "EXERCISE", "archive": "ARCHIVE"}.get(ev.kind, kind)
+    marker = event_kind_label(ev.kind)
     return (
         color.apply(f"[{ev.event_id}]", "gray")
         + " "
@@ -3799,6 +3869,7 @@ def event_detail_lines(ev: TraceEvent, color: Color, ctx: "RenderContext", sourc
         lines.append(label_value("contract", short(ev.contract_id, 66), color))
     if ev.consuming is not None and ev.kind == "exercise":
         lines.append(label_value("consuming", str(ev.consuming).lower(), color))
+    lines.extend(reassignment_detail_lines(ev, color, ctx))
     if ev.acting_parties:
         lines.append(label_value("actors", ", ".join(ctx.party(party) for party in ev.acting_parties), color))
     if ev.signatories:
@@ -3813,6 +3884,29 @@ def event_detail_lines(ev: TraceEvent, color: Color, ctx: "RenderContext", sourc
         lines.extend(block_lines("payload", ev.payload, color, ctx))
     if ev.result is not None:
         lines.extend(block_lines("result", ev.result, color, ctx))
+    return lines
+
+
+def reassignment_detail_lines(ev: TraceEvent, color: Color, ctx: "RenderContext") -> list[str]:
+    """Source/target synchronizer and counter for assign/unassign events.
+
+    Rendered for any event carrying the metadata, so a flattened or partial
+    reassignment payload still shows where the contract moved."""
+    lines: list[str] = []
+    if ev.source_synchronizer or ev.target_synchronizer:
+        lines.append(
+            label_value(
+                "reassignment",
+                f"{short(ev.source_synchronizer, 40)} -> {short(ev.target_synchronizer, 40)}",
+                color,
+            )
+        )
+    if ev.reassignment_id:
+        lines.append(label_value("reassignment id", short(ev.reassignment_id, 66), color))
+    if ev.reassignment_counter is not None:
+        lines.append(label_value("counter", str(ev.reassignment_counter), color))
+    if ev.submitter:
+        lines.append(label_value("submitter", ctx.party(ev.submitter), color))
     return lines
 
 
@@ -3914,6 +4008,8 @@ def build_party_aliases(trace: NormalizedTrace) -> dict[str, str]:
         parties.update(ev.witnesses)
         parties.update(ev.signatories)
         parties.update(ev.observers)
+        if ev.submitter:
+            parties.add(ev.submitter)
         collect_party_ids(ev.payload, parties)
         collect_party_ids(ev.argument, parties)
         collect_party_ids(ev.result, parties)
@@ -4677,6 +4773,8 @@ class Stepper:
         print(label_value("contract", short(ev.contract_id), color))
         if ev.choice:
             print(label_value("choice", f"{ev.choice}  consuming={ev.consuming}", color))
+        for line in reassignment_detail_lines(ev, color, ctx):
+            print(line)
         if ev.acting_parties:
             print(label_value("actors", ", ".join(ctx.party(party) for party in ev.acting_parties), color))
         if ev.witnesses:
@@ -5038,6 +5136,11 @@ def event_to_json(ev: TraceEvent) -> dict[str, Any]:
         "payload": ev.payload,
         "argument": ev.argument,
         "result": ev.result,
+        "sourceSynchronizer": ev.source_synchronizer,
+        "targetSynchronizer": ev.target_synchronizer,
+        "reassignmentId": ev.reassignment_id,
+        "reassignmentCounter": ev.reassignment_counter,
+        "submitter": ev.submitter,
     }
 
 
@@ -5057,6 +5160,11 @@ def event_from_json(data: dict[str, Any]) -> TraceEvent:
         payload=data.get("payload"),
         argument=data.get("argument"),
         result=data.get("result"),
+        source_synchronizer=data.get("sourceSynchronizer"),
+        target_synchronizer=data.get("targetSynchronizer"),
+        reassignment_id=data.get("reassignmentId"),
+        reassignment_counter=as_int(data.get("reassignmentCounter")),
+        submitter=data.get("submitter"),
         raw={},
     )
 

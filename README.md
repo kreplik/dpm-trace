@@ -98,6 +98,26 @@ dpm trace --completion-file completion.json \
   --damlc daml
 ```
 
+### Event kinds
+
+The tree renders create, exercise, archive, and reassignment events. A
+reassignment update shows as `UNASSIGN` on the source synchronizer and `ASSIGN`
+on the target, each with the source/target synchronizer ids, the reassignment id
+and counter, and the submitter:
+
+```
+`-- [0] UNASSIGN Asset:Asset
+    |-- contract: 00aabbcc0011...
+    |-- reassignment: sync-a::... -> sync-b::...
+    |-- reassignment id: reassign-0001
+    |-- counter: 1
+    |-- submitter: Alice
+    `-- witnesses: Alice
+```
+
+An `ASSIGN` event also carries the reassigned contract's payload and
+stakeholders, which the Ledger API nests in the assigned event's created event.
+
 Export a trace artifact:
 
 ```bash

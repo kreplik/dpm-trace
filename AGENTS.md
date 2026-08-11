@@ -31,7 +31,7 @@ argument in `main()`; everything else is plain functions.
 
 Key areas to orient in the file:
 
-- Transaction model + normalization: `NormalizedTrace`, `TraceEvent`, `normalize_trace`, `load_update`.
+- Transaction model + normalization: `NormalizedTrace`, `TraceEvent`, `normalize_trace`, `load_update`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `EVENT_VARIANT_KINDS`; add new Ledger API variant wrappers there rather than in `normalize_event`.
 - Pretty + interactive rendering: `print_pretty_trace`, `Stepper` (the `--visualize` REPL).
 - Failed submissions / completions: `fetch_completion_by_command_id`, `normalize_completion`, `print_completion_trace`.
 - Source mapping: `SourceIndex` (loads `daml.yaml` sources and, with `--dar`, `damlc inspect`), `completion_source_needles`, `render_source_diagnostic`.

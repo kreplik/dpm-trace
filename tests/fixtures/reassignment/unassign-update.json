@@ -1,0 +1,33 @@
+{
+  "update": {
+    "Reassignment": {
+      "value": {
+        "updateId": "update-reassign-unassign-0001",
+        "commandId": "cmd-reassign-0001",
+        "workflowId": "",
+        "offset": 4242,
+        "recordTime": "2024-01-15T10:00:55Z",
+        "events": [
+          {
+            "unassigned": {
+              "nodeId": 0,
+              "offset": 4242,
+              "contractId": "00aabbcc001122334455667788990011aabbcc001122334455667788990011aa",
+              "templateId": "pkg1aabb:Asset:Asset",
+              "packageName": "asset",
+              "source": "sync-a::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+              "target": "sync-b::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002",
+              "reassignmentId": "reassign-0001",
+              "submitter": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+              "reassignmentCounter": 1,
+              "assignmentExclusivity": "2024-01-15T10:05:55Z",
+              "witnessParties": [
+                "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
