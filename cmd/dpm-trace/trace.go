@@ -18,6 +18,10 @@ import (
 // runTrace handles the bare `dpm trace` command. Only the --completion-file
 // path is ported; fetching an update by id needs internal/ledger.
 func runTrace(args []string) int {
+	if wantsHelp(args) {
+		rootHelp(os.Stdout)
+		return 0
+	}
 	var (
 		target             string
 		completionFile     string

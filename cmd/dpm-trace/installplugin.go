@@ -10,6 +10,10 @@ import (
 // runInstallPlugin registers this binary as a DPM component so it runs as
 // `dpm trace`. Ports install_plugin_main.
 func runInstallPlugin(args []string) int {
+	if wantsHelp(args) {
+		commandHelp(os.Stdout, "dpm trace install-plugin [flags]", "Register this binary as a DPM component so it runs as `dpm trace`.", installPluginFlags, "")
+		return 0
+	}
 	opts := plugin.Options{ComponentVersion: version}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]

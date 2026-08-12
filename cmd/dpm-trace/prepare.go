@@ -16,6 +16,10 @@ import (
 // This calls Canton's non-committing prepare API: nothing reaches the ledger,
 // and the artifact must never be presented as a committed transaction.
 func runPrepare(args []string) int {
+	if wantsHelp(args) {
+		commandHelp(os.Stdout, "dpm trace prepare --submitter <url> --act-as <party> --template <id> [flags]", "Prepare a command without committing it.", submissionFlags, "")
+		return 0
+	}
 	opts, spec, rc := parseSubmissionFlags("prepare", args)
 	if rc != 0 {
 		return rc

@@ -11,6 +11,10 @@ import (
 // runCompare compares two committed updates. Ports the update-vs-update branch
 // of run_compare; --prepared comparisons are not ported yet.
 func runCompare(args []string) int {
+	if wantsHelp(args) {
+		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "--command-id, fetching updates by id")
+		return 0
+	}
 	var (
 		targets        []string
 		prepared       string
