@@ -213,3 +213,116 @@ func pythonRepr(s string) string {
 	escaped = strings.ReplaceAll(escaped, "'", `\'`)
 	return "'" + escaped + "'"
 }
+
+// SubmitFailure writes the compact failure view `dpm trace submit` prints when
+// a submission is rejected. Ports print_completion_trace's compact path.
+//
+// It leads with what you sent rather than with completion metadata, because a
+// rejected submission has no transaction to inspect -- the command and the
+// error are the whole story.
+func SubmitFailure(w io.Writer, c *model.Completion, request map[string]any, color Color, index *source.Index, maxSourceLocations int) {
+	statusCode, message := c.StatusFields()
+	commandID := c.String("commandId", "command_id")
+	if commandID == "" {
+		commandID = "-"
+	}
+	offset := orDash(scalarText(c.Get("offset")))
+
+	statusText := scalarText(statusCode)
+	if statusText == "" {
+		statusText = "FAILED"
+	}
+	fmt.Fprintf(w, "%s  %s\n", color.Apply("✗ submission failed", "red", "bold"), statusText)
+	if messageText := scalarText(message); messageText != "" {
+		fmt.Fprintf(w, "  %s\n", color.Apply(pythonRepr(messageText), "yellow"))
+	}
+	fmt.Fprintln(w)
+
+	const col = 52
+	fmt.Fprintf(w, "  %-*s (what you sent)\n", col, "Command")
+	commands, _ := request["commands"].([]any)
+	for i, command := range commands {
+		if i >= 3 {
+			break
+		}
+		fmt.Fprintf(w, "    %s\n", formatCommandSummary(command))
+	}
+	actAs, _ := request["actAs"].([]string)
+	limit := actAs
+	if len(limit) > 2 {
+		limit = limit[:2]
+	}
+	rendered := make([]string, 0, len(limit))
+	for _, party := range limit {
+		rendered = append(rendered, ShortParty(party))
+	}
+	fmt.Fprintf(w, "    act-as %s    command id %s    offset %s\n",
+		strings.Join(rendered, ", "), Short(commandID, 20), offset)
+	fmt.Fprintln(w)
+
+	locations, _ := CompletionSourceDiagnostics(c, index, maxSourceLocations)
+	if len(locations) > 0 {
+		fmt.Fprintf(w, "  %-*s (best match first)\n", col, "Where")
+		fmt.Fprintln(w, IndentText(SourceDiagnostic(locations[0], index, color)))
+		fmt.Fprintln(w)
+	}
+
+	fmt.Fprintln(w, "  Next")
+	fmt.Fprintf(w, "    dpm trace compare --command-id %s --prepared <prepared.json>\n", commandID)
+}
+
+// formatCommandSummary renders one submitted command. Ports _format_command_summary.
+func formatCommandSummary(command any) string {
+	obj, ok := command.(map[string]any)
+	if !ok {
+		return fmt.Sprint(command)
+	}
+	if body, ok := commandBody(obj, "ExerciseCommand", "exerciseCommand"); ok {
+		template := orQuestion(ShortTemplate(fmt.Sprint(body["templateId"])))
+		choice := orQuestion(fmt.Sprint(body["choice"]))
+		contract := Short(fmt.Sprint(body["contractId"]), 10)
+		return strings.TrimRight(fmt.Sprintf("exercise %s:%s on %s  %s",
+			template, choice, contract, summarizeArgs(body["choiceArgument"])), " ")
+	}
+	if body, ok := commandBody(obj, "CreateCommand", "createCommand"); ok {
+		template := orQuestion(ShortTemplate(fmt.Sprint(body["templateId"])))
+		return strings.TrimRight(fmt.Sprintf("create %s  %s",
+			template, summarizeArgs(body["createArguments"])), " ")
+	}
+	return fmt.Sprint(obj)
+}
+
+func commandBody(obj map[string]any, keys ...string) (map[string]any, bool) {
+	for _, key := range keys {
+		if body, ok := obj[key].(map[string]any); ok {
+			return body, true
+		}
+	}
+	return nil, false
+}
+
+// summarizeArgs renders the first three fields in the order they were given.
+// Python iterates the dict, so --arg flag order is what shows.
+func summarizeArgs(value any) string {
+	args, ok := value.(*model.Object)
+	if !ok || args.Len() == 0 {
+		return ""
+	}
+	keys := args.Keys()
+	if len(keys) > 3 {
+		keys = keys[:3]
+	}
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		item, _ := args.Get(key)
+		parts = append(parts, key+"="+FormatScalar(item, nil))
+	}
+	return strings.Join(parts, "  ")
+}
+
+func orQuestion(value string) string {
+	if value == "" {
+		return "?"
+	}
+	return value
+}

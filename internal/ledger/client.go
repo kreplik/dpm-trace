@@ -114,9 +114,15 @@ func (c *Client) once(method, url string, body map[string]any) (*model.Object, e
 
 	data, readErr := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
-		detail := string(data)
-		err := fmt.Errorf("%s %s failed with HTTP %d: %s", method, url, resp.StatusCode, detail)
-		return nil, err, isTransientStatus(resp.StatusCode)
+		// Keep the decoded body: for submit-and-wait a rejection carries the
+		// completion data, which is all a failed submission has.
+		httpErr := &HTTPError{
+			Method: method, URL: url, StatusCode: resp.StatusCode, Detail: string(data),
+		}
+		if decoded, decodeErr := model.Decode(data); decodeErr == nil {
+			httpErr.Body = decoded
+		}
+		return nil, httpErr, isTransientStatus(resp.StatusCode)
 	}
 	if readErr != nil {
 		return nil, readErr, true
@@ -166,3 +172,26 @@ func ResolveToken(token, tokenFile string) (string, error) {
 
 // ErrNoSource is returned when neither a ledger nor a Scan endpoint is given.
 var ErrNoSource = errors.New("choose a source: --scan-url BASE with target, or --ledger-url BASE with target")
+
+// HTTPError is a non-2xx response. Body holds the decoded payload when the
+// participant returned JSON, which submit-and-wait relies on.
+type HTTPError struct {
+	Method     string
+	URL        string
+	StatusCode int
+	Detail     string
+	Body       *model.Object
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("%s %s failed with HTTP %d: %s", e.Method, e.URL, e.StatusCode, e.Detail)
+}
+
+// errorBody returns the decoded response body of an HTTP error, if any.
+func errorBody(err error) *model.Object {
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		return httpErr.Body
+	}
+	return nil
+}

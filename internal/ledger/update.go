@@ -69,3 +69,29 @@ func (c *Client) LoadScanUpdate(updateID string) (*model.Object, string, string,
 	raw, err := c.JSON("GET", url, nil, true)
 	return raw, "scan", url, err
 }
+
+// Prepare calls the non-committing interactive prepare endpoint.
+// Ports the request built in run_prepare.
+func (c *Client) Prepare(request map[string]any) (*model.Object, string, error) {
+	url := JoinURL(c.BaseURL, InteractiveSubmissionPath)
+	response, err := c.JSON("POST", url, request, true)
+	return response, url, err
+}
+
+// SubmitAndWait submits a command and waits for its completion.
+//
+// Retry is disabled: submit-and-wait is not idempotent and a retry could
+// double-submit. ok reports whether the participant accepted the submission; a
+// rejection still returns a decoded body, because that body is the completion
+// data a failed submission has instead of a transaction.
+func (c *Client) SubmitAndWait(request map[string]any) (ok bool, response *model.Object, url string, err error) {
+	url = JoinURL(c.BaseURL, SubmitAndWaitPath)
+	response, err = c.JSON("POST", url, request, false)
+	if err == nil {
+		return true, response, url, nil
+	}
+	if body := errorBody(err); body != nil {
+		return false, body, url, nil
+	}
+	return false, nil, url, err
+}
