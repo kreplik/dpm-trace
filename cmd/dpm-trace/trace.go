@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/walnuthq/dpm-trace/internal/config"
 	"github.com/walnuthq/dpm-trace/internal/ledger"
@@ -28,6 +30,10 @@ func runTrace(args []string) int {
 		token              string
 		tokenFile          string
 		configPath         string
+		exportPath         string
+		waitSeconds        float64
+		dar                []string
+		printJSON          bool
 	)
 	for i := 0; i < len(args); i++ {
 		switch arg := args[i]; arg {
@@ -52,7 +58,7 @@ func runTrace(args []string) int {
 			}
 			i++
 			damlYAML = append(damlYAML, args[i])
-		case "--dar", "--damlc", "--debug-info":
+		case "--damlc", "--debug-info":
 			fmt.Fprintf(os.Stderr, "error: %s needs damlc inspect, which is not ported yet; use python -m dpm_trace.cli\n", arg)
 			return 2
 		case "--submitter", "--ledger-url":
@@ -83,6 +89,34 @@ func runTrace(args []string) int {
 			}
 			i++
 			token = args[i]
+		case "--export", "--out":
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: %s requires a path\n", arg)
+				return 2
+			}
+			i++
+			exportPath = args[i]
+		case "--print-json":
+			printJSON = true
+		case "--wait":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --wait requires seconds")
+				return 2
+			}
+			i++
+			parsed, err := strconv.ParseFloat(args[i], 64)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: --wait must be a number: %q\n", args[i])
+				return 2
+			}
+			waitSeconds = parsed
+		case "--dar":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --dar requires a path")
+				return 2
+			}
+			i++
+			dar = append(dar, args[i])
 		case "--config":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --config requires a path")
@@ -153,16 +187,21 @@ func runTrace(args []string) int {
 		sourceTag string
 		url       string
 	)
-	switch {
-	case scanURL != "":
-		raw, sourceTag, url, err = ledger.New(scanURL, resolvedToken).LoadScanUpdate(target)
-	case ledgerURL != "":
-		raw, sourceTag, url, err = ledger.New(ledgerURL, resolvedToken).LoadUpdate(target, readAs)
-	default:
-		fmt.Fprintf(os.Stderr, "error: %v\n", ledger.ErrNoSource)
-		return 1
+	fetch := func() error {
+		switch {
+		case scanURL != "":
+			raw, sourceTag, url, err = ledger.New(scanURL, resolvedToken).LoadScanUpdate(target)
+		case ledgerURL != "":
+			raw, sourceTag, url, err = ledger.New(ledgerURL, resolvedToken).LoadUpdate(target, readAs)
+		default:
+			return ledger.ErrNoSource
+		}
+		return err
 	}
-	if err != nil {
+	// --wait retries while the update is not yet visible, e.g. a second
+	// participant still ingesting it. Distinct from the client's retry, which
+	// retries a failing request rather than an absent update.
+	if err := fetchWithWait(fetch, waitSeconds); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
@@ -172,6 +211,47 @@ func runTrace(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	artifact := model.NewTraceArtifact(trace, ledgerURL, scanURL, dar, nil)
+	if exportPath != "" {
+		encoded, err := model.Encode(artifact)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if err := os.WriteFile(exportPath, append(encoded, '\n'), 0o644); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Printf("wrote trace artifact: %s\n", exportPath)
+	}
+	if printJSON {
+		encoded, err := model.Encode(model.TraceToJSON(trace))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(encoded))
+		return 0
+	}
 	render.PrettyTrace(os.Stdout, trace, color)
 	return 0
+}
+
+// fetchWithWait retries an absent update until the deadline. Ports
+// load_update_with_wait.
+func fetchWithWait(fetch func() error, waitSeconds float64) error {
+	err := fetch()
+	if err == nil || waitSeconds <= 0 {
+		return err
+	}
+	deadline := time.Now().Add(time.Duration(waitSeconds * float64(time.Second)))
+	for {
+		if time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(500 * time.Millisecond)
+		if err = fetch(); err == nil {
+			return nil
+		}
+	}
 }
