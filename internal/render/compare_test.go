@@ -63,3 +63,39 @@ func TestComparableEqualIgnoresScalarType(t *testing.T) {
 		t.Error("1 and 2 should not compare equal")
 	}
 }
+
+func TestPreparedUpdateComparisonMatchesGoldens(t *testing.T) {
+	root := repoRoot(t)
+	prepared, err := model.LoadPreparedArtifact(filepath.Join(root, "tests/fixtures/compare/prepared.json"))
+	if err != nil {
+		t.Fatalf("load prepared: %v", err)
+	}
+	artifact, err := model.LoadTraceArtifact(filepath.Join(root, "tests/fixtures/compare/trace-a.json"))
+	if err != nil {
+		t.Fatalf("load trace: %v", err)
+	}
+	trace, err := model.TraceFromArtifact(artifact)
+	if err != nil {
+		t.Fatalf("read trace: %v", err)
+	}
+	comparison := model.ComparePreparedToTrace(prepared, trace)
+
+	for _, tc := range []struct {
+		name    string
+		compact bool
+		golden  string
+	}{
+		{"compact", true, "tests/golden/compare-prepared-vs-update.txt"},
+		{"full", false, "tests/golden/compare-prepared-vs-update-full.txt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			PreparedUpdateComparison(&buf, comparison, Color{Enabled: false}, tc.compact)
+			got := strings.TrimRight(buf.String(), "\n")
+			want := goldenStdout(t, filepath.Join(root, tc.golden))
+			if got != want {
+				t.Errorf("differs from %s:\n%s", tc.golden, firstDifference(got, want))
+			}
+		})
+	}
+}
