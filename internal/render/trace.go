@@ -291,3 +291,52 @@ func orDashValue(value string) string {
 	}
 	return value
 }
+
+// PreparedArtifactSummary renders the header shown after a prepare.
+// Ports prepared_artifact_summary. The "committed: no" line and the closing
+// sentence are not decoration: prepared data must never read as committed.
+func PreparedArtifactSummary(artifact map[string]any) string {
+	request, _ := artifact["request"].(map[string]any)
+	response, _ := artifact["response"].(*model.Object)
+
+	commands, _ := request["commands"].([]any)
+	lines := []string{
+		"Prepared command",
+		"  schema:       " + stringField(artifact, "schema"),
+		"  endpoint:     " + orDash(stringField(artifact, "sourceUrl")),
+		"  committed:    no",
+		"  command id:   " + orDash(stringField(request, "commandId")),
+		"  act-as:       " + orDash(joinField(request, "actAs")),
+		"  read-as:      " + orDash(joinField(request, "readAs")),
+		fmt.Sprintf("  commands:     %d", len(commands)),
+	}
+	if response != nil {
+		if hash := model.ObjectString(response, "preparedTransactionHash"); hash != "" {
+			lines = append(lines, "  prepared hash:"+Short(hash, 80))
+		}
+		if _, present := response.Get("costEstimation"); present {
+			lines = append(lines, "  cost:         returned")
+		}
+	}
+	lines = append(lines, "", "This is prepared transaction data from a non-committing prepare call.")
+	return strings.Join(lines, "\n")
+}
+
+func stringField(obj map[string]any, key string) string {
+	if obj == nil {
+		return ""
+	}
+	value, ok := obj[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func joinField(obj map[string]any, key string) string {
+	if obj == nil {
+		return ""
+	}
+	values, _ := obj[key].([]string)
+	return strings.Join(values, ", ")
+}

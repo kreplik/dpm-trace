@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 // PreparedArtifactSchema is the schema string prepared artifacts carry.
@@ -189,4 +190,32 @@ func sortedKeys(obj *Object) []string {
 	keys := obj.Keys()
 	sortStrings(keys)
 	return keys
+}
+
+// NewPreparedArtifact wraps a prepare request and response for export.
+// Ports create_prepared_artifact.
+//
+// committed is always false and the privacy note is fixed: this is prepared
+// data from a non-committing call, and the artifact must never read as a
+// committed transaction.
+func NewPreparedArtifact(request map[string]any, response *Object, sourceURL, ledgerURL string, actAs, readAs []string) map[string]any {
+	return map[string]any{
+		"schema":    PreparedArtifactSchema,
+		"createdAt": time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
+		"kind":      "prepared-command",
+		"source":    "ledger-json-api",
+		"sourceUrl": sourceURL,
+		"participant": map[string]any{
+			"ledgerUrl": nilIfBlank(ledgerURL),
+			"actAs":     stringsJSON(actAs),
+			"readAs":    stringsJSON(readAs),
+		},
+		"committed": false,
+		"request":   request,
+		"response":  response,
+		"privacy": map[string]any{
+			"scope":                    "Prepared command result from an authorized participant endpoint.",
+			"missingPrivateDataPolicy": "counterparty-private data outside this authorization context is not present in the artifact",
+		},
+	}
 }
