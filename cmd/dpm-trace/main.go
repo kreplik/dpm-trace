@@ -39,6 +39,10 @@ func main() {
 		os.Exit(runOpen(args[1:]))
 	}
 
+	if len(args) > 0 && args[0] == "compare" {
+		os.Exit(runCompare(args[1:]))
+	}
+
 	fmt.Fprintln(os.Stderr, "error: this subcommand is not ported yet; use python -m dpm_trace.cli")
 	os.Exit(2)
 }
