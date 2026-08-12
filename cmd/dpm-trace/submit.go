@@ -16,6 +16,10 @@ import (
 // instead of a transaction tree. --allow-fail makes that a success exit, which
 // is how integration tests capture a rejection.
 func runSubmit(args []string) int {
+	if wantsHelp(args) {
+		commandHelp(os.Stdout, "dpm trace submit --submitter <url> --act-as <party> --template <id> [flags]", "Submit a command and print the resulting update id.", submissionFlags, "")
+		return 0
+	}
 	opts, spec, rc := parseSubmissionFlags("submit", args)
 	if rc != 0 {
 		return rc

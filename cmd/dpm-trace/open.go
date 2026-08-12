@@ -11,6 +11,10 @@ import (
 // runOpen reopens an exported trace artifact. Ports run_open, minus --visualize
 // (internal/visualizer) and source diagnostics (internal/source).
 func runOpen(args []string) int {
+	if wantsHelp(args) {
+		commandHelp(os.Stdout, "dpm trace open <artifact.json> [flags]", "Reopen an exported trace artifact.", openFlags, "--visualize")
+		return 0
+	}
 	var (
 		path      string
 		printJSON bool
