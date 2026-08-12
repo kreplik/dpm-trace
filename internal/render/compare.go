@@ -307,9 +307,9 @@ func countMarker(left, right int, color Color) string {
 
 func comparisonResult(hasDifferences bool, color Color) string {
 	if hasDifferences {
-		return color.Apply("visible differences found", "yellow")
+		return color.Apply("visible differences found", "yellow", "bold")
 	}
-	return color.Apply("no visible differences", "green")
+	return color.Apply("no visible differences", "green", "bold")
 }
 
 func traceCompareSummary(s model.TraceSummary) string {
