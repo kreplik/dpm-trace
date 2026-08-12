@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
+	"time"
 )
 
 // TraceArtifactSchema is the schema string exported artifacts carry.
@@ -122,4 +124,143 @@ func orDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// TraceToJSON renders a trace in the artifact encoding. Ports trace_to_json.
+func TraceToJSON(t *Trace) map[string]any {
+	events := map[string]any{}
+	for id, ev := range t.EventsByID {
+		events[id] = EventToJSON(ev)
+	}
+	return map[string]any{
+		"updateId":       t.UpdateID,
+		"source":         t.Source,
+		"sourceUrl":      nilIfBlank(t.SourceURL),
+		"projection":     t.Projection.json(),
+		"recordTime":     nilIfBlank(t.RecordTime),
+		"offset":         nilIfBlank(t.Offset),
+		"synchronizerId": nilIfBlank(t.SynchronizerID),
+		"rootEventIds":   stringsJSON(t.RootEventIDs),
+		"eventsById":     events,
+	}
+}
+
+// EventToJSON renders one event in the artifact encoding. Ports event_to_json.
+func EventToJSON(ev *Event) map[string]any {
+	return map[string]any{
+		"eventId":             ev.EventID,
+		"kind":                ev.Kind,
+		"template":            nilIfBlank(ev.Template),
+		"contractId":          nilIfBlank(ev.ContractID),
+		"choice":              nilIfBlank(ev.Choice),
+		"consuming":           boolOrNil(ev.Consuming),
+		"actingParties":       stringsJSON(ev.ActingParties),
+		"witnesses":           stringsJSON(ev.Witnesses),
+		"signatories":         stringsJSON(ev.Signatories),
+		"observers":           stringsJSON(ev.Observers),
+		"childEventIds":       stringsJSON(ev.ChildEventIDs),
+		"payload":             ev.Payload,
+		"argument":            ev.Argument,
+		"result":              ev.Result,
+		"sourceSynchronizer":  nilIfBlank(ev.SourceSynchronizer),
+		"targetSynchronizer":  nilIfBlank(ev.TargetSynchronizer),
+		"reassignmentId":      nilIfBlank(ev.ReassignmentID),
+		"reassignmentCounter": int64OrNil(ev.ReassignmentCounter),
+		"submitter":           nilIfBlank(ev.Submitter),
+	}
+}
+
+func (p Projection) json() map[string]any {
+	return map[string]any{
+		"source":            p.Source,
+		"participantScoped": p.ParticipantScope,
+		"readAs":            stringsJSON(p.ReadAs),
+		"notGlobal":         p.NotGlobal,
+		"note":              p.Note,
+	}
+}
+
+func boolOrNil(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+// NewTraceArtifact wraps a trace for export. Ports create_trace_artifact.
+//
+// The privacy block is not decoration: an exported artifact travels, and it
+// must carry what projection it came from and what is deliberately absent.
+func NewTraceArtifact(t *Trace, ledgerURL, scanURL string, darPaths, debugInfoPaths []string) map[string]any {
+	packageIDs := map[string]bool{}
+	for _, ev := range t.EventsByID {
+		if id := packageFromTemplate(ev.Template); id != "" {
+			packageIDs[id] = true
+		}
+	}
+	sorted := make([]string, 0, len(packageIDs))
+	for id := range packageIDs {
+		sorted = append(sorted, id)
+	}
+	sortStrings(sorted)
+
+	return map[string]any{
+		"schema":    TraceArtifactSchema,
+		"createdAt": time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
+		"kind":      "committed-update",
+		"trace":     TraceToJSON(t),
+		"participant": map[string]any{
+			"ledgerUrl": nilIfBlank(ledgerURL),
+			"scanUrl":   nilIfBlank(scanURL),
+			"readAs":    stringsJSON(t.Projection.ReadAs),
+		},
+		"packages": packageMetadataContext(darPaths, debugInfoPaths, sorted),
+		"privacy": map[string]any{
+			"scope":                    nilIfBlank(t.Projection.Note),
+			"readAs":                   stringsJSON(t.Projection.ReadAs),
+			"missingPrivateDataPolicy": "private data outside this participant projection is not present in the artifact",
+		},
+	}
+}
+
+// packageMetadataContext records which local package metadata was available.
+// Ports package_metadata_context.
+func packageMetadataContext(darPaths, debugInfoPaths, packageIDs []string) map[string]any {
+	found, missing := splitExisting(darPaths)
+	foundDebug, missingDebug := splitExisting(debugInfoPaths)
+
+	status := "package ids captured; package/source metadata must be supplied by local project or registry"
+	available := len(found) > 0 || len(foundDebug) > 0
+	if available {
+		status = "local package/source metadata attached"
+	}
+	return map[string]any{
+		"available":             available,
+		"packageIds":            stringsJSON(packageIDs),
+		"darPaths":              stringsJSON(found),
+		"debugInfoPaths":        stringsJSON(foundDebug),
+		"missingDarPaths":       stringsJSON(missing),
+		"missingDebugInfoPaths": stringsJSON(missingDebug),
+		"status":                status,
+	}
+}
+
+func splitExisting(paths []string) (found, missing []string) {
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			found = append(found, path)
+		} else {
+			missing = append(missing, path)
+		}
+	}
+	return found, missing
+}
+
+// packageFromTemplate returns the package id of a package:module:entity template.
+func packageFromTemplate(template string) string {
+	parts := strings.Split(template, ":")
+	if len(parts) >= 3 {
+		return parts[0]
+	}
+	return ""
 }

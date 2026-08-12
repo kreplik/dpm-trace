@@ -143,13 +143,6 @@ func nilIfEmpty(s string) any {
 	return s
 }
 
-func boolOrNil(b *bool) any {
-	if b == nil {
-		return nil
-	}
-	return *b
-}
-
 func intOrNil(n *int64) any {
 	if n == nil {
 		return nil
