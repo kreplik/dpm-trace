@@ -3,6 +3,7 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -241,4 +242,35 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// Python's json.dumps defaults to ensure_ascii=True, so every artifact and
+// report it has ever written escapes non-ASCII. daml test puts box-drawing
+// characters in transaction trees, so this is reachable in real output.
+func TestEncodeEscapesNonASCII(t *testing.T) {
+	obj := NewObject()
+	obj.Set("tree", "\u2514\u2500> creates")
+	encoded, err := Encode(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(encoded)
+	if !strings.Contains(got, `\u2514`) || !strings.Contains(got, `\u2500`) {
+		t.Errorf("non-ASCII not escaped: %s", got)
+	}
+	if strings.ContainsRune(got, '\u2514') {
+		t.Errorf("raw non-ASCII survived: %s", got)
+	}
+}
+
+func TestEncodeEscapesAstralAsSurrogatePair(t *testing.T) {
+	obj := NewObject()
+	obj.Set("emoji", "\U0001F600")
+	encoded, err := Encode(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(encoded); !strings.Contains(got, `\ud83d\ude00`) {
+		t.Errorf("astral rune not encoded as a surrogate pair: %s", got)
+	}
 }

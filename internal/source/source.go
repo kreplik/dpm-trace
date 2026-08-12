@@ -330,3 +330,8 @@ func containsString(values []string, want string) bool {
 	}
 	return false
 }
+
+// ModuleFiles returns the loaded files declaring a module, in load order.
+func (ix *Index) ModuleFiles(module string) []string {
+	return ix.moduleFiles[module]
+}
