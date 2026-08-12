@@ -10,7 +10,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 // Set via -ldflags at release time; see .goreleaser.yaml.
@@ -50,13 +49,10 @@ func main() {
 		}
 	}
 
-	// The bare `dpm trace` command: an update id, or a captured completion.
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") || hasFlag(args, "--completion-file") {
-		os.Exit(runTrace(args))
-	}
-
-	fmt.Fprintln(os.Stderr, "error: this subcommand is not ported yet; use python -m dpm_trace.cli")
-	os.Exit(2)
+	// Anything else is the bare `dpm trace` command: an update id, a captured
+	// completion, or flags that configure either. cli.py dispatches the same
+	// way -- only the named subcommands are special.
+	os.Exit(runTrace(args))
 }
 
 func isTTY() bool {
