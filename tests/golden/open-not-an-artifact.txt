@@ -1,0 +1,6 @@
+$ dpm trace open tests/fixtures/reassignment/real-assign-update.json
+--- exit: 1
+--- stdout:
+
+--- stderr:
+error: unsupported trace artifact schema in <root>/tests/fixtures/reassignment/real-assign-update.json: None

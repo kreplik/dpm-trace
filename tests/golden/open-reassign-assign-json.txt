@@ -1,0 +1,63 @@
+$ dpm trace open tests/fixtures/reassignment/real-assign-artifact.json --print-json
+--- exit: 0
+--- stdout:
+{
+  "createdAt": "<timestamp>",
+  "kind": "committed-update",
+  "schema": "dpm-trace/trace-artifact/v0",
+  "trace": {
+    "eventsById": {
+      "0": {
+        "actingParties": [],
+        "argument": null,
+        "childEventIds": [],
+        "choice": null,
+        "consuming": null,
+        "contractId": "00e89575764e68ce627d51fa4f136402cc3320fce88707c58a20c08ddab8768a84ca121220e2579de7823a7d707f22460321a41e6ad0363c24b91d9005600a3f696656fbf7",
+        "eventId": "0",
+        "kind": "assign",
+        "observers": [
+          "Bob::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+        ],
+        "payload": {
+          "amount": {
+            "currency": "USD",
+            "value": "100.0000000000"
+          },
+          "owner": "Bob::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+          "payer": "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+          "viewers": []
+        },
+        "reassignmentCounter": 1,
+        "reassignmentId": "0012200ce3d189576eed2c5bfeb7e4ee84162e6bd9b7a406e2341d110a892300c7deba",
+        "result": null,
+        "signatories": [
+          "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+        ],
+        "sourceSynchronizer": "sync-a::1220e19b470d09961acb2d17952d25309995415fa17cf09a2d60002a7fa25328e486",
+        "submitter": "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb",
+        "targetSynchronizer": "sync-b::1220b13f96ccbe9db7875e1d6f72af00c2dfb2cb880912d8ee0ddee87e494d7a98a1",
+        "template": "4dffebf4008e845e37f602fa2d54fd596a8b605af564239fc62948c39fdb79e2:Iou:Iou",
+        "witnesses": [
+          "Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb"
+        ]
+      }
+    },
+    "offset": "33",
+    "projection": {
+      "notGlobal": true,
+      "note": "Authorized participant projection. Private data outside these party rights is not available.",
+      "participantScoped": true,
+      "readAs": [],
+      "source": "ledger-json-api"
+    },
+    "recordTime": "2026-08-11T12:49:10.994311Z",
+    "rootEventIds": [
+      "0"
+    ],
+    "source": "ledger-json-api",
+    "sourceUrl": "http://localhost:14013/v2/updates/update-by-id",
+    "synchronizerId": "sync-b::1220b13f96ccbe9db7875e1d6f72af00c2dfb2cb880912d8ee0ddee87e494d7a98a1",
+    "updateId": "12203f07f6c7086379239e81b3ff344123a7ffd5e07a4cf70910672532610729fa4f"
+  }
+}
