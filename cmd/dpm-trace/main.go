@@ -27,7 +27,16 @@ func main() {
 		args = args[1:]
 	}
 
-	if len(args) == 1 && (args[0] == "--version" || args[0] == "version") {
+	if len(args) == 0 || (len(args) == 1 && (args[0] == "-h" || args[0] == "--help")) {
+		rootHelp(os.Stdout)
+		return
+	}
+
+	// --version is an addition: cli.py has no version flag, but a standalone
+	// binary needs one and goreleaser injects the values. A bare `version` word
+	// is deliberately NOT an alias -- cli.py would treat it as an update id, and
+	// shadowing a positional argument is a behavior change.
+	if len(args) == 1 && args[0] == "--version" {
 		fmt.Printf("dpm-trace %s (%s, built %s)\n", version, commit, date)
 		return
 	}
