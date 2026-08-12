@@ -6,15 +6,19 @@ $ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/t
     "eventCounts": {
       "left": {
         "archive": 0,
+        "assign": 0,
         "create": 1,
         "exercise": 0,
-        "other": 0
+        "other": 0,
+        "unassign": 0
       },
       "right": {
         "archive": 0,
+        "assign": 0,
         "create": 1,
         "exercise": 1,
-        "other": 0
+        "other": 0,
+        "unassign": 0
       }
     },
     "rootEvents": {
@@ -29,10 +33,13 @@ $ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/t
           "eventId": "#1:0",
           "kind": "create",
           "observers": [],
+          "reassignmentCounter": null,
           "result": null,
           "signatories": [
             "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
           ],
+          "sourceSynchronizer": null,
+          "targetSynchronizer": null,
           "template": "pkg1aabb:Counter:Counter",
           "value": {
             "count": 0,
@@ -58,10 +65,13 @@ $ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/t
               "eventId": "#2:1",
               "kind": "create",
               "observers": [],
+              "reassignmentCounter": null,
               "result": null,
               "signatories": [
                 "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
               ],
+              "sourceSynchronizer": null,
+              "targetSynchronizer": null,
               "template": "pkg2ccdd:Token:Token",
               "value": {
                 "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
@@ -80,10 +90,13 @@ $ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/t
           "observers": [
             "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
           ],
+          "reassignmentCounter": null,
           "result": null,
           "signatories": [
             "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
           ],
+          "sourceSynchronizer": null,
+          "targetSynchronizer": null,
           "template": "pkg2ccdd:Token:Token",
           "value": {
             "newOwner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"

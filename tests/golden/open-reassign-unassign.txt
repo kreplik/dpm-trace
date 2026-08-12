@@ -1,0 +1,29 @@
+$ dpm trace open tests/fixtures/reassignment/real-unassign-artifact.json --color never
+--- exit: 0
+--- stdout:
+Trace artifact
+  schema:       dpm-trace/trace-artifact/v0
+  update:       1220fbb9760a5f29511e63a1911c782711634e4ea43cea344d021d608021ed7f20df
+  kind:         committed-update
+  source:       ledger-json-api
+  read-as:      -
+  events:       1
+Canton trace
+  update:       1220fbb9760a5f29511e63a1911c782711634e4ea43cea344d021d608021ed7f20df
+  source:       ledger-json-api (http://localhost:14013/v2/updates/update-by-id)
+  offset:       30
+  record time:  2026-08-11T12:49:10.620188Z
+  synchronizer: sync-a::1220e19b470d09961acb2d17952d25309995415fa17cf09a2d60002a7fa25328e486
+  visibility:   Authorized participant projection. Private data outside these party rights is not available.
+  events:       +0 create, >0 exercise, x0 archive, <1 unassign
+  parties:
+    Alice = Alice::1220289aed720204f3b88cd0ea989a046fd3b46f47e3bda73d60f3de018c3afae6cb
+
+Trace
+`-- [0] UNASSIGN Iou:Iou
+    |-- contract: 00e89575764e68ce627d51fa4f136402cc3320fce88707c58a20c08ddab8768...
+    |-- reassignment: sync-a::1220e19b470d09961acb2d17952d2... -> sync-b::1220b13f96ccbe9db7875e1d6f72a...
+    |-- reassignment id: 0012200ce3d189576eed2c5bfeb7e4ee84162e6bd9b7a406e2341d110a89230...
+    |-- counter: 1
+    |-- submitter: Alice
+    `-- witnesses: Alice
