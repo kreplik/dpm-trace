@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
+	"github.com/walnuthq/dpm-trace/internal/source"
 )
 
 func TestCompletionTraceMatchesGolden(t *testing.T) {
@@ -16,7 +17,7 @@ func TestCompletionTraceMatchesGolden(t *testing.T) {
 		t.Fatalf("load completion: %v", err)
 	}
 	var buf bytes.Buffer
-	CompletionTrace(&buf, completion, Color{Enabled: false})
+	CompletionTrace(&buf, completion, Color{Enabled: false}, nil, 5)
 	got := strings.TrimRight(buf.String(), "\n")
 	want := goldenStdout(t, filepath.Join(root, "tests/golden/completion-plain.txt"))
 	if got != want {
@@ -69,5 +70,27 @@ func TestFailedCompletionIsNotCommitted(t *testing.T) {
 	}
 	if !completion.Failed() {
 		t.Error("a non-OK status with no update id must report as failed")
+	}
+}
+
+// With sources loaded, the completion view gains a Source diagnostics block.
+func TestCompletionTraceWithSourceMatchesGolden(t *testing.T) {
+	root := repoRoot(t)
+	completion, err := model.LoadCompletion(filepath.Join(root, "examples/failed-with-source.completion.json"))
+	if err != nil {
+		t.Fatalf("load completion: %v", err)
+	}
+	index := source.NewIndex()
+	index.LoadDamlYAML(filepath.Join(root, "tests/fixtures/source-pkg/daml.yaml"))
+
+	var buf bytes.Buffer
+	CompletionTrace(&buf, completion, Color{Enabled: false}, index, 5)
+	got := strings.TrimRight(buf.String(), "\n")
+
+	// The golden records absolute paths scrubbed to <root>; do the same here.
+	got = strings.ReplaceAll(got, root, "<root>")
+	want := goldenStdout(t, filepath.Join(root, "tests/golden/completion-with-source.txt"))
+	if got != want {
+		t.Errorf("differs from the golden:\n%s", firstDifference(got, want))
 	}
 }

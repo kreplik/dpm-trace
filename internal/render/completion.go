@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
+	"github.com/walnuthq/dpm-trace/internal/source"
 )
 
 // CompletionTrace writes the completion view of a submission.
-// Ports print_completion_trace's non-compact path. The compact path is used by
-// `dpm trace submit --allow-fail`, which is not ported yet, and source
-// diagnostics need internal/source.
-func CompletionTrace(w io.Writer, c *model.Completion, color Color) {
+// Ports print_completion_trace's non-compact path; the compact path is used by
+// `dpm trace submit --allow-fail`, which is not ported yet.
+func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *source.Index, maxSourceLocations int) {
 	statusCode, message := c.StatusFields()
 	updateID := c.String("updateId", "update_id")
 	committed := updateID != ""
@@ -41,6 +41,8 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color) {
 	if !committed {
 		fmt.Fprintln(w, "  trace:      no committed transaction tree is available for this completion")
 	}
+	locations, capped := CompletionSourceDiagnostics(c, index, maxSourceLocations)
+	PrintSourceDiagnostics(w, locations, capped, index, color)
 	printLogMatches(w, c.Get("logMatches"), color)
 }
 
