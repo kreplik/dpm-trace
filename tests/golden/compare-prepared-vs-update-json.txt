@@ -1,0 +1,86 @@
+$ dpm trace compare --prepared tests/fixtures/compare/prepared.json --update tests/fixtures/compare/trace-b.json --print-json
+--- exit: 0
+--- stdout:
+{
+  "diff": {
+    "commandCount": {
+      "prepared": 1,
+      "updateRootEvents": 1
+    },
+    "commands": [
+      {
+        "kind": "create",
+        "template": "pkg1aabb:Counter:Counter",
+        "value": {
+          "count": 0,
+          "owner": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        },
+        "valueLabel": "arguments"
+      }
+    ],
+    "notes": [
+      "Prepared data is not committed.",
+      "The comparison checks visible command/event shape; it is not proof of semantic equivalence."
+    ],
+    "rootEvents": [
+      {
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "children": [],
+        "choice": "Transfer",
+        "contractId": "00ccddee001122334455667788990011ccddee0011223...",
+        "eventId": "#2:0",
+        "kind": "exercise",
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "reassignmentCounter": null,
+        "result": null,
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "sourceSynchronizer": null,
+        "targetSynchronizer": null,
+        "template": "pkg2ccdd:Token:Token",
+        "value": {
+          "newOwner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        },
+        "valueLabel": "argument",
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ]
+      }
+    ],
+    "stateDiff": {
+      "archive": 0,
+      "assign": 0,
+      "create": 1,
+      "exercise": 1,
+      "other": 0,
+      "unassign": 0
+    }
+  },
+  "kind": "prepared-vs-update",
+  "left": {
+    "actAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "commandId": "dpm-trace-prepare-001",
+    "commands": 1,
+    "committed": false,
+    "preparedTransactionHash": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+    "readAs": []
+  },
+  "right": {
+    "events": 2,
+    "offset": "202",
+    "readAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "recordTime": "2024-01-15T10:01:55Z",
+    "source": "ledger-json-api",
+    "updateId": "update-fixture-trace-b-0002"
+  }
+}

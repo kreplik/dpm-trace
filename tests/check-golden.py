@@ -82,6 +82,16 @@ CASES: dict[str, list[str]] = {
         "--color", "never", "--full",
     ],
 
+    # trace-b has an exercise with a child create, so this pins whether the
+    # committed side carries child events into the JSON. It does not today;
+    # see #42, which tracks that and the fields the diff ignores.
+    "compare-prepared-vs-update-json": [
+        "compare",
+        "--prepared", "tests/fixtures/compare/prepared.json",
+        "--update", "tests/fixtures/compare/trace-b.json",
+        "--print-json",
+    ],
+
     # ── compare: update vs update ────────────────────────────────────────────
     "compare-update-vs-update": [
         "compare",
