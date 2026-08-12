@@ -13,6 +13,8 @@ import (
 func runCompare(args []string) int {
 	var (
 		targets   []string
+		prepared  string
+		update    string
 		printJSON bool
 		full      bool
 		colorMode = "auto"
@@ -30,13 +32,31 @@ func runCompare(args []string) int {
 			}
 			i++
 			colorMode = args[i]
-		case "--prepared", "--update", "--completion-file", "--command-id":
+		case "--prepared":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --prepared requires a path")
+				return 2
+			}
+			i++
+			prepared = args[i]
+		case "--update":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --update requires a value")
+				return 2
+			}
+			i++
+			update = args[i]
+		case "--completion-file", "--command-id":
 			fmt.Fprintf(os.Stderr, "error: %s comparisons are not ported yet; use python -m dpm_trace.cli\n", arg)
 			return 2
 		default:
 			targets = append(targets, arg)
 		}
 	}
+	if prepared != "" {
+		return runComparePrepared(prepared, update, printJSON, full, colorMode)
+	}
+
 	if len(targets) != 2 {
 		fmt.Fprintln(os.Stderr, "usage: dpm trace compare <update-a> <update-b>")
 		return 2
@@ -75,4 +95,35 @@ func traceFromFile(target string) (*model.Trace, error) {
 		return nil, err
 	}
 	return model.TraceFromArtifact(artifact)
+}
+
+// runComparePrepared compares a prepared command against a committed update.
+func runComparePrepared(preparedPath, update string, printJSON, full bool, colorMode string) int {
+	if update == "" {
+		fmt.Fprintln(os.Stderr, "error: --prepared needs --update, --command-id, or --completion-file")
+		return 1
+	}
+	artifact, err := model.LoadPreparedArtifact(preparedPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	trace, err := traceFromFile(update)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	comparison := model.ComparePreparedToTrace(artifact, trace)
+	if printJSON {
+		encoded, err := model.Encode(comparison.JSON())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(encoded))
+		return 0
+	}
+	render.PreparedUpdateComparison(os.Stdout, comparison, render.ColorFromMode(colorMode, isTTY()), !full)
+	return 0
 }
