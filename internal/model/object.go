@@ -202,3 +202,18 @@ func ensureEOF(dec *json.Decoder) error {
 	}
 	return nil
 }
+
+// ObjectField returns a nested object field, for callers outside this package.
+func ObjectField(obj *Object, key string) (*Object, bool) {
+	return pickObject(obj, key)
+}
+
+// ObjectString returns a field rendered as a string, empty when absent.
+func ObjectString(obj *Object, key string) string {
+	return pickString(obj, key)
+}
+
+// ObjectStrings returns a list field as strings.
+func ObjectStrings(obj *Object, key string) []string {
+	return listString(pick(obj, key))
+}
