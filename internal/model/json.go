@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Decode parses a Ledger API response into the untyped, order-preserving form
@@ -47,7 +48,48 @@ func Encode(v any) ([]byte, error) {
 		return nil, err
 	}
 	// Encode always appends a newline; callers decide their own trailing bytes.
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+	return escapeNonASCII(bytes.TrimRight(buf.Bytes(), "\n")), nil
+}
+
+// escapeNonASCII rewrites non-ASCII runes as \uXXXX escapes, matching Python's
+// json.dumps default of ensure_ascii=True.
+//
+// This is not cosmetic: dpm-trace/test-report/v0 and the trace artifacts are
+// consumed downstream, and `daml test` writes box-drawing characters into
+// transaction trees, so unescaped output would differ from every artifact the
+// Python implementation has ever produced.
+//
+// In valid JSON a non-ASCII rune can only occur inside a string literal, so the
+// whole document can be walked without tracking string state.
+func escapeNonASCII(data []byte) []byte {
+	if isASCII(data) {
+		return data
+	}
+	var out bytes.Buffer
+	out.Grow(len(data))
+	for _, r := range string(data) {
+		if r < utf8.RuneSelf {
+			out.WriteByte(byte(r))
+			continue
+		}
+		if r > 0xFFFF {
+			// Astral planes are encoded as a surrogate pair, as Python does.
+			r -= 0x10000
+			fmt.Fprintf(&out, "\\u%04x\\u%04x", 0xD800+(r>>10), 0xDC00+(r&0x3FF))
+			continue
+		}
+		fmt.Fprintf(&out, "\\u%04x", r)
+	}
+	return out.Bytes()
+}
+
+func isASCII(data []byte) bool {
+	for _, b := range data {
+		if b >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 // pick returns the first key present in obj, mirroring cli.py's pick(). The
