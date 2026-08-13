@@ -25,6 +25,10 @@ if not ledger:
 python = os.environ.get("DPM_TRACE_IT_PYTHON", sys.executable)
 config.environment["PYTHONPATH"] = os.environ.get("DPM_TRACE_IT_SRC", "")
 
+# %dpm is the binary when the runner supplies one, otherwise the Python module.
+# The binary form is what remains once the Python implementation is retired.
+dpm = os.environ.get("DPM_TRACE_IT_DPM") or (python + " -m dpm_trace.cli")
+
 config.substitutions.append(("%daml-yaml", os.environ.get("DPM_TRACE_IT_DAML_YAML", "")))
 config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_IT_DAML", "daml")))
 # %ledger2 must precede %ledger -- otherwise "%ledger" matches inside "%ledger2".
@@ -34,4 +38,4 @@ config.substitutions.append(("%alice", os.environ.get("DPM_TRACE_IT_ALICE", ""))
 config.substitutions.append(("%bob", os.environ.get("DPM_TRACE_IT_BOB", "")))
 config.substitutions.append(("%dar", os.environ.get("DPM_TRACE_IT_DAR", "")))
 config.substitutions.append(("%python", python))
-config.substitutions.append(("%dpm", python + " -m dpm_trace.cli"))
+config.substitutions.append(("%dpm", dpm))
