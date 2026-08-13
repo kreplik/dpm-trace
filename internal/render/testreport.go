@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/walnuthq/dpm-trace/internal/scaffold"
 	"github.com/walnuthq/dpm-trace/internal/source"
 	"github.com/walnuthq/dpm-trace/internal/testrunner"
 )
@@ -165,4 +166,23 @@ func indentBy(value, prefix string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ScaffoldReport writes the summary of a `dpm trace test --init` run.
+// Ports the tail of run_init.
+func ScaffoldReport(w io.Writer, root string, result scaffold.Result, color Color, itestsDir, unitTestsDir string) {
+	fmt.Fprintln(w, color.Apply("dpm trace test --init", "bold"))
+	fmt.Fprintf(w, "  package: %s\n", root)
+	for _, path := range result.Created {
+		fmt.Fprintf(w, "  %s  %s\n", color.Apply("created", "green"), path)
+	}
+	for _, path := range result.Kept {
+		fmt.Fprintf(w, "  %s     %s (already exists)\n", color.Apply("kept", "gray"), path)
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Next steps:")
+	fmt.Fprintf(w, "  unit tests:        %s (self-contained package; or `dpm trace test .` for this package's scripts)\n",
+		color.Apply("dpm trace test "+unitTestsDir, "cyan"))
+	fmt.Fprintf(w, "  integration tests: %s\n",
+		color.Apply("dpm trace test . --integration "+itestsDir+" --canton-jar <canton.jar>", "cyan"))
 }
