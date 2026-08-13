@@ -40,6 +40,7 @@ func runTrace(args []string) int {
 		beginExclusive     string
 		completionLimit    = 100
 		completionTimeout  = 1000
+		logFile            []string
 		exportPath         string
 		waitSeconds        float64
 		dar                []string
@@ -127,6 +128,13 @@ func runTrace(args []string) int {
 			}
 			i++
 			dar = append(dar, args[i])
+		case "--log-file":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --log-file requires a path")
+				return 2
+			}
+			i++
+			logFile = append(logFile, args[i])
 		case "--command-id":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --command-id requires a value")
@@ -229,6 +237,7 @@ func runTrace(args []string) int {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
+		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
 		return 0
 	}
@@ -256,6 +265,7 @@ func runTrace(args []string) int {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
+		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
 		return 0
 	}

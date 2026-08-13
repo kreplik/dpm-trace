@@ -119,6 +119,8 @@ type submissionOpts struct {
 	userID         string
 	synchronizerID string
 	export         string
+	logFile        []string
+	damlYAML       []string
 	printJSON      bool
 	allowFail      bool
 	full           bool
@@ -180,6 +182,10 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 			opts.synchronizerID = value
 		case "--export":
 			opts.export = value
+		case "--log-file":
+			opts.logFile = append(opts.logFile, value)
+		case "--daml-yaml":
+			opts.damlYAML = append(opts.damlYAML, value)
 		case "--color":
 			opts.colorMode = value
 		case "--template":

@@ -260,11 +260,49 @@ func SubmitFailure(w io.Writer, c *model.Completion, request map[string]any, col
 		strings.Join(rendered, ", "), Short(commandID, 20), offset)
 	fmt.Fprintln(w)
 
-	locations, _ := CompletionSourceDiagnostics(c, index, maxSourceLocations)
+	locations, capped := CompletionSourceDiagnostics(c, index, maxSourceLocations)
 	if len(locations) > 0 {
 		fmt.Fprintf(w, "  %-*s (best match first)\n", col, "Where")
-		fmt.Fprintln(w, IndentText(SourceDiagnostic(locations[0], index, color)))
+		fmt.Fprintln(w, IndentText(RenderLocationInline(locations[0], index, color, "", "")))
+		rest := locations[1:]
+		if len(rest) > 0 || capped {
+			shown := rest
+			if len(shown) > 2 {
+				shown = shown[:2]
+			}
+			also := make([]string, 0, len(shown))
+			for _, loc := range shown {
+				also = append(also, fmt.Sprintf("%s:%d [%s]", ShortSourcePath(loc, index), loc.Line, LabelTag(loc.Label)))
+			}
+			extra := len(rest) - len(shown)
+			if capped {
+				extra++
+			}
+			suffix := "  (--full to expand)"
+			if extra > 0 {
+				suffix = fmt.Sprintf("  (+%d more; --full to expand)", extra)
+			}
+			fmt.Fprintf(w, "    also: %s%s\n", strings.Join(also, ", "), suffix)
+		}
 		fmt.Fprintln(w)
+	}
+
+	// A log match is how a rejected submission is tied to operator logs; the
+	// term that matched is named so the correlation is auditable.
+	if matches, ok := c.Get("logMatches").([]any); ok && len(matches) > 0 {
+		if first, isObject := matches[0].(*model.Object); isObject {
+			fileRef := fmt.Sprintf("%s:%s", model.ObjectString(first, "file"), model.ObjectString(first, "line"))
+			term := ""
+			if matchedBy := logMatchedBy(c); matchedBy != "" {
+				term = "  matched by " + matchedBy
+			}
+			more := ""
+			if len(matches) > 1 {
+				more = "  (--full for context)"
+			}
+			fmt.Fprintf(w, "  Logs   %s%s%s\n", fileRef, term, more)
+			fmt.Fprintln(w)
+		}
 	}
 
 	fmt.Fprintln(w, "  Next")
@@ -325,4 +363,44 @@ func orQuestion(value string) string {
 		return "?"
 	}
 	return value
+}
+
+// logMatchedBy names the correlation term that matched a log line, so a reader
+// can tell whether the match was on a command id or a trace id.
+// Ports _log_matched_by.
+func logMatchedBy(c *model.Completion) string {
+	terms := map[string]bool{}
+	if list, ok := c.Get("logMatchTerms").([]any); ok {
+		for _, term := range list {
+			terms[scalarText(term)] = true
+		}
+	}
+	if len(terms) == 0 {
+		return ""
+	}
+
+	for _, field := range []struct{ key, name string }{
+		{"commandId", "command id"},
+		{"command_id", "command id"},
+		{"traceId", "trace id"},
+		{"submissionId", "submission id"},
+		{"submission_id", "submission id"},
+		{"updateId", "update id"},
+		{"update_id", "update id"},
+	} {
+		if value := c.String(field.key); value != "" && terms[value] {
+			return field.name
+		}
+	}
+	if status, ok := model.ObjectField(c.Raw, "status"); ok {
+		for _, field := range []struct{ key, name string }{
+			{"traceId", "trace id"},
+			{"correlationId", "correlation id"},
+		} {
+			if value := model.ObjectString(status, field.key); value != "" && terms[value] {
+				return field.name
+			}
+		}
+	}
+	return "trace id"
 }
