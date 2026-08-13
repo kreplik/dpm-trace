@@ -30,7 +30,7 @@ def main() -> int:
     repo_root = Path(sys.argv[1]).resolve()
 
     env_sibling = os.environ.get("DPM_TRACE_DAML_TESTS_DIR", "").strip()
-    sibling = Path(env_sibling).resolve() if env_sibling else repo_root.parent / "daml-tests"
+    sibling = Path(env_sibling).resolve() if env_sibling else repo_root.parent / "daml-contracts"
     cfg = sibling / "itests" / "lit.cfg.py"
     if not cfg.is_file():
         print(
