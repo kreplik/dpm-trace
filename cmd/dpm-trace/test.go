@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/config"
 	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
+	"github.com/walnuthq/dpm-trace/internal/scaffold"
 	"github.com/walnuthq/dpm-trace/internal/source"
 	"github.com/walnuthq/dpm-trace/internal/testrunner"
 )
@@ -26,12 +28,14 @@ func runTest(args []string) int {
 
 	opts := testrunner.Options{MaxSourceLocations: 6}
 	var (
-		root       string
-		colorMode  = "auto"
-		printJSON  bool
-		noTrees    bool
-		configPath string
-		damlYAML   []string
+		initMode     bool
+		scaffoldOpts scaffold.Options
+		root         string
+		colorMode    = "auto"
+		printJSON    bool
+		noTrees      bool
+		configPath   string
+		damlYAML     []string
 	)
 
 	for i := 0; i < len(args); i++ {
@@ -46,8 +50,17 @@ func runTest(args []string) int {
 		case "--keep-artifacts":
 			opts.KeepArtifacts = true
 			continue
-		case "--integration", "--init", "--no-unittests", "--no-ci":
-			fmt.Fprintf(os.Stderr, "error: %s is not ported yet; use python -m dpm_trace.cli\n", arg)
+		case "--init":
+			initMode = true
+			continue
+		case "--no-unittests":
+			scaffoldOpts.NoUnittests = true
+			continue
+		case "--no-ci":
+			scaffoldOpts.NoCI = true
+			continue
+		case "--integration":
+			fmt.Fprintln(os.Stderr, "error: --integration is not ported yet; use python -m dpm_trace.cli")
 			return 2
 		}
 		if arg[0] != '-' {
@@ -65,6 +78,10 @@ func runTest(args []string) int {
 		i++
 		value := args[i]
 		switch arg {
+		case "--itests-dir":
+			scaffoldOpts.ITestsDir = value
+		case "--unittests-dir":
+			scaffoldOpts.UnitTestsDir = value
 		case "--daml":
 			opts.Daml = value
 		case "-p", "--test-pattern":
@@ -103,12 +120,28 @@ func runTest(args []string) int {
 	if root == "" {
 		root = "."
 	}
-	absolute, err := filepath.Abs(root)
+	// Path.resolve() in Python follows symlinks, which matters where a temp
+	// directory is reached through one: the reported package path must match.
+	absolute, err := resolvePath(root)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 	opts.Root = absolute
+
+	if initMode {
+		scaffoldOpts.Root = absolute
+		result, err := scaffold.Init(os.Stdout, scaffoldOpts)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 2
+		}
+		render.ScaffoldReport(os.Stdout, absolute, result,
+			render.ColorFromMode(colorMode, isTTY()),
+			orDefaultString(scaffoldOpts.ITestsDir, "itests"),
+			orDefaultString(scaffoldOpts.UnitTestsDir, "unittests"))
+		return 0
+	}
 
 	damlYAMLPath := filepath.Join(absolute, "daml.yaml")
 	if _, err := os.Stat(damlYAMLPath); err != nil {
@@ -167,4 +200,34 @@ var testFlags = []flagDoc{
 	{"--keep-artifacts", "Keep the temporary run directory."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
+}
+
+func orDefaultString(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+// resolvePath makes a path absolute and follows symlinks, matching
+// pathlib.Path.expanduser().resolve(). Ports resolve_package_root.
+func resolvePath(path string) (string, error) {
+	if strings.HasPrefix(path, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		path = filepath.Join(home, strings.TrimPrefix(path, "~"))
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	// A path that does not exist yet cannot be resolved; Python returns it
+	// unchanged in that case too.
+	resolved, err := filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return absolute, nil
+	}
+	return resolved, nil
 }
