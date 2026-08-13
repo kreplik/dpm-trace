@@ -13,7 +13,7 @@ import (
 )
 
 // runCompare compares two committed updates. Ports the update-vs-update branch
-// of run_compare; --prepared comparisons are not ported yet.
+// of run_compare.
 func runCompare(args []string) int {
 	if wantsHelp(args) {
 		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "--command-id, fetching updates by id")
@@ -24,6 +24,8 @@ func runCompare(args []string) int {
 		prepared       string
 		update         string
 		completionFile string
+		commandID      string
+		actAs          []string
 		ledgerURL      string
 		scanURL        string
 		readAs         []string
@@ -83,6 +85,13 @@ func runCompare(args []string) int {
 			}
 			i++
 			scanURL = args[i]
+		case "--act-as":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --act-as requires a party id")
+				return 2
+			}
+			i++
+			actAs = append(actAs, args[i])
 		case "--read-as", "--party":
 			if i+1 >= len(args) {
 				fmt.Fprintf(os.Stderr, "error: %s requires a party id\n", arg)
@@ -120,8 +129,12 @@ func runCompare(args []string) int {
 			i++
 			dar = append(dar, args[i])
 		case "--command-id":
-			fmt.Fprintln(os.Stderr, "error: --command-id needs a ledger connection, which is not ported yet; use python -m dpm_trace.cli")
-			return 2
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --command-id requires a value")
+				return 2
+			}
+			i++
+			commandID = args[i]
 		default:
 			targets = append(targets, arg)
 		}
@@ -139,9 +152,10 @@ func runCompare(args []string) int {
 		readAs = config.Strings(nil, cfg, "DPM_TRACE_READ_AS", "readAs", "read_as", "party")
 	}
 	fetch := traceFetcher{ledgerURL: ledgerURL, scanURL: scanURL, readAs: readAs, token: token, tokenFile: tokenFile}
+	lookup := completionLookup{ledgerURL: ledgerURL, actAs: actAs, readAs: readAs, token: token, tokenFile: tokenFile, commandID: commandID}
 
 	if prepared != "" {
-		return runComparePrepared(prepared, update, completionFile, printJSON, full, colorMode, fetch)
+		return runComparePrepared(prepared, update, completionFile, printJSON, full, colorMode, fetch, lookup)
 	}
 
 	if len(targets) != 2 {
@@ -232,9 +246,9 @@ func extractUpdateID(target string) string {
 }
 
 // runComparePrepared compares a prepared command against a committed update.
-func runComparePrepared(preparedPath, update, completionFile string, printJSON, full bool, colorMode string, fetch traceFetcher) int {
-	if completionFile != "" {
-		return runComparePreparedCompletion(preparedPath, completionFile, printJSON, full, colorMode)
+func runComparePrepared(preparedPath, update, completionFile string, printJSON, full bool, colorMode string, fetch traceFetcher, lookup completionLookup) int {
+	if completionFile != "" || lookup.commandID != "" {
+		return runComparePreparedCompletion(preparedPath, completionFile, printJSON, full, colorMode, lookup)
 	}
 	if update == "" {
 		fmt.Fprintln(os.Stderr, "error: --prepared needs --update, --command-id, or --completion-file")
@@ -267,13 +281,19 @@ func runComparePrepared(preparedPath, update, completionFile string, printJSON, 
 
 // runComparePreparedCompletion compares a prepared command against a captured
 // completion. Source diagnostics need internal/source and are not applied.
-func runComparePreparedCompletion(preparedPath, completionPath string, printJSON, full bool, colorMode string) int {
+func runComparePreparedCompletion(preparedPath, completionPath string, printJSON, full bool, colorMode string, lookup completionLookup) int {
 	prepared, err := model.LoadPreparedArtifact(preparedPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	completion, err := model.LoadCompletion(completionPath)
+
+	var completion *model.Completion
+	if completionPath != "" {
+		completion, err = model.LoadCompletion(completionPath)
+	} else {
+		completion, err = lookup.fetch()
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -291,4 +311,31 @@ func runComparePreparedCompletion(preparedPath, completionPath string, printJSON
 	}
 	render.PreparedCompletionComparison(os.Stdout, comparison, render.ColorFromMode(colorMode, isTTY()), !full)
 	return 0
+}
+
+// completionLookup resolves --command-id against a participant, for the
+// prepared-vs-completion comparison.
+type completionLookup struct {
+	ledgerURL string
+	actAs     []string
+	readAs    []string
+	token     string
+	tokenFile string
+	commandID string
+}
+
+func (l completionLookup) fetch() (*model.Completion, error) {
+	resolvedToken, err := ledger.ResolveToken(l.token, l.tokenFile)
+	if err != nil {
+		return nil, err
+	}
+	parties := make([]string, 0, len(l.actAs)+len(l.readAs))
+	parties = append(parties, l.actAs...)
+	parties = append(parties, l.readAs...)
+	return ledger.New(l.ledgerURL, resolvedToken).FetchCompletion(ledger.CompletionLookup{
+		CommandID: l.commandID,
+		Parties:   ledger.ParseParties(parties),
+		Limit:     100,
+		TimeoutMs: 1000,
+	})
 }
