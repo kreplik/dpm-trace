@@ -11,8 +11,8 @@ import (
 )
 
 // CompletionTrace writes the completion view of a submission.
-// Ports print_completion_trace's non-compact path; the compact path is used by
-// `dpm trace submit --allow-fail`, which is not ported yet.
+// Ports print_completion_trace's non-compact path; the compact path is
+// SubmitFailure, used by `dpm trace submit`.
 func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *source.Index, maxSourceLocations int) {
 	statusCode, message := c.StatusFields()
 	updateID := c.String("updateId", "update_id")

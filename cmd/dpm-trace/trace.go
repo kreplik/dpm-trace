@@ -254,7 +254,7 @@ func runTrace(args []string) int {
 			tokenFile = args[i]
 		default:
 			if strings.HasPrefix(arg, "-") {
-				fmt.Fprintf(os.Stderr, "error: %q is not ported yet; use python -m dpm_trace.cli\n", arg)
+				fmt.Fprintf(os.Stderr, "error: unknown flag %q\n", arg)
 				return 2
 			}
 			if target != "" {

@@ -39,6 +39,8 @@ func runTest(args []string) int {
 		configPath      string
 		damlYAML        []string
 		darPaths        []string
+		damlc           string
+		debugInfo       []string
 	)
 
 	for i := 0; i < len(args); i++ {
@@ -128,8 +130,9 @@ func runTest(args []string) int {
 			// damlc-inspect verification of failures is still unported.
 			darPaths = append(darPaths, value)
 		case "--damlc":
-			fmt.Fprintf(os.Stderr, "error: --damlc needs damlc inspect, which is not ported yet; use python -m dpm_trace.cli\n")
-			return 2
+			damlc = value
+		case "--debug-info":
+			debugInfo = append(debugInfo, value)
 		default:
 			fmt.Fprintf(os.Stderr, "error: %q is not supported by dpm trace test yet; use python -m dpm_trace.cli\n", arg)
 			return 2
@@ -142,6 +145,8 @@ func runTest(args []string) int {
 		return 1
 	}
 	darPaths = config.Strings(darPaths, cfg, "DPM_TRACE_DAR", "darPaths", "dar_paths", "dar")
+	damlc = config.String(damlc, cfg, "DPM_TRACE_DAMLC", "damlc")
+	debugInfo = config.Strings(debugInfo, cfg, "DPM_TRACE_DEBUG_INFO", "debugInfoPaths", "debug_info_paths", "debugInfo", "debug_info")
 	damlYAML = config.Strings(damlYAML, cfg, "DPM_TRACE_DAML_YAML", "damlYamlPaths", "daml_yaml_paths", "damlYaml", "daml_yaml")
 
 	if root == "" {
@@ -205,8 +210,16 @@ func runTest(args []string) int {
 	}
 
 	index := source.NewIndex()
+	for _, path := range debugInfo {
+		index.LoadDebugInfo(path)
+	}
 	for _, path := range damlYAML {
 		index.LoadDamlYAML(path)
+	}
+	// run_test defaults --damlc to --daml, so a package built with one
+	// toolchain is inspected with the same one.
+	for _, path := range darPaths {
+		index.LoadDARInspect(path, orDefaultString(damlc, orDefaultString(opts.Daml, "daml")))
 	}
 
 	result, err := testrunner.Run(os.Stderr, opts, index)
