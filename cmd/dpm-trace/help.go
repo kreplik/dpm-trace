@@ -86,8 +86,8 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "workflows use completion data instead.")
 
 	fmt.Fprintln(w, "\nNot ported to the Go build yet (use python -m dpm_trace.cli):")
-	fmt.Fprintln(w, "  --visualize, --damlc, --debug-info, --explain-apis, --log-file,")
-	fmt.Fprintln(w, "  --source-root, --source, completion lookup by --command-id, and dpm trace test")
+	fmt.Fprintln(w, "  --visualize, --damlc, --debug-info (damlc inspect verification;")
+	fmt.Fprintln(w, "  --dar still records package metadata), dpm trace test --integration and --init")
 }
 
 var traceFlags = []flagDoc{
@@ -102,6 +102,12 @@ var traceFlags = []flagDoc{
 	{"--wait SECONDS", "Retry while the update is not yet visible on this participant."},
 	{"--export PATH", "Write a portable trace artifact. Alias of --out."},
 	{"--print-json", "Print the normalized trace JSON and exit."},
+	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
+	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
+	{"--command-id ID", "Look up a failed submission by command id."},
+	{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
+	{"--explain-apis", "Explain Scan API vs Ledger API."},
 	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
@@ -153,6 +159,12 @@ var submissionFlags = []flagDoc{
 	{"--token-file PATH", "Bearer token file. Alias of --access-token-file."},
 	{"--export PATH", "Write the artifact to a file."},
 	{"--print-json", "Print the JSON and exit."},
+	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
+	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
+	{"--command-id ID", "Look up a failed submission by command id."},
+	{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
+	{"--explain-apis", "Explain Scan API vs Ledger API."},
 	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
 	{"-h, --help", "Show this help."},
 }

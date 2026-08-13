@@ -14,7 +14,7 @@ func TestHelpOnlyListsImplementedFlags(t *testing.T) {
 	out := buf.String()
 
 	flagsSection := out[strings.Index(out, "Flags:"):strings.Index(out, "Examples:")]
-	for _, unported := range []string{"--visualize", "--damlc", "--debug-info", "--explain-apis", "--log-file", "--source-root"} {
+	for _, unported := range []string{"--visualize", "--damlc", "--debug-info"} {
 		if strings.Contains(flagsSection, unported) {
 			t.Errorf("%s is listed as a flag but is not implemented", unported)
 		}
