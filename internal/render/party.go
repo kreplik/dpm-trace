@@ -54,6 +54,14 @@ func (c *Context) RenderValue(value any) any {
 			out = append(out, c.RenderValue(item))
 		}
 		return out
+	case []string:
+		// Widened to []any so the value renderer treats it as a JSON list
+		// rather than falling back to Go's slice formatting.
+		out := make([]any, 0, len(v))
+		for _, item := range v {
+			out = append(out, c.Party(item))
+		}
+		return out
 	case *model.Object:
 		out := model.NewObject()
 		for _, key := range v.Keys() {
@@ -172,4 +180,13 @@ func dedupeSorted(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Parties renders a party list with aliases applied, comma separated.
+func (c *Context) Parties(parties []string) string {
+	rendered := make([]string, 0, len(parties))
+	for _, party := range parties {
+		rendered = append(rendered, c.Party(party))
+	}
+	return strings.Join(rendered, ", ")
 }
