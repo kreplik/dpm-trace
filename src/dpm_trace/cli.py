@@ -3160,22 +3160,19 @@ def parse_arg_assignments(values: list[str]) -> dict[str, Any]:
 
 
 def parse_scalar(value: str) -> Any:
+    """Infer a JSON type for an ``--arg`` value.
+
+    Numbers stay strings on purpose. Every numeric field in Daml LF is Int64 or
+    Numeric, and the JSON Ledger API encodes both as JSON strings (Int64 does
+    not survive a JavaScript number). Emitting a JSON number is rejected with
+    ``Expected ujson.Str``, so ``--arg quantity=100`` must send ``"100"``.
+    """
     if value == "null":
         return None
     if value == "true":
         return True
     if value == "false":
         return False
-    if re.fullmatch(r"-?[0-9]+", value):
-        try:
-            return int(value)
-        except ValueError:
-            pass
-    if re.fullmatch(r"-?[0-9]+\.[0-9]+", value):
-        try:
-            return float(value)
-        except ValueError:
-            pass
     if value.startswith(("{", "[")):
         try:
             return json.loads(value)
