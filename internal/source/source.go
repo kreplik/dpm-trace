@@ -8,12 +8,15 @@
 package source
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Location is a resolved position in a Daml source file.
@@ -334,4 +337,107 @@ func containsString(values []string, want string) bool {
 // ModuleFiles returns the loaded files declaring a module, in load order.
 func (ix *Index) ModuleFiles(module string) []string {
 	return ix.moduleFiles[module]
+}
+
+// LoadDARInspect records the module text `damlc inspect` reports for a DAR.
+//
+// This is what makes a failure match trustworthy: a needle found in inspected
+// module text is confirmed present in the compiled package, where a match in a
+// local file is only a guess about the source that produced it. Failures here
+// are silent by design -- source mapping is best-effort and must never fail a
+// trace. Ports SourceIndex._load_dar_inspect.
+func (ix *Index) LoadDARInspect(darPath, damlc string) {
+	if _, err := os.Stat(darPath); err != nil {
+		return
+	}
+	command := DamlcInspectCommand(damlc, darPath)
+
+	cmd := exec.Command(command[0], command[1:]...)
+	cmd.Env = childEnv()
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = nil
+
+	done := make(chan error, 1)
+	if err := cmd.Start(); err != nil {
+		return
+	}
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			return
+		}
+	case <-time.After(30 * time.Second):
+		_ = cmd.Process.Kill()
+		return
+	}
+
+	current := ""
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		if match := inspectModulePattern.FindStringSubmatch(line); match != nil {
+			current = match[1]
+			if _, seen := ix.inspectModul[current]; !seen {
+				ix.inspectModul[current] = []string{}
+			}
+			continue
+		}
+		if current != "" {
+			ix.inspectModul[current] = append(ix.inspectModul[current], line)
+		}
+	}
+}
+
+var inspectModulePattern = regexp.MustCompile(`^module\s+([A-Za-z0-9_.']+)\s+where\b`)
+
+// DamlcInspectCommand builds the inspect invocation, accepting either damlc
+// directly or the daml assistant. Ports damlc_inspect_command.
+func DamlcInspectCommand(damlc, darPath string) []string {
+	executable := expandUser(damlc)
+	if filepath.Base(executable) == "damlc" {
+		return []string{executable, "inspect", darPath, "--detail", "2"}
+	}
+	return []string{executable, "damlc", "inspect", darPath, "--detail", "2"}
+}
+
+func expandUser(path string) string {
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(home, strings.TrimPrefix(path, "~"))
+}
+
+// childEnv mirrors daml_child_env for the inspect subprocess: DPM_RESOLUTION_FILE
+// is dropped so damlc resolves the target package rather than this component's
+// plugin context, and a UTF-8 locale is forced.
+func childEnv() []string {
+	env := map[string]string{}
+	for _, entry := range os.Environ() {
+		if key, value, found := strings.Cut(entry, "="); found {
+			env[key] = value
+		}
+	}
+	delete(env, "DPM_RESOLUTION_FILE")
+
+	ctype := env["LC_ALL"]
+	if ctype == "" {
+		ctype = env["LC_CTYPE"]
+	}
+	if ctype == "" {
+		ctype = env["LANG"]
+	}
+	if !strings.Contains(strings.ToLower(ctype), "utf") {
+		env["LANG"] = "C.UTF-8"
+		env["LC_ALL"] = "C.UTF-8"
+	}
+
+	out := make([]string, 0, len(env))
+	for key, value := range env {
+		out = append(out, key+"="+value)
+	}
+	return out
 }

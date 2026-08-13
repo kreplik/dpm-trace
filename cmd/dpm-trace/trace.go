@@ -42,6 +42,7 @@ func runTrace(args []string) int {
 		completionTimeout  = 1000
 		logFile            []string
 		sourceRoot         []string
+		damlc              string
 		sourceMode         = "auto"
 		explainAPIs        bool
 		exportPath         string
@@ -72,8 +73,15 @@ func runTrace(args []string) int {
 			}
 			i++
 			damlYAML = append(damlYAML, args[i])
-		case "--damlc", "--debug-info":
-			fmt.Fprintf(os.Stderr, "error: %s needs damlc inspect, which is not ported yet; use python -m dpm_trace.cli\n", arg)
+		case "--damlc":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --damlc requires a path")
+				return 2
+			}
+			i++
+			damlc = args[i]
+		case "--debug-info":
+			fmt.Fprintln(os.Stderr, "error: --debug-info is not ported yet; use python -m dpm_trace.cli")
 			return 2
 		case "--submitter", "--ledger-url":
 			if i+1 >= len(args) {
@@ -270,6 +278,8 @@ func runTrace(args []string) int {
 	readAs = config.Strings(readAs, cfg, "DPM_TRACE_READ_AS", "readAs", "read_as", "party")
 	damlYAML = config.Strings(damlYAML, cfg, "DPM_TRACE_DAML_YAML", "damlYamlPaths", "daml_yaml_paths", "damlYaml", "daml_yaml")
 	sourceRoot = config.Strings(sourceRoot, cfg, "DPM_TRACE_SOURCE_ROOT", "sourceRoots", "source_roots", "sourceRoot", "source_root")
+	dar = config.Strings(dar, cfg, "DPM_TRACE_DAR", "darPaths", "dar_paths", "dar")
+	damlc = config.String(damlc, cfg, "DPM_TRACE_DAMLC", "damlc")
 
 	index := source.NewIndex()
 	for _, path := range damlYAML {
@@ -277,6 +287,14 @@ func runTrace(args []string) int {
 	}
 	for _, root := range sourceRoot {
 		index.LoadSourceRoot(root)
+	}
+	// damlc inspect confirms a failure literal exists in the compiled package,
+	// so matches are labelled "damlc inspect: <module>" rather than the weaker
+	// "local source".
+	if len(dar) > 0 {
+		for _, path := range dar {
+			index.LoadDARInspect(path, orDefaultString(damlc, "daml"))
+		}
 	}
 	color := render.ColorFromMode(colorMode, isTTY())
 
