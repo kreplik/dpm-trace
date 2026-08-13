@@ -6,6 +6,8 @@ import (
 
 	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
+	"github.com/walnuthq/dpm-trace/internal/source"
+	"github.com/walnuthq/dpm-trace/internal/visualizer"
 )
 
 // runOpen reopens an exported trace artifact. Ports run_open, minus --visualize
@@ -18,6 +20,7 @@ func runOpen(args []string) int {
 	var (
 		path      string
 		printJSON bool
+		visualize bool
 		colorMode = "auto"
 	)
 	for i := 0; i < len(args); i++ {
@@ -32,8 +35,7 @@ func runOpen(args []string) int {
 			i++
 			colorMode = args[i]
 		case "--visualize":
-			fmt.Fprintln(os.Stderr, "error: --visualize is not ported yet; use python -m dpm_trace.cli")
-			return 2
+			visualize = true
 		default:
 			if path != "" {
 				fmt.Fprintf(os.Stderr, "error: unexpected argument %q\n", arg)
@@ -68,8 +70,14 @@ func runOpen(args []string) int {
 		return 0
 	}
 
+	color := render.ColorFromMode(colorMode, isTTY())
+	// The summary is printed for both paths, as run_open does.
 	fmt.Println(render.TraceArtifactSummary(artifact))
-	render.PrettyTrace(os.Stdout, trace, render.ColorFromMode(colorMode, isTTY()))
+	if visualize {
+		visualizer.New(trace, color, source.NewIndex(), os.Stdout).Run(os.Stdin)
+		return 0
+	}
+	render.PrettyTrace(os.Stdout, trace, color)
 	return 0
 }
 

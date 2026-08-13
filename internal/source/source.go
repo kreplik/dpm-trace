@@ -17,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/walnuthq/dpm-trace/internal/model"
 )
 
 // Location is a resolved position in a Daml source file.
@@ -440,4 +442,13 @@ func childEnv() []string {
 		out = append(out, key+"="+value)
 	}
 	return out
+}
+
+// LocationForEvent resolves an event to its template or choice definition.
+//
+// The lookup tables it needs are populated only by debug info, which is not
+// ported, so this currently always reports no location -- the same as Python
+// without --debug-info. Ports SourceIndex.location_for_event.
+func (ix *Index) LocationForEvent(ev *model.Event) *Location {
+	return nil
 }

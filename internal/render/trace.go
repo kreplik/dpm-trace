@@ -340,3 +340,76 @@ func joinField(obj map[string]any, key string) string {
 	values, _ := obj[key].([]string)
 	return strings.Join(values, ", ")
 }
+
+// PrintSummary writes the header the visualizer opens with.
+// Ports print_summary.
+func PrintSummary(w io.Writer, trace *model.Trace) {
+	fmt.Fprintf(w, "update:      %s\n", trace.UpdateID)
+	fmt.Fprintf(w, "source:      %s (%s)\n", trace.Source, orDash(trace.SourceURL))
+	fmt.Fprintf(w, "record time: %s\n", orDash(trace.RecordTime))
+	fmt.Fprintf(w, "offset:      %s\n", orDash(trace.Offset))
+	fmt.Fprintf(w, "synchronizer:%s\n", orDash(trace.SynchronizerID))
+	fmt.Fprintf(w, "projection:  %s\n", trace.Projection.Note)
+	if len(trace.Projection.ReadAs) > 0 {
+		fmt.Fprintf(w, "read-as:     %s\n", strings.Join(trace.Projection.ReadAs, ", "))
+	}
+	fmt.Fprintf(w, "events:      %d\n", len(trace.EventsByID))
+}
+
+// DebugContextReport states what a trace does and does not contain.
+//
+// The "not present" half is the point: an artifact is a participant projection,
+// and a reader must not mistake absence for evidence. Ports debug_context_report.
+func DebugContextReport(trace *model.Trace) string {
+	seen := map[string]bool{}
+	var packageIDs []string
+	for _, ev := range trace.EventsByID {
+		if id := PackageFromTemplate(ev.Template); id != "" && !seen[id] {
+			seen[id] = true
+			packageIDs = append(packageIDs, id)
+		}
+	}
+	sort.Strings(packageIDs)
+
+	structure := "flat event list"
+	if len(trace.RootEventIDs) > 0 {
+		structure = "event order and parent/child links"
+	}
+	present := []string{
+		"participant-visible transaction tree",
+		structure,
+		"choice arguments and create payloads where exposed",
+		"party/witness labels where exposed",
+	}
+	if len(packageIDs) > 0 {
+		shown := packageIDs
+		if len(shown) > 5 {
+			shown = shown[:5]
+		}
+		present = append(present, "package ids referenced by events: "+strings.Join(shown, ", "))
+	}
+
+	missing := []string{
+		"source metadata unless provided by the local project or registry",
+		"full original command envelope unless captured separately",
+		"private subtransactions outside this projection",
+		"operator logs unless attached separately",
+	}
+
+	var b strings.Builder
+	b.WriteString("\nTrace context assessment\n------------------------\nPresent in this trace:\n")
+	for i, item := range present {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString("- " + item)
+	}
+	b.WriteString("\n\nNot present in this trace artifact:\n")
+	for i, item := range missing {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString("- " + item)
+	}
+	return b.String()
+}
