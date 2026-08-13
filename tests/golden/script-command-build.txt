@@ -7,9 +7,9 @@ parse_scalar
   null → None                                          PASS
   true → True                                          PASS
   false → False                                        PASS
-  42 → int 42                                          PASS  got=42
-  -7 → int -7                                          PASS  got=-7
-  3.14 → float                                         PASS  got=3.14
+  42 → str '42'                                        PASS  got="'42'"
+  -7 → str '-7'                                        PASS  got="'-7'"
+  3.14 → str '3.14'                                    PASS  got="'3.14'"
   JSON object                                          PASS  got={'a': 1}
   JSON array                                           PASS  got=[1, 2]
   plain string                                         PASS  got='hello'
@@ -17,7 +17,7 @@ parse_scalar
 
 parse_arg_assignments
 ────────────────────────────────────────
-  count coerced to int                                 PASS  got=5
+  count stays string                                   PASS  got='5'
   name stays string                                    PASS  got='Alice'
   flag coerced to bool                                 PASS  got=True
   missing = raises                                     PASS
@@ -27,8 +27,8 @@ command_arguments
 ────────────────────────────────────────
   no flags → empty dict                                PASS
   --args-json parsed                                   PASS  got={'owner': 'Alice', 'count': 0}
-  --arg overlays --args-json key                       PASS  got={'owner': 'Alice', 'count': 7}
-  --arg preserves base keys                            PASS  got={'owner': 'Alice', 'count': 7}
+  --arg overlays --args-json key                       PASS  got={'owner': 'Alice', 'count': '7'}
+  --arg preserves base keys                            PASS  got={'owner': 'Alice', 'count': '7'}
   --arg only: null coercion                            PASS  got={'x': None, 'y': False}
   --arg only: false coercion                           PASS  got={'x': None, 'y': False}
   --args-json + --args-file raises                     PASS
