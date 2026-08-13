@@ -9,6 +9,7 @@ import lit.formats
 config.name = "dpm-trace-integration"
 config.test_format = lit.formats.ShTest(execute_external=True)  # real /bin/sh: $(...) etc.
 config.suffixes = [".test"]
+config.excludes = ["demos"]
 config.test_source_root = os.path.dirname(__file__)
 config.test_exec_root = os.path.join(config.test_source_root, ".lit")
 
@@ -34,6 +35,7 @@ config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_IT_DAML", "daml
 # %ledger2 must precede %ledger -- otherwise "%ledger" matches inside "%ledger2".
 config.substitutions.append(("%ledger2", os.environ.get("DPM_TRACE_IT_LEDGER2", "")))
 config.substitutions.append(("%ledger", ledger))
+config.substitutions.append(("%issuer", os.environ.get("DPM_TRACE_IT_ISSUER", "")))
 config.substitutions.append(("%alice", os.environ.get("DPM_TRACE_IT_ALICE", "")))
 config.substitutions.append(("%bob", os.environ.get("DPM_TRACE_IT_BOB", "")))
 config.substitutions.append(("%dar", os.environ.get("DPM_TRACE_IT_DAR", "")))

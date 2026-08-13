@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
+
+	"github.com/walnuthq/dpm-trace/internal/config"
+	"github.com/walnuthq/dpm-trace/internal/ledger"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
@@ -20,6 +24,13 @@ func runCompare(args []string) int {
 		prepared       string
 		update         string
 		completionFile string
+		ledgerURL      string
+		scanURL        string
+		readAs         []string
+		token          string
+		tokenFile      string
+		configPath     string
+		dar            []string
 		printJSON      bool
 		full           bool
 		colorMode      = "auto"
@@ -58,6 +69,56 @@ func runCompare(args []string) int {
 			}
 			i++
 			completionFile = args[i]
+		case "--submitter", "--participant-url", "--ledger-url":
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: %s requires a URL\n", arg)
+				return 2
+			}
+			i++
+			ledgerURL = args[i]
+		case "--scan-url":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --scan-url requires a URL")
+				return 2
+			}
+			i++
+			scanURL = args[i]
+		case "--read-as", "--party":
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: %s requires a party id\n", arg)
+				return 2
+			}
+			i++
+			readAs = append(readAs, args[i])
+		case "--token":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --token requires a value")
+				return 2
+			}
+			i++
+			token = args[i]
+		case "--token-file", "--access-token-file":
+			if i+1 >= len(args) {
+				fmt.Fprintf(os.Stderr, "error: %s requires a path\n", arg)
+				return 2
+			}
+			i++
+			tokenFile = args[i]
+		case "--config":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --config requires a path")
+				return 2
+			}
+			i++
+			configPath = args[i]
+		case "--dar":
+			// Recorded only: damlc-inspect verification is not ported.
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --dar requires a path")
+				return 2
+			}
+			i++
+			dar = append(dar, args[i])
 		case "--command-id":
 			fmt.Fprintln(os.Stderr, "error: --command-id needs a ledger connection, which is not ported yet; use python -m dpm_trace.cli")
 			return 2
@@ -65,8 +126,22 @@ func runCompare(args []string) int {
 			targets = append(targets, arg)
 		}
 	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	ledgerURL = config.String(ledgerURL, cfg, "DPM_TRACE_LEDGER_URL", "ledgerUrl", "ledger_url")
+	scanURL = config.String(scanURL, cfg, "DPM_TRACE_SCAN_URL", "scanUrl", "scan_url")
+	token = config.String(token, cfg, "DPM_TRACE_TOKEN", "token")
+	tokenFile = config.String(tokenFile, cfg, "DPM_TRACE_TOKEN_FILE", "tokenFile", "token_file")
+	if len(readAs) == 0 {
+		readAs = config.Strings(nil, cfg, "DPM_TRACE_READ_AS", "readAs", "read_as", "party")
+	}
+	fetch := traceFetcher{ledgerURL: ledgerURL, scanURL: scanURL, readAs: readAs, token: token, tokenFile: tokenFile}
+
 	if prepared != "" {
-		return runComparePrepared(prepared, update, completionFile, printJSON, full, colorMode)
+		return runComparePrepared(prepared, update, completionFile, printJSON, full, colorMode, fetch)
 	}
 
 	if len(targets) != 2 {
@@ -74,12 +149,12 @@ func runCompare(args []string) int {
 		return 2
 	}
 
-	left, err := traceFromFile(targets[0])
+	left, err := fetch.trace(targets[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	right, err := traceFromFile(targets[1])
+	right, err := fetch.trace(targets[1])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -99,18 +174,65 @@ func runCompare(args []string) int {
 	return 0
 }
 
-// traceFromFile reads a committed trace artifact. Fetching by update id needs
-// internal/ledger and is not ported yet.
-func traceFromFile(target string) (*model.Trace, error) {
-	artifact, err := model.LoadTraceArtifact(target)
+// traceFetcher resolves a compare target: an artifact file if one exists at
+// that path, otherwise an update id fetched from a participant.
+// Ports fetch_trace_for_compare.
+type traceFetcher struct {
+	ledgerURL string
+	scanURL   string
+	readAs    []string
+	token     string
+	tokenFile string
+}
+
+func (f traceFetcher) trace(target string) (*model.Trace, error) {
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		artifact, err := model.LoadTraceArtifact(target)
+		if err != nil {
+			return nil, err
+		}
+		return model.TraceFromArtifact(artifact)
+	}
+
+	updateID := extractUpdateID(target)
+	parties := ledger.ParseParties(f.readAs)
+	resolvedToken, err := ledger.ResolveToken(f.token, f.tokenFile)
 	if err != nil {
 		return nil, err
 	}
-	return model.TraceFromArtifact(artifact)
+
+	var (
+		raw       *model.Object
+		sourceTag string
+		url       string
+	)
+	switch {
+	case f.scanURL != "":
+		raw, sourceTag, url, err = ledger.New(f.scanURL, resolvedToken).LoadScanUpdate(updateID)
+	case f.ledgerURL != "":
+		raw, sourceTag, url, err = ledger.New(f.ledgerURL, resolvedToken).LoadUpdate(updateID, parties)
+	default:
+		return nil, ledger.ErrNoSource
+	}
+	if err != nil {
+		return nil, err
+	}
+	return model.NormalizeTrace(raw, sourceTag, url, parties)
+}
+
+var updateURLPattern = regexp.MustCompile(`/update/([^/?#]+)`)
+
+// extractUpdateID accepts a bare update id or a CantonScan update URL.
+// Ports extract_update_id.
+func extractUpdateID(target string) string {
+	if match := updateURLPattern.FindStringSubmatch(target); match != nil {
+		return match[1]
+	}
+	return target
 }
 
 // runComparePrepared compares a prepared command against a committed update.
-func runComparePrepared(preparedPath, update, completionFile string, printJSON, full bool, colorMode string) int {
+func runComparePrepared(preparedPath, update, completionFile string, printJSON, full bool, colorMode string, fetch traceFetcher) int {
 	if completionFile != "" {
 		return runComparePreparedCompletion(preparedPath, completionFile, printJSON, full, colorMode)
 	}
@@ -123,7 +245,7 @@ func runComparePrepared(preparedPath, update, completionFile string, printJSON, 
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	trace, err := traceFromFile(update)
+	trace, err := fetch.trace(update)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1

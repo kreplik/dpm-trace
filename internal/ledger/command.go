@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
@@ -147,13 +146,12 @@ func ParseArgAssignments(values []string) (*model.Object, error) {
 	return result, nil
 }
 
-var (
-	intPattern   = regexp.MustCompile(`^-?[0-9]+$`)
-	floatPattern = regexp.MustCompile(`^-?[0-9]+\.[0-9]+$`)
-)
-
-// ParseScalar infers a JSON type from an --arg value, falling back to a string.
-// Ports parse_scalar.
+// ParseScalar infers a JSON type for an --arg value. Ports parse_scalar.
+//
+// Numbers stay strings on purpose. Every numeric field in Daml LF is Int64 or
+// Numeric, and the JSON Ledger API encodes both as JSON strings (Int64 does not
+// survive a JavaScript number). Canton 3.5 rejects a JSON number with
+// "Expected ujson.Str", so --arg quantity=100 must send "100".
 func ParseScalar(value string) any {
 	switch value {
 	case "null":
@@ -162,12 +160,6 @@ func ParseScalar(value string) any {
 		return true
 	case "false":
 		return false
-	}
-	if intPattern.MatchString(value) {
-		return json.Number(value)
-	}
-	if floatPattern.MatchString(value) {
-		return json.Number(value)
 	}
 	if strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[") {
 		var decoded any

@@ -133,6 +133,13 @@ var openFlags = []flagDoc{
 
 var compareFlags = []flagDoc{
 	{"--prepared PATH", "Prepared artifact to compare from."},
+	{"--submitter URL", "Ledger JSON API base URL, to fetch updates by id."},
+	{"--scan-url URL", "Scan API base URL, to fetch updates by id."},
+	{"--read-as PARTY", "Party to read as. Repeatable. Alias of --party."},
+	{"--token TOKEN", "Bearer token for the Ledger JSON API."},
+	{"--token-file PATH", "Bearer token file. Alias of --access-token-file."},
+	{"--dar PATH", "Local DAR. Recorded only; damlc inspect is not ported."},
+	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
 	{"--update PATH", "Committed trace artifact to compare against."},
 	{"--completion-file PATH", "Captured completion to compare against."},
 	{"--full", "Verbose comparison instead of the compact view."},
