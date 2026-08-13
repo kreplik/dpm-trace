@@ -41,6 +41,9 @@ func runTrace(args []string) int {
 		completionLimit    = 100
 		completionTimeout  = 1000
 		logFile            []string
+		sourceRoot         []string
+		sourceMode         = "auto"
+		explainAPIs        bool
 		exportPath         string
 		waitSeconds        float64
 		dar                []string
@@ -128,6 +131,41 @@ func runTrace(args []string) int {
 			}
 			i++
 			dar = append(dar, args[i])
+		case "--explain-apis":
+			explainAPIs = true
+			continue
+		case "--source-root":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --source-root requires a path")
+				return 2
+			}
+			i++
+			sourceRoot = append(sourceRoot, args[i])
+		case "--source":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --source requires auto, scan or ledger")
+				return 2
+			}
+			i++
+			sourceMode = args[i]
+			switch sourceMode {
+			case "auto", "scan", "ledger":
+			default:
+				fmt.Fprintf(os.Stderr, "error: --source must be auto, scan or ledger, not %q\n", sourceMode)
+				return 2
+			}
+		case "--max-source-locations":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --max-source-locations requires a number")
+				return 2
+			}
+			i++
+			parsed, err := strconv.Atoi(args[i])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: --max-source-locations must be a number: %q\n", args[i])
+				return 2
+			}
+			maxSourceLocations = parsed
 		case "--log-file":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --log-file requires a path")
@@ -213,6 +251,13 @@ func runTrace(args []string) int {
 			target = arg
 		}
 	}
+	if explainAPIs {
+		fmt.Println(render.ExplainAPIs(ledger.ScanUpdatePath+"{update_id}", ledger.UpdateByIDPath))
+		if target == "" && commandID == "" {
+			return 0
+		}
+	}
+
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -224,10 +269,14 @@ func runTrace(args []string) int {
 	tokenFile = config.String(tokenFile, cfg, "DPM_TRACE_TOKEN_FILE", "tokenFile", "token_file")
 	readAs = config.Strings(readAs, cfg, "DPM_TRACE_READ_AS", "readAs", "read_as", "party")
 	damlYAML = config.Strings(damlYAML, cfg, "DPM_TRACE_DAML_YAML", "damlYamlPaths", "daml_yaml_paths", "damlYaml", "daml_yaml")
+	sourceRoot = config.Strings(sourceRoot, cfg, "DPM_TRACE_SOURCE_ROOT", "sourceRoots", "source_roots", "sourceRoot", "source_root")
 
 	index := source.NewIndex()
 	for _, path := range damlYAML {
 		index.LoadDamlYAML(path)
+	}
+	for _, root := range sourceRoot {
+		index.LoadSourceRoot(root)
 	}
 	color := render.ColorFromMode(colorMode, isTTY())
 
@@ -288,9 +337,9 @@ func runTrace(args []string) int {
 	)
 	fetch := func() error {
 		switch {
-		case scanURL != "":
+		case sourceMode == "scan" || (sourceMode == "auto" && scanURL != ""):
 			raw, sourceTag, url, err = ledger.New(scanURL, resolvedToken).LoadScanUpdate(target)
-		case ledgerURL != "":
+		case sourceMode == "ledger" || (sourceMode == "auto" && ledgerURL != ""):
 			raw, sourceTag, url, err = ledger.New(ledgerURL, resolvedToken).LoadUpdate(target, readAs)
 		default:
 			return ledger.ErrNoSource
