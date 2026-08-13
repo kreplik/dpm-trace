@@ -1,0 +1,22 @@
+{
+  "schema": "daml-debug-info/v1",
+  "packageId": "pkg2ccdd",
+  "sourceRoot": "../source-pkg",
+  "files": [
+    {
+      "path": "FailureDemo.daml",
+      "entities": [
+        {
+          "qualifiedName": "Token:Token",
+          "kind": "template",
+          "startLine": 8
+        },
+        {
+          "qualifiedName": "Token:Token.Transfer",
+          "kind": "choice",
+          "startLine": 14
+        }
+      ]
+    }
+  ]
+}

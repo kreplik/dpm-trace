@@ -43,6 +43,7 @@ func runTrace(args []string) int {
 		logFile            []string
 		sourceRoot         []string
 		damlc              string
+		debugInfo          []string
 		sourceMode         = "auto"
 		explainAPIs        bool
 		exportPath         string
@@ -81,8 +82,12 @@ func runTrace(args []string) int {
 			i++
 			damlc = args[i]
 		case "--debug-info":
-			fmt.Fprintln(os.Stderr, "error: --debug-info is not ported yet; use python -m dpm_trace.cli")
-			return 2
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --debug-info requires a path")
+				return 2
+			}
+			i++
+			debugInfo = append(debugInfo, args[i])
 		case "--submitter", "--ledger-url":
 			if i+1 >= len(args) {
 				fmt.Fprintf(os.Stderr, "error: %s requires a URL\n", arg)
@@ -279,11 +284,15 @@ func runTrace(args []string) int {
 	damlYAML = config.Strings(damlYAML, cfg, "DPM_TRACE_DAML_YAML", "damlYamlPaths", "daml_yaml_paths", "damlYaml", "daml_yaml")
 	sourceRoot = config.Strings(sourceRoot, cfg, "DPM_TRACE_SOURCE_ROOT", "sourceRoots", "source_roots", "sourceRoot", "source_root")
 	dar = config.Strings(dar, cfg, "DPM_TRACE_DAR", "darPaths", "dar_paths", "dar")
+	debugInfo = config.Strings(debugInfo, cfg, "DPM_TRACE_DEBUG_INFO", "debugInfoPaths", "debug_info_paths", "debugInfo", "debug_info")
 	damlc = config.String(damlc, cfg, "DPM_TRACE_DAMLC", "damlc")
 
 	index := source.NewIndex()
 	for _, path := range damlYAML {
 		index.LoadDamlYAML(path)
+	}
+	for _, path := range debugInfo {
+		index.LoadDebugInfo(path)
 	}
 	for _, root := range sourceRoot {
 		index.LoadSourceRoot(root)
@@ -399,7 +408,7 @@ func runTrace(args []string) int {
 		fmt.Println(string(encoded))
 		return 0
 	}
-	render.PrettyTrace(os.Stdout, trace, color)
+	render.PrettyTrace(os.Stdout, trace, color, index)
 	return 0
 }
 

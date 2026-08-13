@@ -217,3 +217,13 @@ func ObjectString(obj *Object, key string) string {
 func ObjectStrings(obj *Object, key string) []string {
 	return listString(pick(obj, key))
 }
+
+// ObjectValue returns a field's raw value.
+func ObjectValue(obj *Object, key string) any {
+	return pick(obj, key)
+}
+
+// ObjectInt returns a field as an integer, or nil when absent or not numeric.
+func ObjectInt(obj *Object, key string) *int64 {
+	return asInt(pick(obj, key))
+}

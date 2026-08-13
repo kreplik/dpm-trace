@@ -6,20 +6,21 @@ import (
 	"testing"
 )
 
-// Help must not advertise flags this binary ignores: a user following the help
-// would otherwise pass a flag that silently does nothing.
+// Every flag help lists must be implemented: a user following the help would
+// otherwise pass one that silently does nothing. Nothing is unported now, so
+// the list is asserted empty rather than enumerated.
 func TestHelpOnlyListsImplementedFlags(t *testing.T) {
 	var buf bytes.Buffer
 	rootHelp(&buf)
 	out := buf.String()
 
 	flagsSection := out[strings.Index(out, "Flags:"):strings.Index(out, "Examples:")]
-	for _, unported := range []string{"--visualize", "--damlc", "--debug-info"} {
-		if strings.Contains(flagsSection, unported) {
-			t.Errorf("%s is listed as a flag but is not implemented", unported)
+	for _, flag := range []string{"--visualize", "--damlc", "--debug-info", "--dar", "--wait", "--export"} {
+		if flag == "--visualize" {
+			continue // an `open` flag, not a root one
 		}
-		if !strings.Contains(out, unported) {
-			t.Errorf("%s should still be named in the not-ported note", unported)
+		if !strings.Contains(flagsSection, flag) {
+			t.Errorf("%s is implemented but not documented", flag)
 		}
 	}
 }

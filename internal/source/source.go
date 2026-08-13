@@ -39,6 +39,8 @@ type Index struct {
 	fileModules  map[string]string   // path -> module name
 	moduleFiles  map[string][]string // module name -> paths
 	inspectModul map[string][]string // module name -> lines from damlc inspect
+	templates    map[string]Location // "<pkg>:<module>:<entity>" -> definition
+	choices      map[string]Location // "<pkg>:<module>:<entity>.<choice>"
 }
 
 // NewIndex returns an empty index.
@@ -48,6 +50,8 @@ func NewIndex() *Index {
 		fileModules:  map[string]string{},
 		moduleFiles:  map[string][]string{},
 		inspectModul: map[string][]string{},
+		templates:    map[string]Location{},
+		choices:      map[string]Location{},
 	}
 }
 
@@ -254,9 +258,14 @@ func (ix *Index) Snippet(loc Location, radius int) string {
 	return FormatPath(loc) + "\n" + strings.Join(rendered, "\n")
 }
 
-// FormatPath renders "path:line:column".
+// FormatPath renders "path:line", adding the column only when it is meaningful.
+// A column of 1 usually means "start of line" rather than a resolved position.
+// Ports format_source_path.
 func FormatPath(loc Location) string {
-	return fmt.Sprintf("%s:%d:%d", loc.Path, loc.Line, loc.Column)
+	if loc.Column > 1 {
+		return fmt.Sprintf("%s:%d:%d", loc.Path, loc.Line, loc.Column)
+	}
+	return fmt.Sprintf("%s:%d", loc.Path, loc.Line)
 }
 
 var needlePatterns = []*regexp.Regexp{
@@ -444,11 +453,109 @@ func childEnv() []string {
 	return out
 }
 
-// LocationForEvent resolves an event to its template or choice definition.
-//
-// The lookup tables it needs are populated only by debug info, which is not
-// ported, so this currently always reports no location -- the same as Python
-// without --debug-info. Ports SourceIndex.location_for_event.
+// LocationForEvent resolves an event to where its template or choice is
+// defined. Only debug info populates these tables, so without --debug-info this
+// reports no location, matching Python. Ports SourceIndex.location_for_event.
 func (ix *Index) LocationForEvent(ev *model.Event) *Location {
+	packageID, module, entity, ok := ParseTemplateRef(ev.Template)
+	if !ok {
+		return nil
+	}
+	key := packageID + ":" + module + ":" + entity
+	if ev.Choice != "" {
+		if loc, found := ix.choices[key+"."+ev.Choice]; found {
+			return &loc
+		}
+		return nil
+	}
+	if loc, found := ix.templates[key]; found {
+		return &loc
+	}
 	return nil
+}
+
+// LoadDebugInfo reads a daml-debug-info/v1 file: a package id, a source root
+// and per-file entity positions.
+//
+// This is what makes `s`/`source` and per-event source lines work -- it maps a
+// template or choice to where it is defined, which neither local text matching
+// nor damlc inspect can do. Ports SourceIndex._load_debug_info.
+func (ix *Index) LoadDebugInfo(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	doc, err := model.Decode(data)
+	if err != nil {
+		return
+	}
+	packageID := model.ObjectString(doc, "packageId")
+	if packageID == "" {
+		return
+	}
+
+	sourceRoot := model.ObjectString(doc, "sourceRoot")
+	if sourceRoot == "" {
+		sourceRoot = filepath.Dir(path)
+	}
+	sourceRoot = expandUser(sourceRoot)
+	if !filepath.IsAbs(sourceRoot) {
+		if resolved, err := filepath.Abs(filepath.Join(filepath.Dir(path), sourceRoot)); err == nil {
+			sourceRoot = resolved
+		}
+	}
+	if !containsString(ix.Roots, sourceRoot) {
+		ix.Roots = append(ix.Roots, sourceRoot)
+	}
+
+	files, _ := model.ObjectValue(doc, "files").([]any)
+	for _, item := range files {
+		fileInfo, ok := item.(*model.Object)
+		if !ok {
+			continue
+		}
+		rawPath := model.ObjectString(fileInfo, "path")
+		if rawPath == "" {
+			continue
+		}
+		filePath := expandUser(rawPath)
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(sourceRoot, filePath)
+		}
+		if content, err := os.ReadFile(filePath); err == nil {
+			ix.files[filePath] = splitLines(string(content))
+		}
+
+		entities, _ := model.ObjectValue(fileInfo, "entities").([]any)
+		for _, raw := range entities {
+			entity, ok := raw.(*model.Object)
+			if !ok {
+				continue
+			}
+			name := model.ObjectString(entity, "qualifiedName")
+			kind := model.ObjectString(entity, "kind")
+			line := model.ObjectInt(entity, "startLine")
+			if name == "" || kind == "" || line == nil {
+				continue
+			}
+			key := packageID + ":" + name
+			loc := Location{Path: filePath, Line: int(*line), Label: name, Column: 1}
+			switch kind {
+			case "template":
+				ix.templates[key] = loc
+			case "choice":
+				ix.choices[key] = loc
+			}
+		}
+	}
+}
+
+// ParseTemplateRef splits a package:module:entity template reference.
+// Ports parse_template_ref.
+func ParseTemplateRef(template string) (packageID, module, entity string, ok bool) {
+	parts := strings.Split(template, ":")
+	if template == "" || len(parts) < 3 {
+		return "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], true
 }

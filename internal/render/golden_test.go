@@ -41,7 +41,7 @@ func TestRendersMatchGoldens(t *testing.T) {
 			var buf bytes.Buffer
 			buf.WriteString(TraceArtifactSummary(artifact))
 			buf.WriteString("\n")
-			PrettyTrace(&buf, trace, Color{Enabled: false})
+			PrettyTrace(&buf, trace, Color{Enabled: false}, nil)
 
 			got := strings.TrimRight(buf.String(), "\n")
 			want := goldenStdout(t, filepath.Join(root, tc.golden))
@@ -66,7 +66,7 @@ func TestPayloadRendersInDocumentOrder(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	PrettyTrace(&buf, trace, Color{Enabled: false})
+	PrettyTrace(&buf, trace, Color{Enabled: false}, nil)
 	const want = "payload: { payer: Alice, owner: Bob, amount: {\"currency\": \"USD\", \"value\": \"100.0000000000\"}, viewers: [] }"
 	if !strings.Contains(buf.String(), want) {
 		t.Errorf("payload line missing or reordered; want:\n%s", want)
