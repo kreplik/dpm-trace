@@ -34,6 +34,12 @@ func runTrace(args []string) int {
 		token              string
 		tokenFile          string
 		configPath         string
+		commandID          string
+		actAs              []string
+		completionUserID   string
+		beginExclusive     string
+		completionLimit    = 100
+		completionTimeout  = 1000
 		exportPath         string
 		waitSeconds        float64
 		dar                []string
@@ -121,6 +127,58 @@ func runTrace(args []string) int {
 			}
 			i++
 			dar = append(dar, args[i])
+		case "--command-id":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --command-id requires a value")
+				return 2
+			}
+			i++
+			commandID = args[i]
+		case "--act-as":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --act-as requires a party id")
+				return 2
+			}
+			i++
+			actAs = append(actAs, args[i])
+		case "--completion-user-id":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --completion-user-id requires a value")
+				return 2
+			}
+			i++
+			completionUserID = args[i]
+		case "--begin-exclusive":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --begin-exclusive requires an offset")
+				return 2
+			}
+			i++
+			beginExclusive = args[i]
+		case "--completion-limit":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --completion-limit requires a number")
+				return 2
+			}
+			i++
+			parsed, err := strconv.Atoi(args[i])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: --completion-limit must be a number: %q\n", args[i])
+				return 2
+			}
+			completionLimit = parsed
+		case "--completion-timeout-ms":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --completion-timeout-ms requires a number")
+				return 2
+			}
+			i++
+			parsed, err := strconv.Atoi(args[i])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: --completion-timeout-ms must be a number: %q\n", args[i])
+				return 2
+			}
+			completionTimeout = parsed
 		case "--config":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --config requires a path")
@@ -167,6 +225,33 @@ func runTrace(args []string) int {
 
 	if completionFile != "" {
 		completion, err := model.LoadCompletion(completionFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
+		return 0
+	}
+
+	if commandID != "" {
+		lookupToken, err := ledger.ResolveToken(token, tokenFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		// parse_parties over act-as, read-as and party, in that order. --party
+		// is folded into readAs when the flags are parsed.
+		parties := make([]string, 0, len(actAs)+len(readAs))
+		parties = append(parties, actAs...)
+		parties = append(parties, readAs...)
+		completion, err := ledger.New(ledgerURL, lookupToken).FetchCompletion(ledger.CompletionLookup{
+			CommandID:      commandID,
+			Parties:        ledger.ParseParties(parties),
+			UserID:         completionUserID,
+			BeginExclusive: beginExclusive,
+			Limit:          completionLimit,
+			TimeoutMs:      completionTimeout,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1

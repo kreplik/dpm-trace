@@ -59,6 +59,21 @@ func New(baseURL, token string) *Client {
 // retried with exponential backoff, 4xx never is. Pass retry=false for
 // non-idempotent calls such as submit-and-wait, where a retry could double-submit.
 func (c *Client) JSON(method, url string, body map[string]any, retry bool) (*model.Object, error) {
+	value, err := c.JSONValue(method, url, body, retry)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := value.(*model.Object)
+	if !ok {
+		return nil, fmt.Errorf("%s %s returned %T, expected a JSON object", method, url, value)
+	}
+	return obj, nil
+}
+
+// JSONValue performs a request and decodes any top-level JSON value. The
+// completions endpoint returns an array, so callers that may receive one use
+// this rather than JSON.
+func (c *Client) JSONValue(method, url string, body map[string]any, retry bool) (any, error) {
 	attempts := 1
 	if retry {
 		attempts = RetryAttempts
@@ -66,9 +81,9 @@ func (c *Client) JSON(method, url string, body map[string]any, retry bool) (*mod
 
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
-		obj, err, transient := c.once(method, url, body)
+		value, err, transient := c.once(method, url, body)
 		if err == nil {
-			return obj, nil
+			return value, nil
 		}
 		lastErr = err
 		if !transient || attempt == attempts-1 {
@@ -83,7 +98,7 @@ func (c *Client) JSON(method, url string, body map[string]any, retry bool) (*mod
 }
 
 // once performs a single request, reporting whether the failure is retryable.
-func (c *Client) once(method, url string, body map[string]any) (*model.Object, error, bool) {
+func (c *Client) once(method, url string, body map[string]any) (any, error, bool) {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := model.Encode(body)
@@ -128,11 +143,11 @@ func (c *Client) once(method, url string, body map[string]any) (*model.Object, e
 		return nil, readErr, true
 	}
 
-	obj, err := model.Decode(data)
+	value, err := model.DecodeValue(data)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s returned invalid JSON: %w", method, url, err), false
 	}
-	return obj, nil, false
+	return value, nil, false
 }
 
 // isTransientStatus reports the 5xx codes a same-request retry can plausibly
