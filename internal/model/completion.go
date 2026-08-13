@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Completion is a submission outcome read from the Ledger API or a captured
@@ -155,4 +156,115 @@ func (c *CompletionComparison) JSON() map[string]any {
 			"logMatches":               logMatches,
 		},
 	}
+}
+
+// AttachLogMatches correlates a completion with operator log lines.
+//
+// Terms shorter than 6 characters are dropped: a short id would match
+// arbitrary log text and the correlation would be noise rather than evidence.
+// Ports attach_log_matches.
+func AttachLogMatches(completion *Object, logFiles []string) *Object {
+	if len(logFiles) == 0 {
+		return completion
+	}
+	terms := CorrelationTerms(completion)
+	matches := []any{}
+
+	for _, path := range logFiles {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			entry := NewObject()
+			entry.Set("file", path)
+			// Python surfaces the OSError text; reproduce the ENOENT form so a
+			// missing log file reads the same from either implementation.
+			entry.Set("error", osErrorText(err, path))
+			matches = append(matches, entry)
+			continue
+		}
+		for i, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			if !containsAnyTerm(line, terms) {
+				continue
+			}
+			text := line
+			if len(text) > 500 {
+				text = text[:500]
+			}
+			entry := NewObject()
+			entry.Set("file", path)
+			entry.Set("line", i+1)
+			entry.Set("text", text)
+			matches = append(matches, entry)
+		}
+	}
+
+	sorted := make([]string, 0, len(terms))
+	for term := range terms {
+		sorted = append(sorted, term)
+	}
+	sortStrings(sorted)
+
+	completion.Set("logMatches", matches)
+	completion.Set("logMatchTerms", toAnyList(sorted))
+	return completion
+}
+
+// CorrelationTerms collects the ids that can tie a completion to a log line.
+// Ports completion_correlation_terms.
+func CorrelationTerms(completion *Object) map[string]bool {
+	terms := map[string]bool{}
+	add := func(value any) {
+		if text := toString(value); text != "" {
+			terms[text] = true
+		}
+	}
+	for _, key := range []string{"commandId", "command_id", "updateId", "update_id",
+		"submissionId", "submission_id", "traceId", "correlationId"} {
+		add(pick(completion, key))
+	}
+	if status, ok := pickObject(completion, "status"); ok {
+		add(pick(status, "traceId"))
+		add(pick(status, "correlationId"))
+	}
+	if traceContext, ok := pickObject(completion, "traceContext"); ok {
+		for _, key := range traceContext.Keys() {
+			value, _ := traceContext.Get(key)
+			add(value)
+		}
+	}
+
+	// A term under 6 characters matches too much log text to be evidence.
+	for term := range terms {
+		if len(term) < 6 {
+			delete(terms, term)
+		}
+	}
+	return terms
+}
+
+func containsAnyTerm(line string, terms map[string]bool) bool {
+	for term := range terms {
+		if term != "" && strings.Contains(line, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func toAnyList(values []string) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, value)
+	}
+	return out
+}
+
+// osErrorText renders a file error the way Python's OSError does.
+func osErrorText(err error, path string) string {
+	if os.IsNotExist(err) {
+		return fmt.Sprintf("[Errno 2] No such file or directory: '%s'", path)
+	}
+	if os.IsPermission(err) {
+		return fmt.Sprintf("[Errno 13] Permission denied: '%s'", path)
+	}
+	return err.Error()
 }

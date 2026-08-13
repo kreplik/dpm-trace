@@ -7,6 +7,7 @@ import (
 	"github.com/walnuthq/dpm-trace/internal/ledger"
 	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
+	"github.com/walnuthq/dpm-trace/internal/source"
 )
 
 // runSubmit submits a command and prints the resulting update id.
@@ -83,8 +84,13 @@ func runSubmit(args []string) int {
 				render.CompletionTrace(os.Stdout, completion,
 					render.ColorFromMode(opts.colorMode, isTTY()), nil, 5)
 			} else {
+				index := source.NewIndex()
+				for _, path := range opts.damlYAML {
+					index.LoadDamlYAML(path)
+				}
+				completion.Raw = model.AttachLogMatches(completion.Raw, opts.logFile)
 				render.SubmitFailure(os.Stdout, completion, request,
-					render.ColorFromMode(opts.colorMode, isTTY()), nil, 5)
+					render.ColorFromMode(opts.colorMode, isTTY()), index, 5)
 			}
 		}
 		if opts.allowFail {

@@ -32,6 +32,22 @@ func Decode(data []byte) (*Object, error) {
 	return obj, nil
 }
 
+// DecodeValue parses any top-level JSON value, not just an object. The
+// completions endpoint returns an array, so callers that may receive one use
+// this rather than Decode.
+func DecodeValue(data []byte) (any, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	value, err := decodeValue(dec)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureEOF(dec); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
 // Encode renders v the way the Python implementation does: two-space indent,
 // sorted keys, and no HTML escaping.
 //
