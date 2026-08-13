@@ -91,9 +91,11 @@ def main() -> int:
     check("null → None", parse_scalar("null") is None)
     check("true → True", parse_scalar("true") is True)
     check("false → False", parse_scalar("false") is False)
-    check("42 → int 42", parse_scalar("42") == 42, parse_scalar("42"))
-    check("-7 → int -7", parse_scalar("-7") == -7, parse_scalar("-7"))
-    check("3.14 → float", abs(parse_scalar("3.14") - 3.14) < 1e-9, parse_scalar("3.14"))
+    # Numbers stay strings: the JSON Ledger API encodes Daml Int64 and Numeric
+    # as JSON strings, and a JSON number is rejected with "Expected ujson.Str".
+    check("42 → str '42'", parse_scalar("42") == "42", repr(parse_scalar("42")))
+    check("-7 → str '-7'", parse_scalar("-7") == "-7", repr(parse_scalar("-7")))
+    check("3.14 → str '3.14'", parse_scalar("3.14") == "3.14", repr(parse_scalar("3.14")))
     check("JSON object", parse_scalar('{"a":1}') == {"a": 1}, parse_scalar('{"a":1}'))
     check("JSON array", parse_scalar("[1,2]") == [1, 2], parse_scalar("[1,2]"))
     check("plain string", parse_scalar("hello") == "hello", parse_scalar("hello"))
@@ -104,7 +106,7 @@ def main() -> int:
     # ── parse_arg_assignments ─────────────────────────────────────────────────
     section("parse_arg_assignments")
     result = parse_arg_assignments(["count=5", "name=Alice", "flag=true"])
-    check("count coerced to int", result.get("count") == 5, result.get("count"))
+    check("count stays string", result.get("count") == "5", result.get("count"))
     check("name stays string", result.get("name") == "Alice", result.get("name"))
     check("flag coerced to bool", result.get("flag") is True, result.get("flag"))
     check_raises("missing = raises", lambda: parse_arg_assignments(["badvalue"]))
@@ -118,7 +120,7 @@ def main() -> int:
     check("--args-json parsed", a == {"owner": "Alice", "count": 0}, a)
 
     b = command_arguments(ns(args_json='{"owner":"Alice"}', arg=["count=7"]))
-    check("--arg overlays --args-json key", b.get("count") == 7, b)
+    check("--arg overlays --args-json key", b.get("count") == "7", b)
     check("--arg preserves base keys", b.get("owner") == "Alice", b)
 
     c = command_arguments(ns(arg=["x=null", "y=false"]))
