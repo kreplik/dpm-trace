@@ -1,7 +1,6 @@
 package ledger
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -13,9 +12,12 @@ func TestParseScalarInfersTypes(t *testing.T) {
 		{"null", nil},
 		{"true", true},
 		{"false", false},
-		{"42", json.Number("42")},
-		{"-7", json.Number("-7")},
-		{"1.5", json.Number("1.5")},
+		// Numbers stay strings: the JSON Ledger API encodes Daml Int64 and
+		// Numeric as strings, and Canton 3.5 rejects a JSON number with
+		// "Expected ujson.Str".
+		{"42", "42"},
+		{"-7", "-7"},
+		{"1.5", "1.5"},
 		{"GOLD", "GOLD"},
 		{"1.2.3", "1.2.3"},         // not a number
 		{"{bad json", "{bad json"}, // invalid JSON stays a string
