@@ -86,8 +86,7 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "workflows use completion data instead.")
 
 	fmt.Fprintln(w, "\nNot ported to the Go build yet (use python -m dpm_trace.cli):")
-	fmt.Fprintln(w, "  --visualize, --damlc, --debug-info (damlc inspect verification;")
-	fmt.Fprintln(w, "  --dar still records package metadata), dpm trace test --integration and --init")
+	fmt.Fprintln(w, "  the source-linked expression replay (unreachable in cli.py too)")
 }
 
 var traceFlags = []flagDoc{
@@ -98,7 +97,9 @@ var traceFlags = []flagDoc{
 	{"--token-file PATH", "Bearer token file. Alias of --access-token-file."},
 	{"--completion-file PATH", "Inspect a captured completion instead of an update."},
 	{"--daml-yaml PATH", "daml.yaml for local source diagnostics. Repeatable."},
-	{"--dar PATH", "Local DAR to record as package metadata. Repeatable."},
+	{"--dar PATH", "Local DAR, verified with damlc inspect. Repeatable."},
+	{"--damlc PATH", "damlc or daml executable for inspection. Defaults to daml."},
+	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--wait SECONDS", "Retry while the update is not yet visible on this participant."},
 	{"--export PATH", "Write a portable trace artifact. Alias of --out."},
 	{"--print-json", "Print the normalized trace JSON and exit."},
@@ -127,6 +128,8 @@ func commandHelp(w io.Writer, usage, description string, flags []flagDoc, notPor
 
 var openFlags = []flagDoc{
 	{"--print-json", "Print the artifact JSON and exit."},
+	{"--visualize", "Open the interactive transaction visualizer."},
+	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
 }

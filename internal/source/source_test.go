@@ -1,9 +1,12 @@
 package source
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/walnuthq/dpm-trace/internal/model"
 )
 
 func testIndex(t *testing.T) *Index {
@@ -91,5 +94,74 @@ func TestMissingDamlYAMLIsIgnored(t *testing.T) {
 	}
 	if locations := ix.FindFailureText("anything", 5); len(locations) != 0 {
 		t.Errorf("expected no locations, got %d", len(locations))
+	}
+}
+
+// Debug info is what resolves a template or choice to its definition; without
+// it, LocationForEvent has nothing to look up.
+func TestLoadDebugInfoResolvesTemplatesAndChoices(t *testing.T) {
+	ix := NewIndex()
+	ix.LoadDebugInfo(filepath.Join("..", "..", "tests/fixtures/debug-info/token-debug-info.json"))
+	if !ix.HasSources() {
+		t.Fatal("debug info did not load the referenced source file")
+	}
+
+	template := &model.Event{Template: "pkg2ccdd:Token:Token", Kind: model.KindCreate}
+	loc := ix.LocationForEvent(template)
+	if loc == nil {
+		t.Fatal("template not resolved")
+	}
+	if loc.Line != 8 || loc.Label != "Token:Token" {
+		t.Errorf("template at %d (%q), want line 8", loc.Line, loc.Label)
+	}
+
+	choice := &model.Event{Template: "pkg2ccdd:Token:Token", Kind: model.KindExercise, Choice: "Transfer"}
+	loc = ix.LocationForEvent(choice)
+	if loc == nil {
+		t.Fatal("choice not resolved")
+	}
+	if loc.Line != 14 || loc.Label != "Token:Token.Transfer" {
+		t.Errorf("choice at %d (%q), want line 14", loc.Line, loc.Label)
+	}
+}
+
+// A package id that does not match must not resolve: debug info is per package.
+func TestLocationForEventRequiresMatchingPackage(t *testing.T) {
+	ix := NewIndex()
+	ix.LoadDebugInfo(filepath.Join("..", "..", "tests/fixtures/debug-info/token-debug-info.json"))
+	other := &model.Event{Template: "otherpkg:Token:Token", Kind: model.KindCreate}
+	if loc := ix.LocationForEvent(other); loc != nil {
+		t.Errorf("resolved %v for a different package", loc)
+	}
+}
+
+// Source mapping is best-effort: a missing or malformed file must be ignored.
+func TestLoadDebugInfoIgnoresBadInput(t *testing.T) {
+	ix := NewIndex()
+	ix.LoadDebugInfo("/nonexistent/debug.json")
+
+	bad := filepath.Join(t.TempDir(), "bad.json")
+	if err := os.WriteFile(bad, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix.LoadDebugInfo(bad)
+
+	noPackage := filepath.Join(t.TempDir(), "nopkg.json")
+	if err := os.WriteFile(noPackage, []byte(`{"files": []}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ix.LoadDebugInfo(noPackage)
+
+	if ix.HasSources() {
+		t.Error("bad input should load nothing")
+	}
+}
+
+func TestFormatPathOmitsColumnOne(t *testing.T) {
+	if got := FormatPath(Location{Path: "/a/B.daml", Line: 8, Column: 1}); got != "/a/B.daml:8" {
+		t.Errorf("got %q, want the column omitted", got)
+	}
+	if got := FormatPath(Location{Path: "/a/B.daml", Line: 8, Column: 18}); got != "/a/B.daml:8:18" {
+		t.Errorf("got %q, want the column included", got)
 	}
 }

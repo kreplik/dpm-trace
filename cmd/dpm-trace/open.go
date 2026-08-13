@@ -21,6 +21,7 @@ func runOpen(args []string) int {
 		path      string
 		printJSON bool
 		visualize bool
+		debugInfo []string
 		colorMode = "auto"
 	)
 	for i := 0; i < len(args); i++ {
@@ -36,6 +37,13 @@ func runOpen(args []string) int {
 			colorMode = args[i]
 		case "--visualize":
 			visualize = true
+		case "--debug-info":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, "error: --debug-info requires a path")
+				return 2
+			}
+			i++
+			debugInfo = append(debugInfo, args[i])
 		default:
 			if path != "" {
 				fmt.Fprintf(os.Stderr, "error: unexpected argument %q\n", arg)
@@ -70,14 +78,26 @@ func runOpen(args []string) int {
 		return 0
 	}
 
+	// An exported artifact can name its own debug-info files; those are used
+	// alongside anything passed on the command line.
+	index := source.NewIndex()
+	if packages, ok := model.ObjectField(artifact, "packages"); ok {
+		debugInfo = append(debugInfo, model.ObjectStrings(packages, "debugInfoPaths")...)
+	}
+	for _, path := range dedupe(debugInfo) {
+		index.LoadDebugInfo(path)
+	}
+
 	color := render.ColorFromMode(colorMode, isTTY())
 	// The summary is printed for both paths, as run_open does.
 	fmt.Println(render.TraceArtifactSummary(artifact))
 	if visualize {
-		visualizer.New(trace, color, source.NewIndex(), os.Stdout).Run(os.Stdin)
+		stepper := visualizer.New(trace, color, index, os.Stdout)
+		stepper.Bundle = artifact
+		stepper.Run(os.Stdin)
 		return 0
 	}
-	render.PrettyTrace(os.Stdout, trace, color)
+	render.PrettyTrace(os.Stdout, trace, color, index)
 	return 0
 }
 
@@ -88,4 +108,18 @@ func errorText(err error, path string) string {
 		return fmt.Sprintf("[Errno 2] No such file or directory: '%s'", path)
 	}
 	return err.Error()
+}
+
+// dedupe preserves order while dropping repeats and empties, matching unique().
+func dedupe(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }

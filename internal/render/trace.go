@@ -3,19 +3,21 @@ package render
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
+	"github.com/walnuthq/dpm-trace/internal/source"
 )
 
 // PrettyTrace writes the participant-visible trace: header, party aliases and
 // the event tree. Ports print_pretty_trace.
 //
-// Source-index integration is not ported yet; the "source roots" header line
-// and per-event source lines appear once internal/source lands.
-func PrettyTrace(w io.Writer, trace *model.Trace, color Color) {
+// index may be nil, in which case no source lines are emitted -- the same as
+// Python without source metadata.
+func PrettyTrace(w io.Writer, trace *model.Trace, color Color, index *source.Index) {
 	ctx := NewContext(trace)
 
 	fmt.Fprintln(w, color.Apply("Canton trace", "bold"))
@@ -33,6 +35,9 @@ func PrettyTrace(w io.Writer, trace *model.Trace, color Color) {
 	}
 	fmt.Fprintf(w, "  visibility:   %s\n", trace.Projection.Note)
 	fmt.Fprintf(w, "  events:       %s\n", StateDiffSummary(trace, color))
+	if index != nil && index.HasSources() {
+		fmt.Fprintf(w, "  source roots: %s\n", strings.Join(index.Roots, ", "))
+	}
 
 	if len(ctx.PartyAliases) > 0 {
 		fmt.Fprintln(w, "  parties:")
@@ -61,12 +66,12 @@ func PrettyTrace(w io.Writer, trace *model.Trace, color Color) {
 
 	fmt.Fprintln(w, color.Apply("Trace", "bold"))
 	for i, eventID := range trace.RootEventIDs {
-		eventTree(w, trace, eventID, "", i == len(trace.RootEventIDs)-1, color, ctx)
+		eventTree(w, trace, eventID, "", i == len(trace.RootEventIDs)-1, color, ctx, index)
 	}
 }
 
 // eventTree writes one event and its descendants. Ports print_event_tree.
-func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast bool, color Color, ctx *Context) {
+func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast bool, color Color, ctx *Context, index *source.Index) {
 	ev, ok := trace.Event(eventID)
 	if !ok {
 		return
@@ -80,7 +85,7 @@ func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast b
 	}
 	fmt.Fprintln(w, prefix+connector+EventTitle(ev, color))
 
-	details := EventDetailLines(ev, color, ctx)
+	details := EventDetailLines(ev, color, ctx, index)
 	for i, line := range details {
 		detailConnector := "|-- "
 		if i == len(details)-1 && len(ev.ChildEventIDs) == 0 {
@@ -90,7 +95,7 @@ func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast b
 	}
 
 	for i, childID := range ev.ChildEventIDs {
-		eventTree(w, trace, childID, prefix+childPrefix, i == len(ev.ChildEventIDs)-1, color, ctx)
+		eventTree(w, trace, childID, prefix+childPrefix, i == len(ev.ChildEventIDs)-1, color, ctx, index)
 	}
 }
 
@@ -115,8 +120,16 @@ func EventTarget(ev *model.Event) string {
 
 // EventDetailLines renders the indented detail block under an event.
 // Ports event_detail_lines.
-func EventDetailLines(ev *model.Event, color Color, ctx *Context) []string {
+func EventDetailLines(ev *model.Event, color Color, ctx *Context, index *source.Index) []string {
 	var lines []string
+	// The source line names the file and line only: the entity label already
+	// says which template or choice it is.
+	if index != nil {
+		if loc := index.LocationForEvent(ev); loc != nil {
+			lines = append(lines, LabelValue("source",
+				fmt.Sprintf("%s:%d (%s)", filepath.Base(loc.Path), loc.Line, loc.Label), color))
+		}
+	}
 	if ev.ContractID != "" {
 		lines = append(lines, LabelValue("contract", Short(ev.ContractID, 66), color))
 	}
