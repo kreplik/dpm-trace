@@ -10,11 +10,10 @@ import (
 	"github.com/walnuthq/dpm-trace/internal/visualizer"
 )
 
-// runOpen reopens an exported trace artifact. Ports run_open, minus --visualize
-// (internal/visualizer) and source diagnostics (internal/source).
+// runOpen reopens an exported trace artifact. Ports run_open.
 func runOpen(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace open <artifact.json> [flags]", "Reopen an exported trace artifact.", openFlags, "--visualize")
+		commandHelp(os.Stdout, "dpm trace open <artifact.json> [flags]", "Reopen an exported trace artifact.", openFlags, "")
 		return 0
 	}
 	var (

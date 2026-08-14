@@ -103,3 +103,25 @@ func TestPackageMetadataSplitsMissingPaths(t *testing.T) {
 		t.Errorf("missingDarPaths = %v", got)
 	}
 }
+
+// resolvePath must match str(Path(p).expanduser()): tidy "." and duplicate
+// slashes, expand "~", but leave ".." in place, which filepath.Clean would not.
+func TestResolvePathMatchesPathlib(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	for _, tc := range []struct{ in, want string }{
+		{"./path/to/app.dar", "path/to/app.dar"},
+		{"path//to/./app.dar", "path/to/app.dar"},
+		{"a/../b.dar", "a/../b.dar"},
+		{"/abs/./x.dar", "/abs/x.dar"},
+		{"~/x.dar", filepath.Join(home, "x.dar")},
+		{".", "."},
+		{"", ""},
+	} {
+		if got := resolvePath(tc.in); got != tc.want {
+			t.Errorf("resolvePath(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

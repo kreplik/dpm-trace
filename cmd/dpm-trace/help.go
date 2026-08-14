@@ -65,7 +65,7 @@ func rootHelp(w io.Writer) {
 		{"compare", "Compare prepared transactions, updates, or completions."},
 		{"prepare", "Prepare a command without committing it."},
 		{"submit", "Submit a command and print the resulting update id."},
-		{"test", "Run Daml Script unit tests. Not ported yet."},
+		{"test", "Run Daml Script unit tests."},
 		{"install-plugin", "Register this binary as a DPM component."},
 	}))
 
@@ -103,6 +103,7 @@ var traceFlags = []flagDoc{
 	{"--wait SECONDS", "Retry while the update is not yet visible on this participant."},
 	{"--export PATH", "Write a portable trace artifact. Alias of --out."},
 	{"--print-json", "Print the normalized trace JSON and exit."},
+	{"--visualize", "Open the interactive transaction visualizer."},
 	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
 	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
 	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},

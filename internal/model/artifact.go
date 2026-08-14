@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -247,13 +248,46 @@ func packageMetadataContext(darPaths, debugInfoPaths, packageIDs []string) map[s
 
 func splitExisting(paths []string) (found, missing []string) {
 	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			found = append(found, path)
+		resolved := resolvePath(path)
+		if _, err := os.Stat(resolved); err == nil {
+			found = append(found, resolved)
 		} else {
-			missing = append(missing, path)
+			missing = append(missing, resolved)
 		}
 	}
 	return found, missing
+}
+
+// resolvePath is str(Path(path).expanduser()): the tilde is expanded and the
+// path is tidied, but ".." is left alone because pathlib does not resolve it
+// without a filesystem lookup. filepath.Clean would collapse it, so the tidying
+// is done by hand.
+func resolvePath(path string) string {
+	if path == "" {
+		return ""
+	}
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			path = filepath.Join(home, strings.TrimPrefix(strings.TrimPrefix(path, "~"), "/"))
+		}
+	}
+	rooted := strings.HasPrefix(path, "/")
+	segments := strings.Split(path, "/")
+	kept := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if segment == "" || segment == "." {
+			continue
+		}
+		kept = append(kept, segment)
+	}
+	out := strings.Join(kept, "/")
+	if rooted {
+		out = "/" + out
+	}
+	if out == "" {
+		return "."
+	}
+	return out
 }
 
 // packageFromTemplate returns the package id of a package:module:entity template.

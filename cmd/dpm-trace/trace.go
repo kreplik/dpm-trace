@@ -13,6 +13,7 @@ import (
 	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
 	"github.com/walnuthq/dpm-trace/internal/source"
+	"github.com/walnuthq/dpm-trace/internal/visualizer"
 )
 
 // runTrace handles the bare `dpm trace` command. Only the --completion-file
@@ -50,6 +51,7 @@ func runTrace(args []string) int {
 		waitSeconds        float64
 		dar                []string
 		printJSON          bool
+		visualize          bool
 	)
 	for i := 0; i < len(args); i++ {
 		switch arg := args[i]; arg {
@@ -125,6 +127,8 @@ func runTrace(args []string) int {
 			exportPath = args[i]
 		case "--print-json":
 			printJSON = true
+		case "--visualize":
+			visualize = true
 		case "--wait":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --wait requires seconds")
@@ -315,6 +319,10 @@ func runTrace(args []string) int {
 		}
 		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
+		if visualize {
+			fmt.Println("")
+			fmt.Println("No transaction tree is available from completion data alone. Use dpm trace <update-id> if the completion includes an update id.")
+		}
 		return 0
 	}
 
@@ -343,6 +351,10 @@ func runTrace(args []string) int {
 		}
 		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
+		if visualize {
+			fmt.Println("")
+			fmt.Println("No transaction tree is available from completion data alone. Use dpm trace <update-id> if the completion includes an update id.")
+		}
 		return 0
 	}
 
@@ -387,6 +399,15 @@ func runTrace(args []string) int {
 		return 1
 	}
 	artifact := model.NewTraceArtifact(trace, ledgerURL, scanURL, dar, nil)
+	if printJSON {
+		encoded, err := model.Encode(model.TraceToJSON(trace))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(encoded))
+		return 0
+	}
 	if exportPath != "" {
 		encoded, err := model.Encode(artifact)
 		if err != nil {
@@ -399,13 +420,9 @@ func runTrace(args []string) int {
 		}
 		fmt.Printf("wrote trace artifact: %s\n", exportPath)
 	}
-	if printJSON {
-		encoded, err := model.Encode(model.TraceToJSON(trace))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
-		}
-		fmt.Println(string(encoded))
+	if visualize {
+		stepper := visualizer.New(trace, color, index, os.Stdout)
+		stepper.Run(os.Stdin)
 		return 0
 	}
 	render.PrettyTrace(os.Stdout, trace, color, index)
