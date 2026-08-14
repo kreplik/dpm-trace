@@ -202,8 +202,10 @@ func UserID(explicit, ledgerURL, token, tokenFile string) string {
 		switch host {
 		case "", "localhost", "127.0.0.1", "::1":
 		default:
+			// {host!r} in cli.py: a plain string reprs with single quotes,
+			// where %q would double-quote it.
 			fmt.Fprintf(os.Stderr,
-				"warning: using default user ID with non-local participant %q; pass --user-id or --token.\n", host)
+				"warning: using default user ID with non-local participant '%s'; pass --user-id or --token.\n", host)
 		}
 	}
 	return "participant_admin"

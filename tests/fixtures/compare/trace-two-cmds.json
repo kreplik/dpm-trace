@@ -1,0 +1,55 @@
+{
+  "schema": "dpm-trace/trace-artifact/v0",
+  "kind": "committed-update",
+  "trace": {
+    "updateId": "update-fixture-two-cmds-0001",
+    "source": "ledger-json-api",
+    "offset": "102",
+    "projection": {
+      "readAs": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"]
+    },
+    "rootEventIds": ["#2:0", "#2:1"],
+    "eventsById": {
+      "#2:0": {
+        "eventId": "#2:0",
+        "kind": "create",
+        "template": "pkg1aabb:Counter:Counter",
+        "contractId": "00aabbcc001122334455667788990011aabbcc001122334455667788990011aa",
+        "choice": null,
+        "consuming": null,
+        "actingParties": [],
+        "witnesses": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"],
+        "signatories": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"],
+        "observers": [],
+        "childEventIds": [],
+        "payload": {
+          "owner": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "count": 0
+        },
+        "argument": null,
+        "result": null
+      },
+      "#2:1": {
+        "eventId": "#2:1",
+        "kind": "exercise",
+        "template": "pkg1aabb:Counter:Counter",
+        "contractId": "00aabbcc001122334455667788990011aabbcc001122334455667788990011aa",
+        "choice": "Increment",
+        "consuming": false,
+        "actingParties": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"],
+        "witnesses": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"],
+        "signatories": ["Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"],
+        "observers": [],
+        "childEventIds": [],
+        "payload": null,
+        "argument": {
+          "value": 3,
+          "x": 1
+        },
+        "result": {
+          "count": 3
+        }
+      }
+    }
+  }
+}
