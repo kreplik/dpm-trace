@@ -31,6 +31,20 @@ CASES: dict[str, list[str]] = {
     # ── trace tree rendering (print_pretty_trace, event_detail_lines) ────────
     # trace-b has an exercise with a child create, so this covers nesting,
     # connectors, party aliasing and payload/argument blocks.
+    # The examples are a Milestone 1 deliverable, so their rendering is pinned
+    # here: a change to the trace tree must be reviewed, not discovered by a
+    # reader of examples/README.md.
+    "example-failed-withdraw": [
+        "--completion-file", "examples/failed-withdraw.completion.json",
+        "--daml-yaml", "examples/asset/daml.yaml", "--color", "never",
+    ],
+    "example-compare-prepared": [
+        "compare", "--prepared", "examples/transfer.prepared.json",
+        "--update", "examples/transfer.trace.json", "--full", "--color", "never",
+    ],
+    "open-example-create": ["open", "examples/create.trace.json", "--color", "never"],
+    "open-example-exercise-child-create": ["open", "examples/exercise-child-create.trace.json", "--color", "never"],
+    "open-example-archive": ["open", "examples/archive.trace.json", "--color", "never"],
     "open-trace-a": ["open", "tests/fixtures/compare/trace-a.json", "--color", "never"],
     "open-trace-b": ["open", "tests/fixtures/compare/trace-b.json", "--color", "never"],
     "open-trace-b-json": ["open", "tests/fixtures/compare/trace-b.json", "--print-json"],
@@ -111,11 +125,11 @@ CASES: dict[str, list[str]] = {
 
     # ── failed submissions / source diagnostics ──────────────────────────────
     "completion-plain": [
-        "--completion-file", "examples/failed-with-source.completion.json",
+        "--completion-file", "tests/fixtures/failed-with-source.completion.json",
         "--color", "never",
     ],
     "completion-with-source": [
-        "--completion-file", "examples/failed-with-source.completion.json",
+        "--completion-file", "tests/fixtures/failed-with-source.completion.json",
         "--daml-yaml", "tests/fixtures/source-pkg/daml.yaml",
         "--color", "never",
     ],

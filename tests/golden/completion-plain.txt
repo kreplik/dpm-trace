@@ -1,4 +1,4 @@
-$ dpm trace --completion-file examples/failed-with-source.completion.json --color never
+$ dpm trace --completion-file tests/fixtures/failed-with-source.completion.json --color never
 --- exit: 0
 --- stdout:
 DPM trace completion

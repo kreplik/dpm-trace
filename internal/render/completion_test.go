@@ -12,7 +12,7 @@ import (
 
 func TestCompletionTraceMatchesGolden(t *testing.T) {
 	root := repoRoot(t)
-	completion, err := model.LoadCompletion(filepath.Join(root, "examples/failed-with-source.completion.json"))
+	completion, err := model.LoadCompletion(filepath.Join(root, "tests/fixtures/failed-with-source.completion.json"))
 	if err != nil {
 		t.Fatalf("load completion: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestFailedCompletionIsNotCommitted(t *testing.T) {
 // With sources loaded, the completion view gains a Source diagnostics block.
 func TestCompletionTraceWithSourceMatchesGolden(t *testing.T) {
 	root := repoRoot(t)
-	completion, err := model.LoadCompletion(filepath.Join(root, "examples/failed-with-source.completion.json"))
+	completion, err := model.LoadCompletion(filepath.Join(root, "tests/fixtures/failed-with-source.completion.json"))
 	if err != nil {
 		t.Fatalf("load completion: %v", err)
 	}

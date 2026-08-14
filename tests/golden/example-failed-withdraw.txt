@@ -1,0 +1,22 @@
+$ dpm trace --completion-file examples/failed-withdraw.completion.json --daml-yaml examples/asset/daml.yaml --color never
+--- exit: 0
+--- stdout:
+DPM trace completion
+  result:     completion failed
+  command id: -
+  submission: -
+  update id:  -
+  offset:     -
+  status:     DAML_FAILURE
+  message:    Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): Insufficient balance
+  trace:      no committed transaction tree is available for this completion
+
+Source diagnostics
+  <root>/examples/asset/daml/Asset.daml:54:20
+  basis: local source
+    52 |       controller owner
+    53 |       do
+  > 54 |         assertMsg "Insufficient balance" (quantity >= amount)
+                            ^
+    55 |         create this with quantity = quantity - amount
+    56 | 

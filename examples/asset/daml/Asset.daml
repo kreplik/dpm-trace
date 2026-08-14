@@ -1,0 +1,75 @@
+-- Copyright (c) 2026 Walnut. Apache-2.0.
+module Asset where
+
+-- | A simple issued asset (IOU-style).
+--
+-- The issuer guarantees the asset; the owner holds it. The owner can transfer
+-- the whole asset, split it into two, or burn it. Every operation is guarded
+-- so the unit tests can demonstrate both happy paths and rejected submissions.
+template Asset
+  with
+    issuer : Party
+    owner : Party
+    name : Text
+    quantity : Int
+  where
+    signatory issuer
+    observer owner
+
+    -- An asset must always carry a positive quantity.
+    ensure quantity > 0
+
+    -- | Transfer the whole asset to a new owner.
+    --   Consuming: archives this asset and creates a fresh one for newOwner.
+    choice Transfer : ContractId Asset
+      with
+        newOwner : Party
+      controller owner
+      do
+        create this with owner = newOwner
+
+    -- | Split `splitQuantity` off into a separate asset, keeping the remainder.
+    choice Split : (ContractId Asset, ContractId Asset)
+      with
+        splitQuantity : Int
+      controller owner
+      do
+        assertMsg "splitQuantity must be between 1 and quantity - 1"
+          (splitQuantity > 0 && splitQuantity < quantity)
+        kept <- create this with quantity = quantity - splitQuantity
+        piece <- create this with quantity = splitQuantity
+        pure (kept, piece)
+
+    -- | Burn (archive) the asset.
+    choice Burn : ()
+      controller owner
+      do
+        pure ()
+
+    -- | Withdraw a certain amount from the asset, reducing its quantity.
+    choice Withdraw : ContractId Asset
+      with amount : Int
+      controller owner
+      do
+        assertMsg "Insufficient balance" (quantity >= amount)
+        create this with quantity = quantity - amount
+
+template AssetRegistry
+  with
+    issuer    : Party
+    activeIds : [Text]
+  where
+    signatory issuer
+
+    choice IssueAsset : (ContractId AssetRegistry, ContractId Asset)
+      with
+        owner : Party
+        name : Text
+        quantity : Int
+      controller issuer
+      do
+        assertMsg "DUPLICATE_CONTRACT_KEY: Asset name already exists in registry"
+                  (name `notElem` activeIds)
+        assetCid <- create Asset with issuer, owner, name, quantity
+        newRegistryCid <- create this with activeIds = name :: activeIds
+        return (newRegistryCid, assetCid)

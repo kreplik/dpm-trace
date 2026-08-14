@@ -1,0 +1,17 @@
+// Bootstrap for examples/devnet-trace-poc.conf: start the nodes, connect both
+// participants to the synchronizer, upload the DAR, allocate the parties the
+// examples use. Pair them with:
+//
+//   java -Ddpm.dar-path=/abs/path/to/app.dar -jar canton-open-source-<v>.jar \
+//     daemon -c examples/devnet-trace-poc.conf \
+//     --bootstrap examples/devnet-trace-poc.bootstrap.canton --no-tty
+nodes.local.start()
+bootstrap.synchronizer_local()
+participant1.synchronizers.connect_local(sequencer1, alias = "da")
+participant2.synchronizers.connect_local(sequencer1, alias = "da")
+utils.retry_until_true { participant1.synchronizers.active("da") && participant2.synchronizers.active("da") }
+participants.all.dars.upload(sys.props("dpm.dar-path"))
+participant1.parties.enable("Issuer")
+participant1.parties.enable("Alice")
+participant2.parties.enable("Bob")
+println("=== dpm-trace examples ready: participant1 http://127.0.0.1:6113, participant2 http://127.0.0.1:6123 ===")
