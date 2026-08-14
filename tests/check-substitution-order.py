@@ -7,13 +7,16 @@ was enforced only by a comment; a refactor that alphabetizes or reorders
 the registrations would silently break every cross-participant integration
 test.
 
+The text comes from `dpm trace test --init`, so this checks whichever
+implementation DPM_TRACE_BIN selects rather than the Python source alone.
+
 This check execs the actual generated lit.cfg.py under a stubbed lit/
 lit_config/config namespace with sentinel ledger URLs, then asserts both
 that `%ledger2` is registered before `%ledger` and that an in-order
 literal-replacement pass (lit's documented behavior) leaves a `%ledger2`
 token intact and uncorrupted. Renaming the substitutions to non-colliding
 names (e.g. %ledger_p1/%ledger_p2) was deferred because it would break the
-sibling daml-tests/itests/*.test files (a separate repo) and the
+sibling daml-contracts/itests/*.test files (a separate repo) and the
 scaffolder-sync check.
 """
 from __future__ import annotations
@@ -29,8 +32,10 @@ def main() -> int:
         print("usage: check-substitution-order.py <repo-root>", file=sys.stderr)
         return 2
     repo_root = Path(sys.argv[1]).resolve()
-    sys.path.insert(0, str(repo_root / "src"))
-    from dpm_trace.cli import integration_lit_cfg_text  # noqa: E402
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from scaffold_output import generated_lit_cfg  # noqa: E402
+
+    lit_cfg_text = generated_lit_cfg(repo_root)
 
     saved = {k: os.environ.get(k) for k in ("DPM_TRACE_IT_LEDGER", "DPM_TRACE_IT_LEDGER2", "DPM_TRACE_IT_DAML")}
     try:
@@ -55,7 +60,7 @@ def main() -> int:
             "__file__": str(repo_root / "itests" / "lit.cfg.py"),
         }
         try:
-            exec(compile(integration_lit_cfg_text(), "lit.cfg.py", "exec"), namespace)
+            exec(compile(lit_cfg_text, "lit.cfg.py", "exec"), namespace)
         finally:
             sys.modules.pop("lit", None)
             sys.modules.pop("lit.formats", None)

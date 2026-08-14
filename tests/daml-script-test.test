@@ -1,12 +1,12 @@
-# Opt-in: runs `dpm trace test` against the sibling daml-tests package with a
+# Opt-in: runs `dpm trace test` against the sibling Daml package (DPM_TRACE_DAML_TESTS_DIR) with a
 # real Daml toolchain. Enable with:
 #
 #   DPM_TRACE_RUN_DAML_TEST=1 DPM_TRACE_DAML=<daml> lit tests/daml-script-test.test
 #
 # REQUIRES: daml-test
-# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli test %root/../daml-tests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
+# RUN: %dpm test %daml-tests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
 
 # CHECK: DPM trace test
-# CHECK: all 7 passed
+# CHECK: all 10 passed
 # CHECK: PASS  testSplit
 # CHECK: PASS  testTransfer

@@ -1,5 +1,5 @@
 # Verbose update-vs-update output via --full: original section-based layout.
-# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare %root/tests/fixtures/compare/trace-a.json %root/tests/fixtures/compare/trace-b.json --color never --full | FileCheck %s
+# RUN: %dpm compare %root/tests/fixtures/compare/trace-a.json %root/tests/fixtures/compare/trace-b.json --color never --full | FileCheck %s
 
 # CHECK: DPM trace comparison
 # CHECK: kind:   update-vs-update
