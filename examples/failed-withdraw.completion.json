@@ -1,0 +1,20 @@
+{
+  "cause": "Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): Insufficient balance",
+  "code": "DAML_FAILURE",
+  "context": {
+    "category": "9",
+    "commands": "{readAs: [], deduplicationPeriod: {duration: 'PT168H'}, submittedAt: '2026-08-14T10:51:05.783996Z', submissionId: '2edc7ce7-6e00-4e09-84fe-b3f6926d262d', actAs: ['Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4'], commandId: 'dpm-trace-submit-90cefb0d2eb9', userId: 'participant_admin', workflowId: }",
+    "definite_answer": "false",
+    "error_id": "UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed",
+    "exercise_trace": "    in choice b9e9e043:Asset:Asset:Withdraw on contract 0059f0a55b (#0)\n    in exercise command b9e9e043:Asset:Asset:Withdraw on contract 0059f0a55b.\n",
+    "participant": "'participant1'",
+    "tid": "3051d9f0355445a8fa7b910f3ebecc7f"
+  },
+  "correlationId": "2edc7ce7-6e00-4e09-84fe-b3f6926d262d",
+  "definiteAnswer": null,
+  "errorCategory": 9,
+  "grpcCodeValue": 9,
+  "resources": [],
+  "retryInfo": null,
+  "traceId": "3051d9f0355445a8fa7b910f3ebecc7f"
+}

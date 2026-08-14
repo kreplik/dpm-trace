@@ -1,0 +1,31 @@
+$ dpm trace open examples/archive.trace.json --color never
+--- exit: 0
+--- stdout:
+Trace artifact
+  schema:       dpm-trace/trace-artifact/v0
+  update:       12205415d6d16bcf37b8c7e1b64ec1281925277273b892d11d4a5e779707bb3dd24f
+  kind:         committed-update
+  source:       ledger-json-api
+  read-as:      Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
+  events:       1
+Canton trace
+  update:       12205415d6d16bcf37b8c7e1b64ec1281925277273b892d11d4a5e779707bb3dd24f
+  source:       ledger-json-api (http://127.0.0.1:6113/v2/updates/update-by-id)
+  offset:       40
+  record time:  2026-08-14T10:51:04.873295Z
+  synchronizer: local::122056c72f69a17036aa76225941950f9218232eae01374241e268d983c995cc7172
+  read-as:      Issuer (Issuer::122036f5...7213a4)
+  visibility:   Authorized participant projection. Private data outside these party rights is not available.
+  events:       +0 create, >1 exercise, x0 archive
+  parties:
+    Alice = Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
+    Issuer = Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
+
+Trace
+`-- [0] EXERCISE Asset:Asset.Burn
+    |-- contract: 00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a808...
+    |-- consuming: true
+    |-- actors: Alice
+    |-- witnesses: Issuer
+    |-- argument: {}
+    `-- result: {}

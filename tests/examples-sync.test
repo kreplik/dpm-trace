@@ -1,0 +1,5 @@
+# The examples package is a copy of the canonical sibling; this fails if it
+# drifts. Skips cleanly when the sibling is not checked out.
+# RUN: %python %root/tests/check-examples-sync.py %root | FileCheck %s
+
+# CHECK: examples-sync checks

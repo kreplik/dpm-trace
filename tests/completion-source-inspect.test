@@ -1,5 +1,5 @@
 # REQUIRES: damlc-inspect
-# RUN: %dpm --completion-file %root/examples/failed-with-source.completion.json --daml-yaml %root/../daml-examples/daml-3x/daml.yaml --dar %root/../daml-examples/daml-3x/.daml/dist/counter-example-1.0.0.dar --damlc %damlc --color never | FileCheck %s
+# RUN: %dpm --completion-file %root/tests/fixtures/failed-with-source.completion.json --daml-yaml %root/../daml-examples/daml-3x/daml.yaml --dar %root/../daml-examples/daml-3x/.daml/dist/counter-example-1.0.0.dar --damlc %damlc --color never | FileCheck %s
 
 # CHECK: DPM trace completion
 # CHECK: result:     completion failed

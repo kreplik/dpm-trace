@@ -1,0 +1,84 @@
+{
+  "createdAt": "2026-08-14T10:51:04.459415Z",
+  "kind": "committed-update",
+  "packages": {
+    "available": false,
+    "darPaths": [],
+    "debugInfoPaths": [],
+    "missingDarPaths": [],
+    "missingDebugInfoPaths": [],
+    "packageIds": [
+      "b9e9e0435939afacd6370b1f8351ade6bffb0f382bc69645a8251eb789333ab4"
+    ],
+    "status": "package ids captured; package/source metadata must be supplied by local project or registry"
+  },
+  "participant": {
+    "ledgerUrl": "http://127.0.0.1:6113",
+    "readAs": [
+      "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+    ],
+    "scanUrl": null
+  },
+  "privacy": {
+    "missingPrivateDataPolicy": "private data outside this participant projection is not present in the artifact",
+    "readAs": [
+      "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+    ],
+    "scope": "Authorized participant projection. Private data outside these party rights is not available."
+  },
+  "schema": "dpm-trace/trace-artifact/v0",
+  "trace": {
+    "eventsById": {
+      "0": {
+        "actingParties": [],
+        "argument": null,
+        "childEventIds": [],
+        "choice": null,
+        "consuming": null,
+        "contractId": "00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22cbb2ca121220bcb8aa55510c3fd6d4c33076219f2743e584a554555715e7bdba6114819094db",
+        "eventId": "0",
+        "kind": "create",
+        "observers": [
+          "Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ],
+        "payload": {
+          "issuer": "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4",
+          "name": "GOLD",
+          "owner": "Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4",
+          "quantity": "100"
+        },
+        "reassignmentCounter": null,
+        "reassignmentId": null,
+        "result": null,
+        "signatories": [
+          "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ],
+        "sourceSynchronizer": null,
+        "submitter": null,
+        "targetSynchronizer": null,
+        "template": "b9e9e0435939afacd6370b1f8351ade6bffb0f382bc69645a8251eb789333ab4:Asset:Asset",
+        "witnesses": [
+          "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ]
+      }
+    },
+    "offset": "34",
+    "projection": {
+      "notGlobal": true,
+      "note": "Authorized participant projection. Private data outside these party rights is not available.",
+      "participantScoped": true,
+      "readAs": [
+        "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+      ],
+      "source": "ledger-json-api"
+    },
+    "recordTime": "2026-08-14T10:51:00.896440Z",
+    "rootEventIds": [
+      "0"
+    ],
+    "source": "ledger-json-api",
+    "sourceUrl": "http://127.0.0.1:6113/v2/updates/update-by-id",
+    "synchronizerId": "local::122056c72f69a17036aa76225941950f9218232eae01374241e268d983c995cc7172",
+    "updateId": "12207166eda75063d89cfebd13ee8523c52750c9b2e362236f5f73b9b66851898dc8"
+  }
+}
