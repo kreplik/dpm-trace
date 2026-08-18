@@ -1,10 +1,7 @@
-// Command dpm-trace is the Go port of the participant-scoped Canton
-// transaction visualizer.
+// Command dpm-trace inspects participant-scoped Canton transactions.
 //
-// Subcommands are ported one at a time and each is verified against the golden
-// harness in tests/golden (tests/check-golden.py, which takes DPM_TRACE_BIN).
-// Anything not yet ported exits 2 rather than guessing: the Python
-// implementation in src/dpm_trace remains the shipping one.
+// Output is verified byte-for-byte by the golden harness in tests/golden
+// (tests/check-golden.py, which locates the binary through DPM_TRACE_BIN).
 package main
 
 import (

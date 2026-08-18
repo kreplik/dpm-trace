@@ -1,6 +1,6 @@
 // Package visualizer is the interactive --visualize REPL.
 //
-// Ports from src/dpm_trace/cli.py: Stepper (order, show_current, show_tree,
+// Ported from the original Python implementation: Stepper (order, show_current, show_tree,
 // show_source, step_variables, jump), Breakpoint, ExpressionStep,
 // eval_daml_expression and _eval_replay.
 //

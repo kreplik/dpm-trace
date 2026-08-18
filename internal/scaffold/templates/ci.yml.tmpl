@@ -20,13 +20,20 @@ jobs:
         with:
           repository: walnuthq/dpm-trace
           path: dpm-trace
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dpm-trace/go.mod
+      - name: Build dpm-trace
+        run: |
+          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install Daml SDK
         run: |
           curl -sSL https://get.daml.com/ | sh -s {{.SDKVersion}}
           echo "$HOME/.daml/bin" >> "$GITHUB_PATH"
       - name: Unit tests (dpm trace test)
         run: |
-          PYTHONPATH="$GITHUB_WORKSPACE/dpm-trace/src" python3 -m dpm_trace.cli test {{if .WithUnittests}}{{.UnitTestsDir}}{{else}}.{{end}} \
+          dpm-trace test {{if .WithUnittests}}{{.UnitTestsDir}}{{else}}.{{end}} \
             --daml daml --no-trees --junit unit-results.xml
 
   integration-tests:
@@ -41,6 +48,13 @@ jobs:
         with:
           repository: walnuthq/dpm-trace
           path: dpm-trace
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dpm-trace/go.mod
+      - name: Build dpm-trace
+        run: |
+          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install Daml SDK
         run: |
           curl -sSL https://get.daml.com/ | sh -s {{.SDKVersion}}
@@ -52,7 +66,7 @@ jobs:
           command -v FileCheck || sudo ln -sf "$(ls /usr/lib/llvm-*/bin/FileCheck | head -1)" /usr/local/bin/FileCheck
       - name: Integration tests (managed Canton)
         run: |
-          PYTHONPATH="$GITHUB_WORKSPACE/dpm-trace/src" python3 -m dpm_trace.cli test . \
+          dpm-trace test . \
             --integration {{.ITestsDir}} \
             --canton-jar "$HOME/.daml/sdk/{{.SDKVersion}}/canton/canton.jar" \
             --daml daml

@@ -140,27 +140,13 @@ CASES: dict[str, list[str]] = {
 }
 
 # Driver scripts that exercise code paths the CLI cannot reach offline --
-# request building, the submit failure path, test-report parsing.
+# comparison model construction, driven through the CLI.
 #
-# These import dpm_trace.cli and call functions directly, so unlike CASES they
-# are NOT a port oracle: they always run under this Python and ignore
-# DPM_TRACE_BIN. Their value is regression safety here, plus a recorded
-# specification of the expected output for a reimplementation's own unit tests
-# to be written against.
+# What remains here drives the binary like CASES does; the entries that called
+# into the Python implementation went with it. Their behaviour now lives in the
+# Go package tests.
 SCRIPT_CASES: dict[str, list[str]] = {
-    # prepare/submit request building (parse_scalar, command_arguments, ...)
-    "script-command-build": ["tests/check-command-build.py", "<root>"],
-    # run_submit failure path rendering, all four flag combinations
-    "script-submit-failure": ["tests/check-submit-failure.py"],
-    "script-submit-failure-full": ["tests/check-submit-failure.py", "--full"],
-    "script-submit-failure-debug": ["tests/check-submit-failure.py", "--debug-info"],
-    "script-submit-failure-full-debug": ["tests/check-submit-failure.py", "--full", "--debug-info"],
-    # dpm trace test: JUnit parsing, transaction HTML decoding, report rendering
-    "script-test-report": ["tests/check-test-report.py", "<root>"],
-    # comparison model construction
     "script-compare": ["tests/check-compare.py", "<root>"],
-    # visualizer preorder/breakpoints/step variables
-    "script-stepper": ["tests/check-stepper.py", "<root>"],
 }
 
 def scrubbers(root: Path) -> list[tuple[re.Pattern[str], str]]:
@@ -245,10 +231,15 @@ def main() -> int:
     golden_dir = root / GOLDEN_DIR
     golden_dir.mkdir(parents=True, exist_ok=True)
 
-    # The implementation under test. Defaults to this repo's Python module;
-    # a port sets DPM_TRACE_BIN to its own binary and must match every golden.
-    binary_env = os.environ.get("DPM_TRACE_BIN")
-    binary = binary_env.split() if binary_env else [sys.executable, "-m", "dpm_trace.cli"]
+    # The implementation under test. There is only one now, so the binary is
+    # required rather than defaulted: silently testing something else is worse
+    # than refusing to run.
+    binary_env = os.environ.get("DPM_TRACE_BIN", "").strip()
+    if not binary_env:
+        print("error: DPM_TRACE_BIN must point at the dpm-trace binary "
+              "(go build -o /tmp/dpm-trace ./cmd/dpm-trace)", file=sys.stderr)
+        return 2
+    binary = binary_env.split()
 
     # (name, argv, command prefix, display label)
     plan: list[tuple[str, list[str], list[str], str]] = [

@@ -1,10 +1,8 @@
 """Obtain the scaffolder's generated `itests/lit.cfg.py`.
 
-The text used to be read straight out of `dpm_trace.cli.integration_lit_cfg_text`,
-which pinned the checks to the Python implementation and left the Go build's
-copy (internal/scaffold/templates/lit.cfg.py.tmpl) checked by nobody. Running
-`dpm trace test --init` instead exercises whichever implementation is under
-test, so both copies are covered by the same checks.
+Obtained by running `dpm trace test --init`, so the checks cover the template
+that actually ships (internal/scaffold/templates/lit.cfg.py.tmpl) rather than a
+separate copy.
 """
 from __future__ import annotations
 
@@ -17,10 +15,10 @@ from pathlib import Path
 
 def cli_command(repo_root: Path) -> list[str]:
     """The implementation under test, as in check-golden.py and lit.cfg.py."""
-    binary_env = os.environ.get("DPM_TRACE_BIN")
-    if binary_env:
-        return binary_env.split()
-    return [sys.executable, "-m", "dpm_trace.cli"]
+    binary_env = os.environ.get("DPM_TRACE_BIN", "").strip()
+    if not binary_env:
+        raise SystemExit("DPM_TRACE_BIN must point at the dpm-trace binary")
+    return binary_env.split()
 
 
 def generated_lit_cfg(repo_root: Path) -> str:
@@ -31,10 +29,9 @@ def generated_lit_cfg(repo_root: Path) -> str:
             "name: scaffold-check\nversion: 1.0.0\nsource: daml\n", encoding="utf-8"
         )
         (package / "daml").mkdir()
-        env = {**os.environ, "PYTHONPATH": str(repo_root / "src")}
         result = subprocess.run(
             cli_command(repo_root) + ["test", str(package), "--init"],
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True,
         )
         if result.returncode != 0:
             raise RuntimeError(f"--init failed (rc={result.returncode})\n{result.stderr}")
