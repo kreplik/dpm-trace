@@ -1,0 +1,154 @@
+name: ci
+
+# The gate for every push and pull request. The suites drive the compiled
+# binary, which tests/lit.cfg.py locates through DPM_TRACE_BIN.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  go:
+    name: go build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed:"; echo "$unformatted"; exit 1
+          fi
+      - run: go vet ./...
+      - run: go test ./...
+      - name: Cross-compile the release matrix
+        run: |
+          for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 \
+              go build -o /dev/null ./cmd/dpm-trace || exit 1
+            echo "built $target"
+          done
+
+  lit:
+    name: lit
+    runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          # The suite drivers are Python programs that drive the binary; the
+          # tool itself has no Python in it.
+          python-version: '3.11'
+      - name: Install lit + FileCheck
+        run: |
+          python3 -m pip install --upgrade pip lit
+          sudo apt-get update && sudo apt-get install -y llvm
+          command -v FileCheck || sudo ln -sf \
+            "$(find /usr/lib -path '*/llvm-*/bin/FileCheck' -type f -print -quit)" \
+            /usr/local/bin/FileCheck
+      - name: Build the binary
+        run: |
+          go build -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          echo "DPM_TRACE_BIN=$RUNNER_TEMP/dpm-trace" >> "$GITHUB_ENV"
+      - name: lit tests
+        # golden.test runs tests/check-golden.py, so the byte-exact goldens are
+        # covered here rather than in a job of their own.
+        run: lit tests -v
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      # Fails the job below this. Raise it as coverage improves; never lower it
+      # to make a red build green.
+      COVERAGE_FLOOR: '60.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install lit + FileCheck
+        run: |
+          python3 -m pip install --upgrade pip lit
+          sudo apt-get update && sudo apt-get install -y llvm
+          command -v FileCheck || sudo ln -sf \
+            "$(find /usr/lib -path '*/llvm-*/bin/FileCheck' -type f -print -quit)" \
+            /usr/local/bin/FileCheck
+
+      - name: Unit coverage
+        run: go test ./... -coverprofile=unit.out
+
+      - name: Suite coverage
+        # Most verification drives the CLI as a subprocess, which `go test`
+        # cannot see. An instrumented binary plus GOCOVERDIR captures it.
+        # The directory must exist: the binary writes an error to stderr
+        # otherwise, which corrupts the output the goldens compare.
+        run: |
+          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/dpm-trace
+          mkdir -p "$RUNNER_TEMP/covdata"
+          export GOCOVERDIR="$RUNNER_TEMP/covdata"
+          export DPM_TRACE_BIN="$RUNNER_TEMP/dpm-cov"
+          # Correctness is gated by the `lit` job above, which runs
+          # uninstrumented. Here the runs exist to produce coverage data, and a
+          # rare flake under instrumentation must not fail the measurement.
+          lit tests -q || echo "::warning::lit reported failures under the instrumented binary"
+          python3 tests/check-golden.py .
+          go tool covdata percent -i="$RUNNER_TEMP/covdata"
+          go tool covdata textfmt -i="$RUNNER_TEMP/covdata" -o=suite.out
+
+      - name: Merge and report
+        run: |
+          { cat unit.out; tail -n +2 suite.out; } > merged.out
+          unit="$(go tool cover -func=unit.out   | tail -1 | awk '{print $3}')"
+          total="$(go tool cover -func=merged.out | tail -1 | awk '{print $3}')"
+
+          {
+            echo "### Coverage"
+            echo
+            echo "| scope | statements |"
+            echo "| --- | --- |"
+            echo "| unit tests only | $unit |"
+            echo "| including lit + goldens | **$total** |"
+            echo
+            echo "Floor: ${COVERAGE_FLOOR}%"
+            echo
+            echo '<details><summary>Per package</summary>'
+            echo
+            echo '```'
+            go tool cover -func=merged.out | grep -v "100.0%$" | tail -40
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          value="${total%\%}"
+          if awk "BEGIN{exit !($value < $COVERAGE_FLOOR)}"; then
+            echo "::error::coverage $total is below the floor of ${COVERAGE_FLOOR}%"
+            exit 1
+          fi
+          echo "coverage $total (floor ${COVERAGE_FLOOR}%)"
+
+      - uses: actions/upload-artifact@v4
+        # act has no artifact backend (no ACTIONS_RUNTIME_TOKEN); skip it there
+        # so a local run of this job is not reported as failed.
+        if: always() && !env.ACT
+        with:
+          name: coverage
+          path: |
+            unit.out
+            suite.out
+            merged.out
