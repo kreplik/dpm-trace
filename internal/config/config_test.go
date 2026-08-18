@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/walnuthq/dpm-trace/internal/model"
 )
 
 func write(t *testing.T, path, content string) {
@@ -109,5 +111,56 @@ func TestStringsAcceptsScalarOrList(t *testing.T) {
 func TestExplicitMissingConfigIsAnError(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "nope.json")); err == nil {
 		t.Error("an explicit missing config must be an error")
+	}
+}
+
+// Config values may arrive as a PATH-style list or as a single value; both
+// must work, and empty segments must not become empty paths.
+func TestSplitList(t *testing.T) {
+	if got := splitList("/a" + string(filepath.ListSeparator) + "/b"); len(got) != 2 || got[0] != "/a" {
+		t.Errorf("split = %v", got)
+	}
+	if got := splitList("/only"); len(got) != 1 || got[0] != "/only" {
+		t.Errorf("single value = %v", got)
+	}
+	if got := splitList(""); len(got) != 0 {
+		t.Errorf("empty = %v, want nothing", got)
+	}
+	sep := string(filepath.ListSeparator)
+	if got := splitList("/a" + sep + sep + "/b"); len(got) != 2 {
+		t.Errorf("empty segments kept: %v", got)
+	}
+}
+
+// Precedence for list options: an explicit flag wins, then the environment,
+// then the config file. Getting this backwards would let a stale config
+// override what the user just typed.
+func TestStringsPrecedence(t *testing.T) {
+	cfg, err := model.Decode([]byte(`{"darPaths":["/from/config.dar"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := Strings([]string{"/explicit.dar"}, cfg, "DPM_TRACE_DAR", "darPaths"); got[0] != "/explicit.dar" {
+		t.Errorf("explicit lost: %v", got)
+	}
+
+	t.Setenv("DPM_TRACE_DAR", "/from/env.dar")
+	if got := Strings(nil, cfg, "DPM_TRACE_DAR", "darPaths"); got[0] != "/from/env.dar" {
+		t.Errorf("env lost: %v", got)
+	}
+
+	os.Unsetenv("DPM_TRACE_DAR")
+	if got := Strings(nil, cfg, "DPM_TRACE_DAR", "darPaths"); got[0] != "/from/config.dar" {
+		t.Errorf("config lost: %v", got)
+	}
+
+	// An unknown key and no env means no value, not an empty string entry.
+	if got := Strings(nil, cfg, "DPM_TRACE_DAR", "absent"); len(got) != 0 {
+		t.Errorf("got %v, want nothing", got)
+	}
+	// Alternate key spellings are tried in order.
+	if got := Strings(nil, cfg, "", "dar_paths", "darPaths"); got[0] != "/from/config.dar" {
+		t.Errorf("alternate key not tried: %v", got)
 	}
 }

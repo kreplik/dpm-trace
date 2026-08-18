@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,5 +139,108 @@ func TestDetectSDKVersionPicksHighestInstalled(t *testing.T) {
 	writeManifest(t, home, "3.5.1")
 	if got := DetectSDKVersion(home); got != "3.5.1" {
 		t.Errorf("DetectSDKVersion = %q, want 3.5.1", got)
+	}
+}
+
+// The DPM home is chosen explicitly, then from DPM_HOME, then ~/.dpm. Getting
+// this wrong writes the component where dpm will not look for it.
+func TestResolveHomePrecedence(t *testing.T) {
+	t.Setenv("DPM_HOME", "/from/env")
+
+	if got, err := resolveHome("/explicit"); err != nil || got != "/explicit" {
+		t.Errorf("explicit = %q, %v", got, err)
+	}
+	if got, err := resolveHome(""); err != nil || got != "/from/env" {
+		t.Errorf("env = %q, %v", got, err)
+	}
+
+	os.Unsetenv("DPM_HOME")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	if got, err := resolveHome(""); err != nil || got != filepath.Join(home, ".dpm") {
+		t.Errorf("default = %q, %v", got, err)
+	}
+}
+
+func TestResolveHomeExpandsTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory")
+	}
+	got, err := resolveHome("~/custom-dpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(home, "custom-dpm") {
+		t.Errorf("got %q", got)
+	}
+}
+
+// Without an SDK manifest there is nothing to register into, and the error has
+// to say how to fix it rather than just failing.
+func TestInstallWithoutAnySDKExplainsItself(t *testing.T) {
+	home := t.TempDir()
+	err := Install(io.Discard, Options{DPMHome: home})
+	if err == nil {
+		t.Fatal("installing with no SDK returned no error")
+	}
+	if !strings.Contains(err.Error(), "--sdk-version") {
+		t.Errorf("error does not suggest a fix: %v", err)
+	}
+}
+
+// The binary is written via a temporary file and renamed, so a failed copy
+// cannot leave a half-written executable that dpm would then try to run.
+func TestCopyExecutableIsAtomicAndExecutable(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source-bin")
+	if err := os.WriteFile(source, []byte("#!/bin/sh\necho hi\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(dir, "dest-bin")
+	if err := copyExecutable(source, dest); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Errorf("mode = %v, want it executable", info.Mode().Perm())
+	}
+	if _, err := os.Stat(dest + ".tmp"); err == nil {
+		t.Error("the temporary file was left behind")
+	}
+	if err := copyExecutable(filepath.Join(dir, "absent"), dest); err == nil {
+		t.Error("copying a missing source returned no error")
+	}
+}
+
+// A home with no manifests at all resolves to no version rather than guessing.
+func TestDetectSDKVersionWithoutManifests(t *testing.T) {
+	if got := DetectSDKVersion(t.TempDir()); got != "" {
+		t.Errorf("got %q, want empty", got)
+	}
+	home := t.TempDir()
+	dir := filepath.Join(home, "cache", "sdk", "open-source")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Non-manifest files must be ignored.
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := DetectSDKVersion(home); got != "" {
+		t.Errorf("got %q from a directory with no manifests", got)
+	}
+}
+
+// dpm may be absent or fail; detection must fall back rather than error.
+func TestActiveDPMVersionWithoutDPM(t *testing.T) {
+	if got := ActiveDPMVersion(t.TempDir()); got != "" {
+		t.Errorf("got %q with no dpm binary, want empty", got)
 	}
 }

@@ -18,5 +18,6 @@ reference.conf
 # Go port
 cover.out
 coverage.out
+merged.out
 /dpm-trace
 /dist/
