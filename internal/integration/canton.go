@@ -35,7 +35,9 @@ func ParsePlacements(arg string) []Placement {
 		if indexText != "" {
 			// A malformed index falls back to participant 1 rather than
 			// failing: the placement syntax is a convenience, not a contract.
-			if parsed, err := strconv.Atoi(indexText); err == nil {
+			// int() tolerates surrounding whitespace, so "Alice@ 2" places on
+			// participant 2 rather than falling back to 1.
+			if parsed, err := strconv.Atoi(strings.TrimSpace(indexText)); err == nil {
 				index = parsed
 			}
 		}

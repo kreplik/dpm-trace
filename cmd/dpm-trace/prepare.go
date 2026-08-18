@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/config"
@@ -121,6 +122,14 @@ type submissionOpts struct {
 	export         string
 	logFile        []string
 	damlYAML       []string
+	sourceRoots    []string
+	debugInfo      []string
+	dar            []string
+	damlc          string
+	scanURL        string
+	verbose        bool
+	waitSeconds    int
+	maxSourceLoc   int
 	printJSON      bool
 	allowFail      bool
 	full           bool
@@ -128,7 +137,7 @@ type submissionOpts struct {
 }
 
 func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.CommandSpec, int) {
-	opts := submissionOpts{colorMode: "auto"}
+	opts := submissionOpts{colorMode: "auto", maxSourceLoc: 5}
 	var spec ledger.CommandSpec
 
 	needsValue := func(i int, flag string) (string, bool) {
@@ -148,6 +157,9 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 			continue
 		case "--allow-fail":
 			opts.allowFail = true
+			continue
+		case "-v", "--verbose":
+			opts.verbose = true
 			continue
 		case "--full":
 			opts.full = true
@@ -186,6 +198,27 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 			opts.logFile = append(opts.logFile, value)
 		case "--daml-yaml":
 			opts.damlYAML = append(opts.damlYAML, value)
+		case "--source-root":
+			opts.sourceRoots = append(opts.sourceRoots, value)
+		case "--debug-info":
+			opts.debugInfo = append(opts.debugInfo, value)
+		case "--dar":
+			opts.dar = append(opts.dar, value)
+		case "--damlc":
+			opts.damlc = value
+		case "--scan-url":
+			opts.scanURL = value
+		case "--out":
+			// Alias of --export, as add_common_connection_args declares it.
+			opts.export = value
+		case "--wait":
+			if n, err := strconv.Atoi(value); err == nil {
+				opts.waitSeconds = n
+			}
+		case "--max-source-locations":
+			if n, err := strconv.Atoi(value); err == nil {
+				opts.maxSourceLoc = n
+			}
 		case "--color":
 			opts.colorMode = value
 		case "--template":

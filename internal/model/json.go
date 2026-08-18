@@ -67,6 +67,19 @@ func Encode(v any) ([]byte, error) {
 	return escapeNonASCII(bytes.TrimRight(buf.Bytes(), "\n")), nil
 }
 
+// EncodeCompact is Encode without indentation, for values rendered inline.
+// Same two corrections: no HTML escaping, and non-ASCII escaped as Python's
+// ensure_ascii does.
+func EncodeCompact(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return escapeNonASCII(bytes.TrimRight(buf.Bytes(), "\n")), nil
+}
+
 // escapeNonASCII rewrites non-ASCII runes as \uXXXX escapes, matching Python's
 // json.dumps default of ensure_ascii=True.
 //

@@ -42,7 +42,8 @@ const (
 // Failed reports whether the case counts against the CI gate.
 func (c Case) Failed() bool { return c.Status == StatusFailed || c.Status == StatusError }
 
-// junitSuites mirrors the JUnit XML `daml test` writes.
+// junitSuites mirrors the JUnit XML `daml test` writes: a <testsuites> wrapper
+// around one or more <testsuite> elements.
 type junitSuites struct {
 	Suites []junitSuite `xml:"testsuite"`
 }
@@ -66,10 +67,13 @@ type junitDetail struct {
 	Text    string `xml:",chardata"`
 }
 
-// ParseJUnit reads the JUnit XML produced by `daml test`. Ports parse_junit.
+// ParseJUnit reads the JUnit XML produced by `daml test`. Ports parse_junit,
+// whose `iter("testsuite")` matches the root element as well as nested ones.
 //
-// A testsuite element may be nested, so the whole document is walked rather
-// than only its direct children.
+// Both document shapes are legal and both occur: `daml test` writes a
+// <testsuites> wrapper, but other producers emit a bare <testsuite> root.
+// Reading only the nested form yields zero cases for the latter, which would
+// make a failing run exit 0 -- the CI gate silently inverted.
 func ParseJUnit(path string) ([]Case, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -79,9 +83,20 @@ func ParseJUnit(path string) ([]Case, error) {
 	if err := xml.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
+	suites := doc.Suites
+	if len(suites) == 0 {
+		// A bare <testsuite> root: unmarshal again against that shape.
+		var root junitSuite
+		if err := xml.Unmarshal(data, &root); err != nil {
+			return nil, err
+		}
+		if len(root.Cases) > 0 {
+			suites = []junitSuite{root}
+		}
+	}
 
 	var results []Case
-	for _, suite := range doc.Suites {
+	for _, suite := range suites {
 		for _, testcase := range suite.Cases {
 			status := StatusPassed
 			var detail *junitDetail

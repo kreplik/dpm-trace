@@ -36,18 +36,19 @@ implementation this was ported from has been removed.
 
 Key areas to orient in the tree:
 
-- Transaction model + normalization: `NormalizedTrace`, `TraceEvent`, `normalize_trace`, `load_update`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `EVENT_VARIANT_KINDS`; add new Ledger API variant wrappers there rather than in `normalize_event`.
-- Pretty + interactive rendering: `print_pretty_trace`, `Stepper` (the `--visualize` REPL).
-- Failed submissions / completions: `fetch_completion_by_command_id`, `normalize_completion`, `print_completion_trace`.
-- Source mapping: `SourceIndex` (loads `daml.yaml` sources and, with `--dar`, `damlc inspect`), `completion_source_needles`, `render_source_diagnostic`.
-- Test runner (`dpm trace test`): `test_main` → `run_test` → `daml_test_command`, `parse_junit`, `transaction_html_to_text`, `transaction_stats`, `test_failure_locations`, `print_test_report` / `test_report_json`.
-- Integration runner (`--integration`): `run_integration_tests` boots a local Canton (`canton_config_text`, `canton_bootstrap_text`, `find_free_ports`, `wait_for_parties`, `build_dar`), exports `DPM_TRACE_IT_*` env, runs `lit`, tears down. `--parties Name@N` (`parse_party_placements`) provisions N participants; tests reach participant K via `%ledger{K}` and tolerate ingestion lag with `dpm trace --wait`.
-- Scaffolder (`--init`): `run_init` writes `itests/` (from `integration_lit_cfg_text` / `integration_example_test_text` — keep `daml-tests/itests/lit.cfg.py` in sync) and a self-contained `unittests/` package (`unit_test_daml_yaml_text` / `unit_test_example_text`).
-- Submit primitive (`dpm trace submit`): `submit_main` → `run_submit` (submit-and-wait, prints the update id).
+- Transaction model + normalization: `internal/model` -- `Trace`, `Event`, `NormalizeTrace`, `NormalizeEvent`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `eventVariantKinds`; add new Ledger API variant wrappers there rather than in `NormalizeEvent`. `linkRangeChildren` reconstructs the tree from `lastDescendantNodeId`, and `inferRoots` keeps document order because `compare` pairs roots positionally.
+- Ledger access: `internal/ledger` -- the JSON Ledger API client with bounded retry (`JSON`, `LoadUpdate`, `Prepare`, `SubmitAndWait`, `FetchCompletion`), plus command building (`CommandSpec`). Decode through `internal/model`, never `encoding/json`: the latter loses numeric precision and key order.
+- Pretty + interactive rendering: `internal/render` (`PrettyTrace`, `CompletionTrace`, `SubmitFailure`, the compare views) and `internal/visualizer` (the `--visualize` REPL: `Stepper`, `Breakpoint`).
+- Source mapping: `internal/source` -- `Index` loads `daml.yaml` sources, `--debug-info` files and, with `--dar`, `damlc inspect` output; `FindFailureText`, `EntityContaining`, `Snippet`.
+- Test runner (`dpm trace test`): `internal/testrunner` -- `Run` → `Command`, `ParseJUnit`, `TransactionHTMLToText`, `FailureLocations`, `ReportJSON` (`dpm-trace/test-report/v0`). Exit 1 means tests failed; operational errors exit 2.
+- Integration runner (`--integration`): `internal/integration` -- `Run` boots a local Canton (`ConfigText`, `BootstrapText`, `FreePorts`, `WaitForParties`, `BuildDAR`), exports `DPM_TRACE_IT_*`, runs `lit`, tears down. `--parties Name@N` (`ParsePlacements`) provisions N participants; tests reach participant K via `%ledger{K}` and tolerate ingestion lag with `dpm trace --wait`.
+- Scaffolder (`--init`): `internal/scaffold` writes `itests/` and a self-contained `unittests/` package from the embedded templates. `templates/lit.cfg.py.tmpl` is kept in sync with the canonical `daml-contracts/itests/lit.cfg.py` by `tests/check-scaffolder-sync.py`.
+- DPM component: `internal/plugin` -- `Install` writes the component into the DPM home and registers it in the SDK manifest.
 - Spawning daml/damlc/canton: `testrunner.ChildEnv` (drops `DPM_RESOLUTION_FILE`, forces a UTF-8 locale).
 
 A worked example package for the test runner (Asset contract + Script tests +
-CI workflow + regression demo) lives in the sibling `daml-tests` directory.
+CI workflow + regression demo) lives in the sibling `daml-contracts` directory;
+`examples/` in this repo carries a copy plus committed trace artifacts.
 
 ## Development Rules
 
@@ -108,7 +109,7 @@ lit tests/completion-source-inspect.test
 The `dpm trace test` parsing and source mapping are covered by the
 daml-independent `tests/test-report-parse.test` (committed fixtures in
 `tests/fixtures/`, always run). The end-to-end runner is opt-in and uses the
-sibling `daml-tests` package:
+sibling `daml-contracts` package:
 
 ```bash
 DPM_TRACE_RUN_DAML_TEST=1 \

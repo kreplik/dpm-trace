@@ -179,3 +179,34 @@ func TestFileExistsAndCopyFile(t *testing.T) {
 		t.Error("copyFile created a missing parent directory; cli.py does not")
 	}
 }
+
+// The CI-gate contract depends on both JUnit document shapes parsing: `daml
+// test` writes a <testsuites> wrapper, but a bare <testsuite> root is equally
+// legal. Reading only the nested form gives zero cases, so Failed() is false
+// and a red run exits 0.
+func TestParseJUnitAcceptsBothDocumentShapes(t *testing.T) {
+	failing := `<testcase name="testFails" classname="Test"><failure message="boom">boom</failure></testcase>`
+
+	for name, document := range map[string]string{
+		"wrapped": `<?xml version="1.0"?><testsuites><testsuite name="Test">` + failing + `</testsuite></testsuites>`,
+		"bare":    `<?xml version="1.0"?><testsuite name="Test">` + failing + `</testsuite>`,
+	} {
+		path := filepath.Join(t.TempDir(), "junit.xml")
+		if err := os.WriteFile(path, []byte(document), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cases, err := ParseJUnit(path)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(cases) != 1 {
+			t.Fatalf("%s: parsed %d cases, want 1", name, len(cases))
+		}
+		if cases[0].Status != StatusFailed {
+			t.Errorf("%s: status = %q, want failed", name, cases[0].Status)
+		}
+		if !(Result{Cases: cases}).Failed() {
+			t.Errorf("%s: Failed() = false -- the CI gate would exit 0 on a red run", name)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/walnuthq/dpm-trace/internal/ledger"
@@ -144,7 +146,7 @@ func Run(stdout, stderr io.Writer, opts Options) (int, error) {
 		if canton.Process == nil {
 			return
 		}
-		_ = canton.Process.Signal(os.Interrupt)
+		_ = canton.Process.Signal(syscall.SIGTERM)
 		done := make(chan struct{})
 		go func() { _, _ = canton.Process.Wait(); close(done) }()
 		select {
@@ -210,8 +212,15 @@ func Run(stdout, stderr io.Writer, opts Options) (int, error) {
 	code := 0
 	if litErr != nil {
 		code = 1
-		if exit, ok := litErr.(*exec.ExitError); ok {
+		var exit *exec.ExitError
+		if errors.As(litErr, &exit) {
 			code = exit.ExitCode()
+		} else {
+			// lit missing or not executable: the suite never ran, so this is
+			// an operational error rather than a failing suite. Reported here
+			// because the output is otherwise indistinguishable from a red run.
+			fmt.Fprintf(stderr, "error: %v\n", litErr)
+			code = 2
 		}
 		if opts.Verbose {
 			fmt.Fprintf(stderr, "\n--- Canton log (last 60 lines) ---\n%s\n", ReadTail(logPath, 60))
@@ -237,9 +246,13 @@ func WaitForParties(placements []PartyEndpoint, canton *exec.Cmd, logPath string
 	lastError := ""
 
 	for time.Now().Before(deadline) {
-		if canton.ProcessState != nil && canton.ProcessState.Exited() {
-			return nil, fmt.Errorf("Canton exited during startup (code %d):\n%s",
-				canton.ProcessState.ExitCode(), ReadTail(logPath, 40))
+		// ProcessState is only populated by Wait, which nothing calls during
+		// polling -- checking it here never fires, so a Canton that died on a
+		// bad jar argument or a port clash used to poll connection-refused for
+		// the full timeout. Signal 0 asks the OS whether the process is still
+		// alive without touching it.
+		if canton.Process != nil && canton.Process.Signal(syscall.Signal(0)) != nil {
+			return nil, fmt.Errorf("Canton exited during startup:\n%s", ReadTail(logPath, 40))
 		}
 
 		for _, placement := range placements {

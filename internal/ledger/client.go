@@ -136,6 +136,14 @@ func (c *Client) once(method, url string, body map[string]any) (any, error, bool
 		}
 		if decoded, decodeErr := model.Decode(data); decodeErr == nil {
 			httpErr.Body = decoded
+		} else {
+			// A proxy error page or plain-text rejection is still a rejection:
+			// wrap it so --allow-fail renders a completion instead of exiting
+			// with a raw error. Mirrors submit_and_wait's JSONDecodeError arm.
+			wrapped := model.NewObject()
+			wrapped.Set("status", resp.StatusCode)
+			wrapped.Set("error", string(data))
+			httpErr.Body = wrapped
 		}
 		return nil, httpErr, isTransientStatus(resp.StatusCode)
 	}

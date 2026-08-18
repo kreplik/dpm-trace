@@ -115,11 +115,17 @@ func ShortSourcePath(loc source.Location, index *source.Index) string {
 // RenderLocationInline renders a location as a one-line header plus code, used
 // by the compact submit-failure view. Ports _render_loc_inline.
 //
-// The entity hint ("in choice Withdraw") needs damlc inspect or debug info,
-// neither of which is ported, so it is currently always absent.
+// The entity hint ("in choice Asset.Withdraw") comes either from the caller --
+// derived from the submitted command, needing no tooling -- or from the index,
+// which knows where each template and choice is defined.
 func RenderLocationInline(loc source.Location, index *source.Index, color Color, entityKind, entityName string) string {
 	header := fmt.Sprintf("%s:%d", ShortSourcePath(loc, index), loc.Line)
 	tag := LabelTag(loc.Label)
+	if entityKind == "" && entityName == "" && index != nil {
+		if kind, label, ok := index.EntityContaining(loc.Path, loc.Line); ok {
+			entityKind, entityName = kind, label
+		}
+	}
 	if entityKind != "" && entityName != "" {
 		header += fmt.Sprintf("  in %s %s   [%s]", entityKind, entityName, tag)
 	} else if desc := labelDisplay(loc.Label); desc != "" {

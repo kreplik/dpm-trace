@@ -59,11 +59,11 @@ func NormalizeTrace(raw *Object, source, sourceURL string, parties []string) (*T
 			eventsRaw = []any{single}
 		}
 	}
-	eventsByID := normalizeEventsMap(eventsRaw)
+	eventsByID, eventOrder := normalizeEventsMap(eventsRaw)
 
 	rootIDs := listString(pick(tx, "root_event_ids", "rootEventIds"))
 	if len(rootIDs) == 0 {
-		rootIDs = inferRoots(eventsByID)
+		rootIDs = inferRoots(eventsByID, eventOrder)
 	}
 
 	note := participantNote
@@ -111,8 +111,9 @@ func unwrapTransaction(raw *Object) *Object {
 
 // normalizeEventsMap accepts either the map or list encoding of an event
 // collection. Ports normalize_events_map.
-func normalizeEventsMap(eventsRaw any) map[string]*Event {
+func normalizeEventsMap(eventsRaw any) (map[string]*Event, []string) {
 	result := make(map[string]*Event)
+	var order []string
 
 	add := func(id string, value any) {
 		obj, ok := asObject(value)
@@ -120,6 +121,9 @@ func normalizeEventsMap(eventsRaw any) map[string]*Event {
 			return
 		}
 		ev := NormalizeEvent(id, obj)
+		if _, seen := result[ev.EventID]; !seen {
+			order = append(order, ev.EventID)
+		}
 		result[ev.EventID] = ev
 	}
 
@@ -145,7 +149,7 @@ func normalizeEventsMap(eventsRaw any) map[string]*Event {
 	}
 
 	linkRangeChildren(result)
-	return result
+	return result, order
 }
 
 // NormalizeEvent turns one raw event into an Event. Ports normalize_event.
@@ -237,8 +241,15 @@ func kindFromExplicit(explicit string) string {
 	return KindEvent
 }
 
-// inferRoots returns the events that are nobody's child. Ports infer_roots.
-func inferRoots(eventsByID map[string]*Event) []string {
+// inferRoots returns the events that are nobody's child, in document order.
+// Ports infer_roots.
+//
+// Order is load-bearing rather than cosmetic: both compare paths pair root
+// events positionally, so a different order produces spurious only-in-A /
+// only-in-B rows. Python iterates the events dict, which preserves insertion
+// order, so the id order recorded during normalization is carried here instead
+// of sorting -- a lexical sort puts "#10:0" before "#1:0".
+func inferRoots(eventsByID map[string]*Event, order []string) []string {
 	children := make(map[string]bool)
 	for _, ev := range eventsByID {
 		for _, child := range ev.ChildEventIDs {
@@ -246,17 +257,14 @@ func inferRoots(eventsByID map[string]*Event) []string {
 		}
 	}
 	var roots []string
-	for id := range eventsByID {
+	for _, id := range order {
 		if !children[id] {
 			roots = append(roots, id)
 		}
 	}
 	if len(roots) == 0 {
-		for id := range eventsByID {
-			roots = append(roots, id)
-		}
+		roots = append(roots, order...)
 	}
-	sortEventIDs(roots)
 	return roots
 }
 
@@ -285,7 +293,7 @@ func linkRangeChildren(eventsByID map[string]*Event) {
 		return 0, false
 	}
 
-	for _, id := range numeric {
+	for position, id := range numeric {
 		ev := eventsByID[id]
 		if len(ev.ChildEventIDs) > 0 {
 			continue
@@ -294,13 +302,34 @@ func linkRangeChildren(eventsByID map[string]*Event) {
 		if !ok {
 			continue
 		}
-		self, _ := strconv.Atoi(id)
-		for _, candidate := range numeric {
-			n, _ := strconv.Atoi(candidate)
-			if n > self && n <= last {
-				ev.ChildEventIDs = append(ev.ChildEventIDs, candidate)
+
+		// Walk forward taking direct children only: after claiming one, skip
+		// past its own descendant range, because those belong to it rather
+		// than to us. Claiming every id in (self, last] instead would attach
+		// grandchildren to the root as well, so a nested event renders twice
+		// and --export persists the duplicate.
+		var children []string
+		for index := position + 1; index < len(numeric); index++ {
+			childID := numeric[index]
+			childNode, err := strconv.Atoi(childID)
+			if err != nil || childNode > last {
+				break
+			}
+			children = append(children, childID)
+
+			childLast, ok := lastDescendant(childID)
+			if !ok || childLast <= childNode {
+				continue
+			}
+			for index+1 < len(numeric) {
+				next, err := strconv.Atoi(numeric[index+1])
+				if err != nil || next > childLast {
+					break
+				}
+				index++
 			}
 		}
+		ev.ChildEventIDs = children
 	}
 }
 
@@ -318,8 +347,10 @@ func eventVariant(raw *Object) *Object {
 	return raw
 }
 
-// sortEventIDs orders numerically when every id is numeric, lexically otherwise,
-// so tree output does not depend on map iteration order.
+// SortEventIDs orders numerically when every id is numeric, lexically
+// otherwise, so output does not depend on map iteration order.
+func SortEventIDs(ids []string) { sortEventIDs(ids) }
+
 func sortEventIDs(ids []string) {
 	allNumeric := true
 	for _, id := range ids {

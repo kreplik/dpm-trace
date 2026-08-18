@@ -16,8 +16,8 @@ import (
 	"github.com/walnuthq/dpm-trace/internal/visualizer"
 )
 
-// runTrace handles the bare `dpm trace` command. Only the --completion-file
-// path is ported; fetching an update by id needs internal/ledger.
+// runTrace handles the bare `dpm trace` command: an update id, a captured
+// completion, or a command id to look one up by.
 func runTrace(args []string) int {
 	if wantsHelp(args) {
 		rootHelp(os.Stdout)
@@ -68,7 +68,13 @@ func runTrace(args []string) int {
 				return 2
 			}
 			i++
-			colorMode = args[i]
+			switch args[i] {
+			case "auto", "always", "never":
+				colorMode = args[i]
+			default:
+				fmt.Fprintf(os.Stderr, "error: --color must be auto, always or never, got %q\n", args[i])
+				return 2
+			}
 		case "--daml-yaml":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --daml-yaml requires a path")
@@ -90,7 +96,7 @@ func runTrace(args []string) int {
 			}
 			i++
 			debugInfo = append(debugInfo, args[i])
-		case "--submitter", "--ledger-url":
+		case "--submitter", "--participant-url", "--ledger-url":
 			if i+1 >= len(args) {
 				fmt.Fprintf(os.Stderr, "error: %s requires a URL\n", arg)
 				return 2
@@ -217,6 +223,11 @@ func runTrace(args []string) int {
 				return 2
 			}
 			i++
+			// int("") raises; an explicitly empty value is a mistake, not zero.
+			if strings.TrimSpace(args[i]) == "" {
+				fmt.Fprintln(os.Stderr, "error: --begin-exclusive must be an integer offset")
+				return 2
+			}
 			beginExclusive = args[i]
 		case "--completion-limit":
 			if i+1 >= len(args) {
@@ -292,11 +303,14 @@ func runTrace(args []string) int {
 	damlc = config.String(damlc, cfg, "DPM_TRACE_DAMLC", "damlc")
 
 	index := source.NewIndex()
-	for _, path := range damlYAML {
-		index.LoadDamlYAML(path)
-	}
+	// Debug info first, then daml.yaml, then source roots, then DARs. The
+	// order is observable: ShortSourcePath strips the first matching root, and
+	// the summary prints roots in load order.
 	for _, path := range debugInfo {
 		index.LoadDebugInfo(path)
+	}
+	for _, path := range damlYAML {
+		index.LoadDamlYAML(path)
 	}
 	for _, root := range sourceRoot {
 		index.LoadSourceRoot(root)
@@ -318,6 +332,9 @@ func runTrace(args []string) int {
 			return 1
 		}
 		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
+		if printJSON {
+			return printCompletionJSON(completion)
+		}
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
 		if visualize {
 			fmt.Println("")
@@ -350,6 +367,9 @@ func runTrace(args []string) int {
 			return 1
 		}
 		completion.Raw = model.AttachLogMatches(completion.Raw, logFile)
+		if printJSON {
+			return printCompletionJSON(completion)
+		}
 		render.CompletionTrace(os.Stdout, completion, color, index, maxSourceLocations)
 		if visualize {
 			fmt.Println("")
@@ -369,6 +389,13 @@ func runTrace(args []string) int {
 		return 1
 	}
 
+	// run_trace normalizes both before fetching: a pasted CantonScan URL is
+	// reduced to its update id, and --read-as is comma-split, so
+	// `--read-as 'Alice,Bob'` is two parties rather than one bogus one. The
+	// parties also label the projection, so NormalizeTrace takes the same list.
+	updateID := extractUpdateID(target)
+	parties := ledger.ParseParties(readAs)
+
 	var (
 		raw       *model.Object
 		sourceTag string
@@ -377,9 +404,9 @@ func runTrace(args []string) int {
 	fetch := func() error {
 		switch {
 		case sourceMode == "scan" || (sourceMode == "auto" && scanURL != ""):
-			raw, sourceTag, url, err = ledger.New(scanURL, resolvedToken).LoadScanUpdate(target)
+			raw, sourceTag, url, err = ledger.New(scanURL, resolvedToken).LoadScanUpdate(updateID)
 		case sourceMode == "ledger" || (sourceMode == "auto" && ledgerURL != ""):
-			raw, sourceTag, url, err = ledger.New(ledgerURL, resolvedToken).LoadUpdate(target, readAs)
+			raw, sourceTag, url, err = ledger.New(ledgerURL, resolvedToken).LoadUpdate(updateID, parties)
 		default:
 			return ledger.ErrNoSource
 		}
@@ -393,12 +420,12 @@ func runTrace(args []string) int {
 		return 1
 	}
 
-	trace, err := model.NormalizeTrace(raw, sourceTag, url, readAs)
+	trace, err := model.NormalizeTrace(raw, sourceTag, url, parties)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	artifact := model.NewTraceArtifact(trace, ledgerURL, scanURL, dar, nil)
+	artifact := model.NewTraceArtifact(trace, ledgerURL, scanURL, dar, debugInfo)
 	if printJSON {
 		encoded, err := model.Encode(model.TraceToJSON(trace))
 		if err != nil {
@@ -446,4 +473,16 @@ func fetchWithWait(fetch func() error, waitSeconds float64) error {
 			return nil
 		}
 	}
+}
+
+// printCompletionJSON emits a completion for --print-json, as run_trace does on
+// the --completion-file and --command-id paths.
+func printCompletionJSON(completion *model.Completion) int {
+	encoded, err := model.Encode(completion.Raw)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Println(string(encoded))
+	return 0
 }

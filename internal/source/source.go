@@ -12,11 +12,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
 )
@@ -56,7 +58,12 @@ func NewIndex() *Index {
 }
 
 // HasSources reports whether anything was loaded.
-func (ix *Index) HasSources() bool { return len(ix.files) > 0 }
+func (ix *Index) HasSources() bool {
+	if len(ix.templates) > 0 || len(ix.choices) > 0 {
+		return true
+	}
+	return len(ix.files) > 0
+}
 
 // Lines returns the loaded content of a file.
 func (ix *Index) Lines(path string) ([]string, bool) {
@@ -99,8 +106,13 @@ func (ix *Index) LoadSourceRoot(root string) {
 	if err != nil {
 		return
 	}
+	// A root that does not exist is still recorded: the summary lists what was
+	// asked for, and silently dropping it hides a typo.
 	info, err := os.Stat(resolved)
 	if err != nil {
+		if !containsString(ix.Roots, resolved) {
+			ix.Roots = append(ix.Roots, resolved)
+		}
 		return
 	}
 
@@ -213,10 +225,15 @@ func (ix *Index) findText(text, label string, paths []string, limit int) []Locat
 			continue
 		}
 		for i, line := range lines {
-			column := strings.Index(line, text)
-			if column < 0 {
+			offset := strings.Index(line, text)
+			if offset < 0 {
 				continue
 			}
+			// Columns count characters, not bytes: str.find does, editors do,
+			// and a non-ASCII string literal earlier on the line (common in
+			// assertMsg) would otherwise shift the reported column and the
+			// caret to the right.
+			column := utf8.RuneCountInString(line[:offset])
 			result = append(result, Location{Path: path, Line: i + 1, Label: label, Column: column + 1})
 			if len(result) >= limit {
 				return result
@@ -252,7 +269,9 @@ func (ix *Index) Snippet(loc Location, radius int) string {
 		prefix := fmt.Sprintf("%s %*d | ", marker, width, lineNo)
 		rendered = append(rendered, prefix+lines[lineNo-1])
 		if lineNo == loc.Line && loc.Column > 1 {
-			rendered = append(rendered, strings.Repeat(" ", len(prefix)+loc.Column-1)+"^")
+			// Pad in characters for the same reason the column is counted in
+			// characters; len() would drift on a multibyte line.
+			rendered = append(rendered, strings.Repeat(" ", utf8.RuneCountInString(prefix)+loc.Column-1)+"^")
 		}
 	}
 	return FormatPath(loc) + "\n" + strings.Join(rendered, "\n")
@@ -293,7 +312,7 @@ func Needles(message string) []string {
 	var cleaned []string
 	for _, candidate := range candidates {
 		candidate = strings.Trim(candidate, " .\n\r\t")
-		if len(candidate) < 4 || containsString(cleaned, candidate) {
+		if utf8.RuneCountInString(candidate) < 4 || containsString(cleaned, candidate) {
 			continue
 		}
 		cleaned = append(cleaned, candidate)
@@ -317,8 +336,10 @@ func damlModuleName(lines []string) string {
 func stripYAMLScalar(value string) string {
 	value = strings.TrimSpace(value)
 	if len(value) >= 2 {
-		first, last := value[0], value[len(value)-1]
-		if (first == '"' || first == '\'') && first == last {
+		// Either quote character on either end, matched or not: strip_yaml_scalar
+		// tests startswith/endswith independently.
+		isQuote := func(c byte) bool { return c == '"' || c == '\'' }
+		if isQuote(value[0]) && isQuote(value[len(value)-1]) {
 			return value[1 : len(value)-1]
 		}
 	}
@@ -343,6 +364,31 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// EntityContaining returns the kind and label of the innermost choice or
+// template whose definition starts at or before line, in the same file.
+//
+// It is what turns a bare "Asset.daml:54" into "Asset.daml:54 in choice
+// Asset.Withdraw" -- the difference between a line number and an explanation.
+// Ports SourceIndex.entity_containing.
+func (ix *Index) EntityContaining(path string, line int) (kind, label string, ok bool) {
+	best := 0
+	consider := func(loc Location, entity string) {
+		if loc.Path != path || loc.Line <= 0 || loc.Line > line {
+			return
+		}
+		if best == 0 || loc.Line > best {
+			best, kind, label, ok = loc.Line, entity, loc.Label, true
+		}
+	}
+	for _, loc := range ix.choices {
+		consider(loc, "choice")
+	}
+	for _, loc := range ix.templates {
+		consider(loc, "template")
+	}
+	return kind, label, ok
 }
 
 // ModuleFiles returns the loaded files declaring a module, in load order.
@@ -414,6 +460,20 @@ func DamlcInspectCommand(damlc, darPath string) []string {
 func expandUser(path string) string {
 	if !strings.HasPrefix(path, "~") {
 		return path
+	}
+	// "~name/x" is that user's home, not a directory under ours. An unknown
+	// user is left alone rather than silently rewritten.
+	if len(path) > 1 && path[1] != '/' {
+		name := path[1:]
+		rest := ""
+		if slash := strings.Index(name, "/"); slash >= 0 {
+			name, rest = name[:slash], name[slash+1:]
+		}
+		other, err := user.Lookup(name)
+		if err != nil {
+			return path
+		}
+		return filepath.Join(other.HomeDir, rest)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

@@ -3,7 +3,6 @@ package ledger
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -91,7 +90,10 @@ func (s CommandSpec) arguments() (any, error) {
 	var base any = model.NewObject()
 	switch {
 	case s.ArgsJSON != "":
-		decoded, err := model.Decode([]byte(s.ArgsJSON))
+		// Any JSON value is legal: a choice can take a list, a scalar or null
+		// as its parameter. Only combining it with --arg requires an object,
+		// which the overlay below enforces.
+		decoded, err := model.DecodeValue([]byte(s.ArgsJSON))
 		if err != nil {
 			return nil, fmt.Errorf("invalid JSON in --args-json: %w", err)
 		}
@@ -101,7 +103,7 @@ func (s CommandSpec) arguments() (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		decoded, err := model.Decode(data)
+		decoded, err := model.DecodeValue(data)
 		if err != nil {
 			return nil, fmt.Errorf("invalid JSON in %s: %w", s.ArgsFile, err)
 		}
@@ -162,8 +164,11 @@ func ParseScalar(value string) any {
 		return false
 	}
 	if strings.HasPrefix(value, "{") || strings.HasPrefix(value, "[") {
-		var decoded any
-		if err := json.Unmarshal([]byte(value), &decoded); err == nil {
+		// model.DecodeValue, not encoding/json: the latter decodes numbers as
+		// float64, so a large Int64 loses precision and 1.0 re-encodes as 1,
+		// and it drops object key order. Both reach the wire and the exported
+		// prepared artifact.
+		if decoded, err := model.DecodeValue([]byte(value)); err == nil {
 			return decoded
 		}
 	}
@@ -171,14 +176,19 @@ func ParseScalar(value string) any {
 }
 
 func normalizeCommandsJSON(data []byte, source string) ([]any, error) {
-	var raw any
-	if err := json.Unmarshal(data, &raw); err != nil {
+	// Decoded through model so numbers keep their lexical form and objects
+	// keep key order; file-loaded commands stay *model.Object, which is what
+	// summarizeArgs asserts on when rendering a submit failure.
+	raw, err := model.DecodeValue(data)
+	if err != nil {
 		return nil, fmt.Errorf("invalid JSON in %s: %w", source, err)
 	}
 	switch value := raw.(type) {
-	case map[string]any:
-		if commands, ok := value["commands"].([]any); ok {
-			return commands, nil
+	case *model.Object:
+		if commands, ok := value.Get("commands"); ok {
+			if list, ok := commands.([]any); ok {
+				return list, nil
+			}
 		}
 		return []any{value}, nil
 	case []any:

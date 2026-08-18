@@ -339,7 +339,10 @@ func eventRowText(row model.CompareRow) string {
 		template = template + "." + row.Choice
 	}
 	suffix := ""
-	if row.ContractID != "" && row.ContractID != "-" {
+	if row.ContractID != "" {
+		// "-" is the placeholder shortValue stores for an absent id, and it is
+		// still printed: a row reading "(-)" says the id was absent, where no
+		// suffix at all reads as "not applicable".
 		suffix = " (" + row.ContractID + ")"
 	}
 	return label + " " + template + suffix

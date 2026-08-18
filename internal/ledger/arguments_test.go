@@ -119,3 +119,40 @@ func TestArgumentsRejectsBadAssignment(t *testing.T) {
 		t.Error("an assignment without = was accepted")
 	}
 }
+
+// A choice parameter need not be a record: a list, a scalar or null are all
+// legal, and encoding/json would also round-trip large integers wrongly.
+func TestArgumentsAcceptsNonObjectJSON(t *testing.T) {
+	for _, raw := range []string{`[1,2]`, `"just text"`, `null`, `42`} {
+		if _, err := (CommandSpec{ArgsJSON: raw}).arguments(); err != nil {
+			t.Errorf("--args-json %s rejected: %v", raw, err)
+		}
+	}
+	// Combining a non-object with --arg is the one case that must fail.
+	if _, err := (CommandSpec{ArgsJSON: `[1,2]`, Args: []string{"a=b"}}).arguments(); err == nil {
+		t.Error("--arg over a JSON array was accepted")
+	}
+}
+
+// Values must survive the round trip exactly: encoding/json decodes into
+// float64, so a large Int64 loses its last digit and 1.0 becomes 1.
+func TestArgumentsPreserveNumericForm(t *testing.T) {
+	got, err := (CommandSpec{ArgsJSON: `{"big":9007199254740993,"exact":1.0}`}).arguments()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := encode(t, got)
+	for _, want := range []string{"9007199254740993", "1.0"} {
+		if !strings.Contains(encoded, want) {
+			t.Errorf("value not preserved: want %s in %s", want, encoded)
+		}
+	}
+}
+
+// ParseScalar takes the same path for inline JSON in --arg.
+func TestParseScalarPreservesNumericForm(t *testing.T) {
+	value := ParseScalar(`{"big":9007199254740993}`)
+	if !strings.Contains(encode(t, value), "9007199254740993") {
+		t.Errorf("got %s", encode(t, value))
+	}
+}

@@ -17,6 +17,7 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
@@ -30,6 +31,10 @@ builds:
 archives:
   - id: dpm-trace
     formats: [tar.gz]
+    # Windows users expect a zip, and tar is not built in on older Windows.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE

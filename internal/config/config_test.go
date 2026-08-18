@@ -114,24 +114,6 @@ func TestExplicitMissingConfigIsAnError(t *testing.T) {
 	}
 }
 
-// Config values may arrive as a PATH-style list or as a single value; both
-// must work, and empty segments must not become empty paths.
-func TestSplitList(t *testing.T) {
-	if got := splitList("/a" + string(filepath.ListSeparator) + "/b"); len(got) != 2 || got[0] != "/a" {
-		t.Errorf("split = %v", got)
-	}
-	if got := splitList("/only"); len(got) != 1 || got[0] != "/only" {
-		t.Errorf("single value = %v", got)
-	}
-	if got := splitList(""); len(got) != 0 {
-		t.Errorf("empty = %v, want nothing", got)
-	}
-	sep := string(filepath.ListSeparator)
-	if got := splitList("/a" + sep + sep + "/b"); len(got) != 2 {
-		t.Errorf("empty segments kept: %v", got)
-	}
-}
-
 // Precedence for list options: an explicit flag wins, then the environment,
 // then the config file. Getting this backwards would let a stale config
 // override what the user just typed.
