@@ -39,6 +39,10 @@ for key in (
     # check-golden.py reads this itself, so lit must let it through or the
     # goldens silently run against Python while %dpm runs the binary.
     "DPM_TRACE_BIN",
+    # A `go build -cover` binary warns on stderr when this is unset, which
+    # corrupts output the suites compare. Forward it so coverage can be
+    # measured across the subprocess runs.
+    "GOCOVERDIR",
     "DPM_TRACE_DAML",
     "DPM_TRACE_DAMLC",
     "DPM_TRACE_CANTON_JAR",
