@@ -3,6 +3,7 @@ package render
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
 )
@@ -220,5 +221,36 @@ func TestShortTemplate(t *testing.T) {
 		if got := ShortTemplate(unchanged); got != unchanged {
 			t.Errorf("ShortTemplate(%q) = %q", unchanged, got)
 		}
+	}
+}
+
+// Inline JSON goes through the port's encoder, not encoding/json: the latter
+// HTML-escapes and leaves non-ASCII raw, both of which diverge from the
+// artifacts and reports this tool emits elsewhere.
+func TestFormatScalarEncodingMatchesTheArtifactEncoder(t *testing.T) {
+	obj := model.NewObject()
+	obj.Set("markup", "a < b")
+	obj.Set("unicode", "café")
+
+	got := FormatScalar(obj, nil)
+	if !strings.Contains(got, "a < b") {
+		t.Errorf("< was HTML-escaped: %s", got)
+	}
+	if !strings.Contains(got, `\u00e9`) {
+		t.Errorf("non-ASCII not escaped as ensure_ascii does: %s", got)
+	}
+}
+
+// Truncation counts characters: cutting bytes can split a multibyte rune.
+func TestShortCutsOnCharacterBoundaries(t *testing.T) {
+	got := Short("ééééééééééééé", 8)
+	if !strings.HasSuffix(got, "...") {
+		t.Fatalf("not truncated: %q", got)
+	}
+	if !utf8.ValidString(got) {
+		t.Errorf("truncation split a rune: %q", got)
+	}
+	if runes := []rune(got); len(runes) != 8 {
+		t.Errorf("got %d characters, want 8: %q", len(runes), got)
 	}
 }

@@ -48,7 +48,7 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *sourc
 
 // PreparedCompletionComparison writes a prepared-vs-completion comparison.
 // Ports print_prepared_completion_comparison, minus source diagnostics.
-func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, color Color, compact bool) {
+func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, color Color, compact bool, index *source.Index, maxSourceLocations int) {
 	completion := c.Completion
 	committed := c.CommittedUpdateAvailable
 	failed := !committed && isFailingStatus(c.StatusCode)
@@ -71,7 +71,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 
 		fmt.Fprintf(w, "  A  command %s   (prepared)\n", Short(orDashValue(c.Left.CommandID), 20))
 		completionID := Short(orDashValue(completion.String("commandId", "command_id")), 20)
-		offset := orDash(scalarText(completion.Get("offset")))
+		offset := orDashFalsy(completion.Get("offset"))
 		if committed {
 			updateID := Short(completion.String("updateId", "update_id"), 12)
 			fmt.Fprintf(w, "  B  completion %s   update %s   offset %s\n", completionID, updateID, offset)
@@ -115,7 +115,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	fmt.Fprintf(w, "  command id: %s%s\n", orDash(completion.String("commandId", "command_id")), marker)
 	fmt.Fprintf(w, "  submission: %s\n", orDash(completion.String("submissionId", "submission_id")))
 	fmt.Fprintf(w, "  update id:  %s\n", Short(orDashValue(completion.String("updateId", "update_id")), 80))
-	fmt.Fprintf(w, "  offset:     %s\n", orDash(scalarText(completion.Get("offset"))))
+	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset")))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(c.StatusCode))
 	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(c.Message)))
 
@@ -135,6 +135,8 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	if sync := completion.Get("synchronizerTime", "synchronizer_time"); sync != nil {
 		fmt.Fprintf(w, "  sync time:  %s\n", scalarText(sync))
 	}
+	locations, capped := CompletionSourceDiagnostics(c.Completion, index, maxSourceLocations)
+	PrintSourceDiagnostics(w, locations, capped, index, color)
 	printLogMatches(w, completion.Get("logMatches"), color)
 }
 
@@ -186,6 +188,16 @@ func isFailingStatus(code any) bool {
 }
 
 // scalarText renders a decoded JSON scalar the way Python's str() would.
+// orDashFalsy renders a value the way Python's `x or '-'` does: a zero offset
+// or an empty string both show as "-", because both mean "not reported".
+func orDashFalsy(value any) string {
+	text := scalarText(value)
+	if text == "" || text == "0" {
+		return "-"
+	}
+	return text
+}
+
 func scalarText(value any) string {
 	if value == nil {
 		return ""
@@ -207,6 +219,11 @@ func orDashIfNil(value any) string {
 // unless the text contains one, with backslashes escaped.
 func pythonRepr(s string) string {
 	escaped := strings.ReplaceAll(s, "\\", "\\\\")
+	// repr escapes control characters; without this a multi-line failure
+	// message breaks the single-line compact layout.
+	escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+	escaped = strings.ReplaceAll(escaped, "\r", "\\r")
+	escaped = strings.ReplaceAll(escaped, "\t", "\\t")
 	if strings.Contains(s, "'") && !strings.Contains(s, `"`) {
 		return `"` + escaped + `"`
 	}
@@ -262,8 +279,10 @@ func SubmitFailure(w io.Writer, c *model.Completion, request map[string]any, col
 
 	locations, capped := CompletionSourceDiagnostics(c, index, maxSourceLocations)
 	if len(locations) > 0 {
+		// The submitted command names the choice, so the hint needs no tooling.
+		entityKind, entityName := EntityFromRequest(request)
 		fmt.Fprintf(w, "  %-*s (best match first)\n", col, "Where")
-		fmt.Fprintln(w, IndentText(RenderLocationInline(locations[0], index, color, "", "")))
+		fmt.Fprintln(w, IndentText(RenderLocationInline(locations[0], index, color, entityKind, entityName)))
 		rest := locations[1:]
 		if len(rest) > 0 || capped {
 			shown := rest
@@ -403,4 +422,27 @@ func logMatchedBy(c *model.Completion) string {
 		}
 	}
 	return "trace id"
+}
+
+// EntityFromRequest derives the "in choice Asset.Withdraw" hint from the
+// submitted command, which names the template and choice directly.
+// Ports _entity_from_request.
+func EntityFromRequest(request map[string]any) (kind, name string) {
+	commands, _ := request["commands"].([]any)
+	for _, command := range commands {
+		obj, ok := command.(map[string]any)
+		if !ok {
+			continue
+		}
+		body, ok := commandBody(obj, "ExerciseCommand", "exerciseCommand")
+		if !ok {
+			continue
+		}
+		template := ShortTemplate(fmt.Sprint(body["templateId"]))
+		choice := fmt.Sprint(body["choice"])
+		if template != "" && choice != "" && choice != "<nil>" {
+			return "choice", template + "." + choice
+		}
+	}
+	return "", ""
 }

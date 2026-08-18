@@ -1,6 +1,7 @@
 package testrunner
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,7 +45,9 @@ func (r Result) Failed() bool {
 
 // Command builds the `daml test` invocation. Ports daml_test_command.
 func Command(opts Options, junitPath, txnsDir, tableDir string) []string {
-	executable := opts.Daml
+	// Expanded here as the integration runner does: "~/.daml/bin/daml" is a
+	// path the shell would have expanded, and exec will not.
+	executable := expandUser(opts.Daml)
 	if executable == "" {
 		executable = "daml"
 	}
@@ -142,7 +145,13 @@ func Run(stderr io.Writer, opts Options, index *source.Index) (Result, error) {
 	env := ChildEnv(map[string]string{"DAML_PACKAGE": opts.Root})
 
 	command := Command(opts, junitPath, txnsDir, tableDir)
-	stdout, _ := runCommand(command, opts.Root, env)
+	stdout, runErr := runCommand(command, opts.Root, env)
+	if isSpawnFailure(runErr) {
+		// A missing or non-executable --daml never produced output, so the
+		// retry below would report "the package may not compile" for what is
+		// actually a bad path.
+		return result, fmt.Errorf("could not run %q: %w", command[0], runErr)
+	}
 
 	result.TreesAvailable = fileExists(junitPath)
 	if !result.TreesAvailable {
@@ -158,8 +167,10 @@ func Run(stderr io.Writer, opts Options, index *source.Index) (Result, error) {
 
 	if !fileExists(junitPath) {
 		fmt.Fprint(stderr, stdout)
+		// The displayed command drops the output-path flags, which are noise
+		// for a reader diagnosing a compile failure.
 		return result, fmt.Errorf("'%s' produced no test results; the package may not compile",
-			strings.Join(command, " "))
+			strings.Join(DisplayCommandArgs(command), " "))
 	}
 
 	cases, err := ParseJUnit(junitPath)
@@ -167,8 +178,10 @@ func Run(stderr io.Writer, opts Options, index *source.Index) (Result, error) {
 		return result, err
 	}
 	summary := ParseSummary(stdout)
+	// A negative value is unset; an explicit 0 means "resolve none", and the
+	// JSON report records whatever was asked for.
 	maxLocations := opts.MaxSourceLocations
-	if maxLocations <= 0 {
+	if maxLocations < 0 {
 		maxLocations = 6
 	}
 
@@ -302,4 +315,41 @@ func stringsOrEmpty(values []string) []string {
 		return []string{}
 	}
 	return values
+}
+
+// isSpawnFailure reports whether the command never started, as opposed to
+// running and exiting non-zero.
+func isSpawnFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var exit *exec.ExitError
+	return !errors.As(err, &exit)
+}
+
+// DisplayCommandArgs strips the output-path flags from a command for display.
+func DisplayCommandArgs(command []string) []string {
+	var out []string
+	for i := 0; i < len(command); i++ {
+		switch command[i] {
+		case "--junit", "--transactions-output", "--table-output":
+			i++
+			continue
+		}
+		out = append(out, command[i])
+	}
+	return out
+}
+
+// expandUser resolves a leading ~ so an unexpanded path from a config file or
+// a quoted flag still runs.
+func expandUser(path string) string {
+	if !strings.HasPrefix(path, "~") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(home, strings.TrimPrefix(path, "~"))
 }

@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"sort"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 
@@ -69,7 +70,9 @@ func (s *Stepper) preorder() []string {
 			remaining = append(remaining, eventID)
 		}
 	}
-	sort.Strings(remaining)
+	// Numeric-aware, like the model's own ordering: sort.Strings puts "10"
+	// before "2" and would renumber the steps of a partially-linked trace.
+	model.SortEventIDs(remaining)
 	for _, eventID := range remaining {
 		visit(eventID)
 	}
@@ -89,6 +92,18 @@ func (s *Stepper) Run(in io.Reader) {
 		return
 	}
 	s.ShowCurrent()
+
+	// Ctrl-C exits the REPL, not the process: the Python stepper catches
+	// KeyboardInterrupt, and killing the process would skip any cleanup the
+	// caller has pending.
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	defer signal.Stop(interrupt)
+	go func() {
+		<-interrupt
+		fmt.Fprintln(s.out)
+		os.Exit(0)
+	}()
 
 	scanner := bufio.NewScanner(in)
 	for {
@@ -310,8 +325,9 @@ func (s *Stepper) inputContractPayload(contractID string) any {
 func findContractPayload(value any, contractID string) any {
 	switch v := value.(type) {
 	case *model.Object:
-		if model.ObjectString(v, "contractId") == contractID {
-			for _, key := range []string{"createArguments", "createArgument", "payload"} {
+		if model.ObjectString(v, "contractId") == contractID ||
+			model.ObjectString(v, "contract_id") == contractID {
+			for _, key := range []string{"createArguments", "createArgument", "create_arguments", "payload"} {
 				if payload, ok := v.Get(key); ok && payload != nil {
 					return payload
 				}
@@ -357,7 +373,10 @@ func (s *Stepper) ListBreakpoints() {
 
 // ClearBreakpoints removes one breakpoint or all of them.
 func (s *Stepper) ClearBreakpoints(cmd string) {
-	arg := strings.TrimSpace(strings.TrimPrefix(cmd, "clear"))
+	// partition(" "), not TrimPrefix: "clearX" has no argument and clears
+	// everything, where trimming the prefix would leave "X" and print usage.
+	_, arg, _ := strings.Cut(cmd, " ")
+	arg = strings.TrimSpace(arg)
 	if arg == "" {
 		s.Breakpoints = nil
 		fmt.Fprintln(s.out, s.Color.Apply("cleared all breakpoints", "yellow"))

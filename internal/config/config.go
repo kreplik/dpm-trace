@@ -108,7 +108,10 @@ func Strings(current []string, config *model.Object, env string, keys ...string)
 	}
 	if env != "" {
 		if value := os.Getenv(env); value != "" {
-			return splitList(value)
+			// One value, not a PATH-style list: config_values wraps a scalar
+			// as a single-element list, so a path containing a colon stays
+			// whole.
+			return []string{value}
 		}
 	}
 	for _, key := range keys {
@@ -117,19 +120,6 @@ func Strings(current []string, config *model.Object, env string, keys ...string)
 		}
 	}
 	return nil
-}
-
-func splitList(value string) []string {
-	var out []string
-	for _, part := range filepath.SplitList(value) {
-		if part != "" {
-			out = append(out, part)
-		}
-	}
-	if len(out) == 0 && value != "" {
-		return []string{value}
-	}
-	return out
 }
 
 func ancestors(dir string) []string {

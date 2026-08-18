@@ -3,6 +3,7 @@ package ledger
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
 )
@@ -31,9 +32,11 @@ func (c *Client) FetchCompletion(lookup CompletionLookup) (*model.Completion, er
 		return nil, fmt.Errorf("--act-as, --read-as, or --party is required for completion lookup")
 	}
 
+	// int() tolerates surrounding whitespace, so " 5 " is 5. An empty value is
+	// rejected by the flag parser, which knows whether the flag was given.
 	beginExclusive := int64(0)
 	if lookup.BeginExclusive != "" {
-		parsed, err := strconv.ParseInt(lookup.BeginExclusive, 10, 64)
+		parsed, err := strconv.ParseInt(strings.TrimSpace(lookup.BeginExclusive), 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("--begin-exclusive must be an integer offset")
 		}
@@ -98,16 +101,28 @@ func NormalizeCompletionList(raw any) []*model.Object {
 	var candidates []any
 	switch value := raw.(type) {
 	case *model.Object:
+		// An or-chain, as normalize_completion_list uses: a falsy value (an
+		// empty list) falls through to the next key, and the first truthy one
+		// wins even if it is not a list -- in which case there are no
+		// completions rather than the whole object being treated as one.
+		var picked any
 		for _, key := range []string{"completions", "items", "responses", "completionResponses"} {
-			if nested, ok := value.Get(key); ok {
-				if list, isList := nested.([]any); isList {
-					candidates = list
-					break
-				}
+			nested, ok := value.Get(key)
+			if !ok || isFalsy(nested) {
+				continue
 			}
+			picked = nested
+			break
 		}
-		if candidates == nil {
+		switch {
+		case picked == nil:
 			candidates = []any{value}
+		default:
+			list, isList := picked.([]any)
+			if !isList {
+				return nil
+			}
+			candidates = list
 		}
 	case []any:
 		candidates = value
@@ -134,4 +149,22 @@ func toAnySlice(values []string) []any {
 		out = append(out, value)
 	}
 	return out
+}
+
+// isFalsy reports whether a decoded JSON value is falsy the way Python's or
+// treats it: nil, false, an empty string, an empty list or an empty object.
+func isFalsy(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return true
+	case bool:
+		return !v
+	case string:
+		return v == ""
+	case []any:
+		return len(v) == 0
+	case *model.Object:
+		return v.Len() == 0
+	}
+	return false
 }

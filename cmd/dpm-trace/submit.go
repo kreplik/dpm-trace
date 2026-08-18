@@ -80,17 +80,28 @@ func runSubmit(args []string) int {
 			if completion.String("commandId", "command_id") == "" {
 				completion.Raw.Set("commandId", commandID)
 			}
+			// The index and log matches are built before choosing compact or
+			// full, as run_submit does: --full previously discarded exactly
+			// the diagnostics --daml-yaml and --log-file were asking for.
+			index := source.NewIndex()
+			for _, path := range opts.debugInfo {
+				index.LoadDebugInfo(path)
+			}
+			for _, path := range opts.damlYAML {
+				index.LoadDamlYAML(path)
+			}
+			for _, root := range opts.sourceRoots {
+				index.LoadSourceRoot(root)
+			}
+			for _, path := range opts.dar {
+				index.LoadDARInspect(path, orDefaultString(opts.damlc, "daml"))
+			}
+			completion.Raw = model.AttachLogMatches(completion.Raw, opts.logFile)
+			color := render.ColorFromMode(opts.colorMode, isTTY())
 			if opts.full {
-				render.CompletionTrace(os.Stdout, completion,
-					render.ColorFromMode(opts.colorMode, isTTY()), nil, 5)
+				render.CompletionTrace(os.Stdout, completion, color, index, opts.maxSourceLoc)
 			} else {
-				index := source.NewIndex()
-				for _, path := range opts.damlYAML {
-					index.LoadDamlYAML(path)
-				}
-				completion.Raw = model.AttachLogMatches(completion.Raw, opts.logFile)
-				render.SubmitFailure(os.Stdout, completion, request,
-					render.ColorFromMode(opts.colorMode, isTTY()), index, 5)
+				render.SubmitFailure(os.Stdout, completion, request, color, index, opts.maxSourceLoc)
 			}
 		}
 		if opts.allowFail {
@@ -111,7 +122,13 @@ func runSubmit(args []string) int {
 
 	updateID := model.ObjectString(response, "updateId")
 	if updateID == "" {
-		fmt.Fprintln(os.Stderr, "error: submit-and-wait returned no updateId")
+		// Include the body: without it there is nothing to debug, since the
+		// call succeeded and only the shape was unexpected.
+		detail := ""
+		if encoded, err := model.Encode(response); err == nil {
+			detail = ": " + string(encoded)
+		}
+		fmt.Fprintf(os.Stderr, "error: submit-and-wait returned no updateId%s\n", detail)
 		return 1
 	}
 	fmt.Println(updateID)

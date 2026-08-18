@@ -198,7 +198,10 @@ func FormatScalar(value any, ctx *Context) string {
 // compactSorted mirrors json.dumps(value, sort_keys=True): compact separators,
 // sorted keys. Python emits ", " and ": " separators in compact mode.
 func compactSorted(value any) (string, error) {
-	encoded, err := json.Marshal(value)
+	// model.EncodeCompact, not json.Marshal: the latter HTML-escapes (< becomes
+	// \u003c) and leaves non-ASCII raw, where the port's encoder leaves < alone
+	// and escapes non-ASCII as Python's ensure_ascii does.
+	encoded, err := model.EncodeCompact(value)
 	if err != nil {
 		return "", err
 	}
@@ -244,10 +247,14 @@ func Short(value string, maxLen int) string {
 	if value == "" {
 		return "-"
 	}
-	if len(value) <= maxLen {
+	// Counted and cut in characters: slicing bytes can split a multibyte rune
+	// into mojibake, and would truncate at a different visual width than
+	// Python's character slicing.
+	runes := []rune(value)
+	if len(runes) <= maxLen {
 		return value
 	}
-	return value[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // ShortTemplate drops the package id from a package:module:entity template.

@@ -327,7 +327,9 @@ func PreparedArtifactSummary(artifact map[string]any) string {
 		if hash := model.ObjectString(response, "preparedTransactionHash"); hash != "" {
 			lines = append(lines, "  prepared hash:"+Short(hash, 80))
 		}
-		if _, present := response.Get("costEstimation"); present {
+		// Presence is not enough: a null costEstimation means none was
+		// returned, and printing the line then is misleading.
+		if value, present := response.Get("costEstimation"); present && value != nil {
 			lines = append(lines, "  cost:         returned")
 		}
 	}

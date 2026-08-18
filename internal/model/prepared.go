@@ -201,7 +201,7 @@ func sortedKeys(obj *Object) []string {
 func NewPreparedArtifact(request map[string]any, response *Object, sourceURL, ledgerURL string, actAs, readAs []string) map[string]any {
 	return map[string]any{
 		"schema":    PreparedArtifactSchema,
-		"createdAt": time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
+		"createdAt": isoTimestamp(time.Now().UTC()),
 		"kind":      "prepared-command",
 		"source":    "ledger-json-api",
 		"sourceUrl": sourceURL,

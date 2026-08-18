@@ -20,7 +20,7 @@ func LoadTraceArtifact(path string) (*Object, error) {
 	}
 	artifact, err := Decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("trace artifact must be a JSON object: %s", path)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if schema := pickString(artifact, "schema"); schema != TraceArtifactSchema {
 		return nil, fmt.Errorf("unsupported trace artifact schema in %s: %s", path, quoteOrNone(schema))
@@ -207,7 +207,7 @@ func NewTraceArtifact(t *Trace, ledgerURL, scanURL string, darPaths, debugInfoPa
 
 	return map[string]any{
 		"schema":    TraceArtifactSchema,
-		"createdAt": time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
+		"createdAt": isoTimestamp(time.Now().UTC()),
 		"kind":      "committed-update",
 		"trace":     TraceToJSON(t),
 		"participant": map[string]any{
@@ -292,9 +292,19 @@ func resolvePath(path string) string {
 
 // packageFromTemplate returns the package id of a package:module:entity template.
 func packageFromTemplate(template string) string {
-	parts := strings.Split(template, ":")
-	if len(parts) >= 3 {
-		return parts[0]
+	// One colon is enough: package_from_template splits on the first one, so a
+	// "pkg:Module" reference still yields its package id.
+	if package_, _, found := strings.Cut(template, ":"); found {
+		return package_
 	}
 	return ""
+}
+
+// isoTimestamp formats a UTC instant the way datetime.isoformat() does: the
+// microseconds are omitted when they are zero rather than printed as .000000.
+func isoTimestamp(t time.Time) string {
+	if t.Nanosecond() == 0 {
+		return t.Format("2006-01-02T15:04:05Z")
+	}
+	return t.Format("2006-01-02T15:04:05.000000Z")
 }

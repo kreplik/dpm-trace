@@ -60,7 +60,8 @@ jobs:
           DPM_TRACE_DAML_TESTS_DIR: ${{ github.workspace }}/daml-contracts
         run: |
           set -o pipefail
-          go test ./... -coverprofile=unit.out
+          mkdir -p "$RUNNER_TEMP/unitcov"
+          go test ./... -cover -args -test.gocoverdir="$RUNNER_TEMP/unitcov"
 
           go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/dpm-trace
           mkdir -p "$RUNNER_TEMP/covdata"
@@ -76,23 +77,21 @@ jobs:
                   --parties Alice@1,Bob@2,Issuer@1) \
             || echo "::warning::the integration suite reported failures"
 
-          go tool covdata textfmt -i="$RUNNER_TEMP/covdata" -o=suite.out
-          { cat unit.out; tail -n +2 suite.out; } > merged.out
+          # covdata merge, not concatenation: shared blocks would otherwise
+          # be counted twice.
+          go tool covdata textfmt -i="$RUNNER_TEMP/unitcov,$RUNNER_TEMP/covdata" -o=coverage.out
 
           {
             echo "### Coverage including a real Canton run"
             echo
             echo "| scope | statements |"
             echo "| --- | --- |"
-            echo "| unit tests only | $(go tool cover -func=unit.out   | tail -1 | awk '{print $3}') |"
-            echo "| all layers | **$(go tool cover -func=merged.out | tail -1 | awk '{print $3}')** |"
+            echo "| unit tests only | $(go tool covdata func -i="$RUNNER_TEMP/unitcov" | tail -1 | awk '{print $NF}') |"
+            echo "| all layers | **$(go tool covdata func -i="$RUNNER_TEMP/unitcov,$RUNNER_TEMP/covdata" | tail -1 | awk '{print $NF}')** |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always() && !env.ACT
         with:
           name: integration-coverage
-          path: |
-            unit.out
-            suite.out
-            merged.out
+          path: coverage.out

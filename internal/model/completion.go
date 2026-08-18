@@ -21,7 +21,9 @@ func LoadCompletion(path string) (*Completion, error) {
 	}
 	raw, err := Decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("completion file must be a JSON object: %s", path)
+		// Keep the decoder's message: "must be a JSON object" is a guess that
+		// hides a syntax error, which is the more common cause.
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return &Completion{Raw: NormalizeCompletion(raw)}, nil
 }
@@ -182,12 +184,16 @@ func AttachLogMatches(completion *Object, logFiles []string) *Object {
 			continue
 		}
 		for i, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			// splitlines() strips the carriage return; splitting on \n alone
+			// leaves it, so a CRLF log renders a stray \r at each line end.
+			line = strings.TrimSuffix(line, "\r")
 			if !containsAnyTerm(line, terms) {
 				continue
 			}
 			text := line
-			if len(text) > 500 {
-				text = text[:500]
+			// Counted in characters, as Python's slicing does.
+			if runes := []rune(text); len(runes) > 500 {
+				text = string(runes[:500])
 			}
 			entry := NewObject()
 			entry.Set("file", path)

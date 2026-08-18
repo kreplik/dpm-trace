@@ -48,7 +48,7 @@ func TestPreparedCompletionComparisonMatchesGoldens(t *testing.T) {
 			}
 			var buf bytes.Buffer
 			PreparedCompletionComparison(&buf, model.ComparePreparedToCompletion(prepared, completion),
-				Color{Enabled: false}, tc.compact)
+				Color{Enabled: false}, tc.compact, source.NewIndex(), 5)
 			got := strings.TrimRight(buf.String(), "\n")
 			want := goldenStdout(t, filepath.Join(root, tc.golden))
 			if got != want {

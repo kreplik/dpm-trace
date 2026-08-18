@@ -23,7 +23,7 @@ func runTest(args []string) int {
 	if wantsHelp(args) {
 		commandHelp(os.Stdout, "dpm trace test <package-dir> [flags]",
 			"Run Daml Script unit tests, render each script's transaction tree, and map failures to source.",
-			testFlags, "--integration, --init, --dar, --damlc")
+			testFlags, "")
 		return 0
 	}
 
@@ -41,6 +41,7 @@ func runTest(args []string) int {
 		darPaths        []string
 		damlc           string
 		debugInfo       []string
+		sourceRoots     []string
 	)
 
 	for i := 0; i < len(args); i++ {
@@ -68,7 +69,9 @@ func runTest(args []string) int {
 			integrationOpts.Verbose = true
 			continue
 		}
-		if arg[0] != '-' {
+		// An empty argument is the package root (cwd), as run_test treats it;
+		// indexing arg[0] here would panic.
+		if !strings.HasPrefix(arg, "-") {
 			if root != "" {
 				fmt.Fprintf(os.Stderr, "error: unexpected argument %q\n", arg)
 				return 2
@@ -133,6 +136,8 @@ func runTest(args []string) int {
 			damlc = value
 		case "--debug-info":
 			debugInfo = append(debugInfo, value)
+		case "--source-root":
+			sourceRoots = append(sourceRoots, value)
 		default:
 			fmt.Fprintf(os.Stderr, "error: unknown flag %q\n", arg)
 			return 2
@@ -141,12 +146,15 @@ func runTest(args []string) int {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
+		// 1 is reserved for "tests failed"; operational errors exit 2 so the
+		// CI gate can tell a red suite from a broken invocation.
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		return 2
 	}
 	darPaths = config.Strings(darPaths, cfg, "DPM_TRACE_DAR", "darPaths", "dar_paths", "dar")
 	damlc = config.String(damlc, cfg, "DPM_TRACE_DAMLC", "damlc")
 	debugInfo = config.Strings(debugInfo, cfg, "DPM_TRACE_DEBUG_INFO", "debugInfoPaths", "debug_info_paths", "debugInfo", "debug_info")
+	sourceRoots = config.Strings(sourceRoots, cfg, "DPM_TRACE_SOURCE_ROOT", "sourceRoots", "source_roots", "sourceRoot")
 	damlYAML = config.Strings(damlYAML, cfg, "DPM_TRACE_DAML_YAML", "damlYamlPaths", "daml_yaml_paths", "damlYaml", "daml_yaml")
 
 	if root == "" {
@@ -157,7 +165,7 @@ func runTest(args []string) int {
 	absolute, resolveErr := resolvePath(root)
 	if err = resolveErr; err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		return 2
 	}
 	opts.Root = absolute
 
@@ -216,6 +224,9 @@ func runTest(args []string) int {
 	for _, path := range damlYAML {
 		index.LoadDamlYAML(path)
 	}
+	for _, root := range sourceRoots {
+		index.LoadSourceRoot(root)
+	}
 	// run_test defaults --damlc to --daml, so a package built with one
 	// toolchain is inspected with the same one.
 	for _, path := range darPaths {
@@ -232,7 +243,7 @@ func runTest(args []string) int {
 		encoded, err := model.Encode(testrunner.ReportJSON(absolute, result.Command, result.Cases, opts.MaxSourceLocations))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
+			return 2
 		}
 		fmt.Println(string(encoded))
 	} else {
