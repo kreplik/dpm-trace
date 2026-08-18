@@ -134,7 +134,7 @@ func runTest(args []string) int {
 		case "--debug-info":
 			debugInfo = append(debugInfo, value)
 		default:
-			fmt.Fprintf(os.Stderr, "error: %q is not supported by dpm trace test yet; use python -m dpm_trace.cli\n", arg)
+			fmt.Fprintf(os.Stderr, "error: unknown flag %q\n", arg)
 			return 2
 		}
 	}
@@ -166,7 +166,7 @@ func runTest(args []string) int {
 		integrationOpts.Daml = opts.Daml
 		integrationOpts.DAR = firstOrEmpty(darPaths)
 		integrationOpts.KeepArtifacts = opts.KeepArtifacts
-		// The generated lit.cfg.py builds %dpm as "<python> -m dpm_trace.cli",
+		// The generated lit.cfg.py builds %dpm from DPM_TRACE_IT_DPM,
 		// so the suite drives the Python implementation. Point it at the
 		// interpreter and source tree the same way run_integration_tests does;
 		// switching %dpm to this binary would change what the suite tests.

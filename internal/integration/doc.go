@@ -1,6 +1,6 @@
 // Package integration runs an lit suite against a managed local Canton node.
 //
-// Ports from src/dpm_trace/cli.py: run_integration_tests, canton_config_text,
+// Ported from the original Python implementation: run_integration_tests, canton_config_text,
 // canton_bootstrap_text, find_free_ports, parse_party_placements,
 // wait_for_parties, build_dar, daml_child_env.
 //

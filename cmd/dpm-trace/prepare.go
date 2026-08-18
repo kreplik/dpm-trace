@@ -205,7 +205,7 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 		case "--command-json":
 			spec.CommandJSON = value
 		default:
-			fmt.Fprintf(os.Stderr, "error: %q is not supported by dpm trace %s yet; use python -m dpm_trace.cli\n", arg, name)
+			fmt.Fprintf(os.Stderr, "error: unknown flag %q for dpm trace %s\n", arg, name)
 			return opts, spec, 2
 		}
 	}

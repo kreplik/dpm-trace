@@ -159,8 +159,10 @@ func runCompare(args []string) int {
 	}
 
 	if len(targets) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: dpm trace compare <update-a> <update-b>")
-		return 2
+		// Matches cli.py verbatim, including the "error:" prefix and exit 1:
+		// run_compare reports this through the same path as any other failure.
+		fmt.Fprintln(os.Stderr, "error: usage: dpm trace compare <update-a> <update-b> or --prepared prepared.json --update <update-id>")
+		return 1
 	}
 
 	left, err := fetch.trace(targets[0])

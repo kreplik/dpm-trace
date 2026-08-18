@@ -1,7 +1,7 @@
 // Package plugin registers the binary as a DPM component so it runs as
 // `dpm trace`.
 //
-// Ports from src/dpm_trace/cli.py: install_plugin_main, DPM home discovery
+// Ported from the original Python implementation: install_plugin_main, DPM home discovery
 // ($DPM_HOME or ~/.dpm), component.yaml generation and SDK manifest
 // registration.
 //

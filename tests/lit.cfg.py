@@ -12,15 +12,14 @@ config.test_exec_root = os.path.join(config.test_source_root, ".lit")
 
 repo_root = os.path.dirname(config.test_source_root)
 
-# The suite drives the CLI as a black box, so %dpm can be either
-# implementation: DPM_TRACE_BIN selects the compiled Go binary (the same
-# variable tests/check-golden.py takes), and without it the Python module runs.
-# %python stays for the driver scripts, which are Python either way.
-_binary = os.environ.get("DPM_TRACE_BIN")
-if _binary:
-    dpm = os.path.abspath(os.path.expanduser(_binary))
-else:
-    dpm = "env PYTHONPATH=%s/src %s -m dpm_trace.cli" % (repo_root, sys.executable)
+# %dpm is the dpm-trace binary. %python stays for the driver scripts, which are
+# Python programs that drive the binary -- not a second implementation.
+_binary = os.environ.get("DPM_TRACE_BIN", "").strip()
+if not _binary:
+    lit_config.fatal(
+        "DPM_TRACE_BIN must point at the dpm-trace binary; build it with "
+        "`go build -o /tmp/dpm-trace ./cmd/dpm-trace`")
+dpm = os.path.abspath(os.path.expanduser(_binary))
 
 config.substitutions.append(("%dpm", dpm))
 config.substitutions.append(("%python", sys.executable))

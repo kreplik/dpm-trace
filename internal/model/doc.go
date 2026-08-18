@@ -1,7 +1,7 @@
 // Package model holds the transaction model and the normalization that turns a
 // Ledger API response into it, plus the on-disk artifact encodings.
 //
-// Ports from src/dpm_trace/cli.py: TraceEvent, NormalizedTrace,
+// Ported from the original Python implementation: TraceEvent, NormalizedTrace,
 // EVENT_VARIANT_KINDS, normalize_trace, normalize_event, normalize_events_map,
 // unwrap_transaction, infer_roots, link_range_children, normalize_completion,
 // trace_to_json, trace_from_json, event_to_json, event_from_json,

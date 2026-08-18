@@ -84,9 +84,6 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "\nOutput is participant-scoped: it is one participant's projection, not a")
 	fmt.Fprintln(w, "global Canton transaction. A failed submission has no update id, so those")
 	fmt.Fprintln(w, "workflows use completion data instead.")
-
-	fmt.Fprintln(w, "\nNot ported to the Go build yet (use python -m dpm_trace.cli):")
-	fmt.Fprintln(w, "  the source-linked expression replay (unreachable in cli.py too)")
 }
 
 var traceFlags = []flagDoc{
@@ -123,7 +120,7 @@ func commandHelp(w io.Writer, usage, description string, flags []flagDoc, notPor
 	fmt.Fprintf(w, "  %s\n", usage)
 	writeSection(w, "Flags", flagRows(flags))
 	if notPorted != "" {
-		fmt.Fprintf(w, "\nNot ported to the Go build yet (use python -m dpm_trace.cli):\n  %s\n", notPorted)
+		fmt.Fprintf(w, "\nNot supported:\n  %s\n", notPorted)
 	}
 }
 

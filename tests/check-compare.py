@@ -41,11 +41,12 @@ def check(
 
 
 def _invoke(*flags: str, src: str) -> subprocess.CompletedProcess:
-    # These checks drive the CLI as a black box, so they run against either
-    # implementation: DPM_TRACE_BIN selects a compiled binary, exactly as in
-    # tests/check-golden.py and tests/lit.cfg.py.
-    binary_env = os.environ.get("DPM_TRACE_BIN")
-    binary = binary_env.split() if binary_env else [sys.executable, "-m", "dpm_trace.cli"]
+    # Drives the CLI as a black box. DPM_TRACE_BIN is required: there is no
+    # second implementation to fall back to.
+    binary_env = os.environ.get("DPM_TRACE_BIN", "").strip()
+    if not binary_env:
+        raise SystemExit("DPM_TRACE_BIN must point at the dpm-trace binary")
+    binary = binary_env.split()
     result = subprocess.run(
         binary + ["compare", "--color", "never"] + list(flags),
         capture_output=True,

@@ -37,11 +37,14 @@ def main() -> int:
 
     lit_cfg_text = generated_lit_cfg(repo_root)
 
-    saved = {k: os.environ.get(k) for k in ("DPM_TRACE_IT_LEDGER", "DPM_TRACE_IT_LEDGER2", "DPM_TRACE_IT_DAML")}
+    saved = {k: os.environ.get(k) for k in (
+        "DPM_TRACE_IT_LEDGER", "DPM_TRACE_IT_LEDGER2", "DPM_TRACE_IT_DAML", "DPM_TRACE_IT_DPM")}
     try:
         os.environ["DPM_TRACE_IT_LEDGER"] = "http://ledger1.example"
         os.environ["DPM_TRACE_IT_LEDGER2"] = "http://ledger2.example"
         os.environ["DPM_TRACE_IT_DAML"] = "daml"
+        # The generated config now refuses to load without a binary.
+        os.environ["DPM_TRACE_IT_DPM"] = "/stub/dpm-trace"
 
         config = types.SimpleNamespace(substitutions=[], environment={})
         lit_config = types.SimpleNamespace(fatal=lambda msg: (_ for _ in ()).throw(SystemExit(msg)))
