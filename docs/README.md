@@ -4,9 +4,11 @@ User-facing documentation for `dpm trace`.
 
 ## Index
 
+- [`commands.md`](commands.md) - full command and flag reference.
+- [`unit-tests.md`](unit-tests.md) - running Daml Script tests as a source-mapped CI gate.
 - [`integration-tests.md`](integration-tests.md) - running `dpm trace test --integration` against a managed local Canton.
 - [`REAL-UPDATE-SMOKE.md`](REAL-UPDATE-SMOKE.md) - redacted real-Canton smoke-test checklist with placeholders.
-- [`TECHNICAL-NOTES.md`](TECHNICAL-NOTES.md) - implementation notes for the trace/test proof of concept.
+- [`TECHNICAL-NOTES.md`](TECHNICAL-NOTES.md) - implementation notes for the trace/test internals.
 
 ## Path Hygiene
 

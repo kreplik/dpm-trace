@@ -1,0 +1,113 @@
+{
+  "createdAt": "2026-08-14T10:51:06.564642Z",
+  "kind": "committed-update",
+  "packages": {
+    "available": false,
+    "darPaths": [],
+    "debugInfoPaths": [],
+    "missingDarPaths": [],
+    "missingDebugInfoPaths": [],
+    "packageIds": [
+      "b9e9e0435939afacd6370b1f8351ade6bffb0f382bc69645a8251eb789333ab4"
+    ],
+    "status": "package ids captured; package/source metadata must be supplied by local project or registry"
+  },
+  "participant": {
+    "ledgerUrl": "http://127.0.0.1:6113",
+    "readAs": [
+      "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+    ],
+    "scanUrl": null
+  },
+  "privacy": {
+    "missingPrivateDataPolicy": "private data outside this participant projection is not present in the artifact",
+    "readAs": [
+      "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+    ],
+    "scope": "Authorized participant projection. Private data outside these party rights is not available."
+  },
+  "schema": "dpm-trace/trace-artifact/v0",
+  "trace": {
+    "eventsById": {
+      "0": {
+        "actingParties": [
+          "Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ],
+        "argument": {
+          "newOwner": "Mallory::1220ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0099"
+        },
+        "childEventIds": [
+          "1"
+        ],
+        "choice": "Transfer",
+        "consuming": true,
+        "contractId": "0059f0a55ba182af89abbf3213b2df6bbdeaba0409a9d41080573864051d7e5d0cca1212205a94ea4e9da4e288b99ac8161664f9ecd5cf0a7706601162807e4c26f9d534d0",
+        "eventId": "0",
+        "kind": "exercise",
+        "observers": [],
+        "payload": null,
+        "reassignmentCounter": null,
+        "reassignmentId": null,
+        "result": "00aaf7338336777d953129c2a977c97114814c34077033a7b5e95746d073be3cb8ca121220d88306495c3f074124e2232cf5d0b88670e88b985c60d1949c462ddb46c99a3e",
+        "signatories": [],
+        "sourceSynchronizer": null,
+        "submitter": null,
+        "targetSynchronizer": null,
+        "template": "b9e9e0435939afacd6370b1f8351ade6bffb0f382bc69645a8251eb789333ab4:Asset:Asset",
+        "witnesses": [
+          "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ]
+      },
+      "1": {
+        "actingParties": [],
+        "argument": null,
+        "childEventIds": [],
+        "choice": null,
+        "consuming": null,
+        "contractId": "00aaf7338336777d953129c2a977c97114814c34077033a7b5e95746d073be3cb8ca121220d88306495c3f074124e2232cf5d0b88670e88b985c60d1949c462ddb46c99a3e",
+        "eventId": "1",
+        "kind": "create",
+        "observers": [
+          "Bob::1220bc0a0061582e9c8b49216c664d89319f440129fd8b2b0304ddcdd5e7f98dd640"
+        ],
+        "payload": {
+          "issuer": "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4",
+          "name": "SILVER",
+          "owner": "Mallory::1220ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0099",
+          "quantity": "100"
+        },
+        "reassignmentCounter": null,
+        "reassignmentId": null,
+        "result": null,
+        "signatories": [
+          "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ],
+        "sourceSynchronizer": null,
+        "submitter": null,
+        "targetSynchronizer": null,
+        "template": "b9e9e0435939afacd6370b1f8351ade6bffb0f382bc69645a8251eb789333ab4:Asset:Asset",
+        "witnesses": [
+          "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+        ]
+      }
+    },
+    "offset": "46",
+    "projection": {
+      "notGlobal": true,
+      "note": "Authorized participant projection. Private data outside these party rights is not available.",
+      "participantScoped": true,
+      "readAs": [
+        "Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4"
+      ],
+      "source": "ledger-json-api"
+    },
+    "recordTime": "2026-08-14T10:51:05.732693Z",
+    "rootEventIds": [
+      "0"
+    ],
+    "source": "ledger-json-api",
+    "sourceUrl": "http://127.0.0.1:6113/v2/updates/update-by-id",
+    "synchronizerId": "local::122056c72f69a17036aa76225941950f9218232eae01374241e268d983c995cc7172",
+    "updateId": "1220drifted2ca3aa72aae3eee228cb84e30e559dfdcfc2b7189def41a3b4589b6d5"
+  }
+}

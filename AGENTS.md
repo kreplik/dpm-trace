@@ -4,9 +4,9 @@ Guidance for agents working in this repository.
 
 ## Project
 
-`dpm-trace` is a DPM component proof of concept for participant-scoped Canton
-transaction visualization, and for turning Daml Script unit tests into a
-source-mapped CI gate.
+`dpm-trace` is a DPM component for participant-scoped Canton transaction
+visualization, and for turning Daml Script unit tests into a source-mapped CI
+gate.
 
 Command surface:
 
@@ -38,7 +38,7 @@ Key areas to orient in the tree:
 
 - Transaction model + normalization: `internal/model` -- `Trace`, `Event`, `NormalizeTrace`, `NormalizeEvent`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `eventVariantKinds`; add new Ledger API variant wrappers there rather than in `NormalizeEvent`. `linkRangeChildren` reconstructs the tree from `lastDescendantNodeId`, and `inferRoots` keeps document order because `compare` pairs roots positionally.
 - Ledger access: `internal/ledger` -- the JSON Ledger API client with bounded retry (`JSON`, `LoadUpdate`, `Prepare`, `SubmitAndWait`, `FetchCompletion`), plus command building (`CommandSpec`). Decode through `internal/model`, never `encoding/json`: the latter loses numeric precision and key order.
-- Pretty + interactive rendering: `internal/render` (`PrettyTrace`, `CompletionTrace`, `SubmitFailure`, the compare views) and `internal/visualizer` (the `--visualize` REPL: `Stepper`, `Breakpoint`).
+- Pretty + interactive rendering: `internal/render` (`PrettyTrace`, `CompletionTrace`, `SubmitFailure`, the compare views) and `internal/visualizer` (the `--visualize` REPL: `Stepper`, `Breakpoint`, plus `Filter` for search and `ShowTree`/`Collapse`/`Expand` for the foldable tree). The REPL's command list lives in three places that drift apart -- `Dispatch`, the `help` output and the startup banner; `TestHelpNamesEveryFilterField` and `TestBannerMentionsSearch` guard two of them.
 - Source mapping: `internal/source` -- `Index` loads `daml.yaml` sources, `--debug-info` files and, with `--dar`, `damlc inspect` output; `FindFailureText`, `EntityContaining`, `Snippet`.
 - Test runner (`dpm trace test`): `internal/testrunner` -- `Run` → `Command`, `ParseJUnit`, `TransactionHTMLToText`, `FailureLocations`, `ReportJSON` (`dpm-trace/test-report/v0`). Exit 1 means tests failed; operational errors exit 2.
 - Integration runner (`--integration`): `internal/integration` -- `Run` boots a local Canton (`ConfigText`, `BootstrapText`, `FreePorts`, `WaitForParties`, `BuildDAR`), exports `DPM_TRACE_IT_*`, runs `lit`, tears down. `--parties Name@N` (`ParsePlacements`) provisions N participants; tests reach participant K via `%ledger{K}` and tolerate ingestion lag with `dpm trace --wait`.
@@ -54,7 +54,7 @@ CI workflow + regression demo) lives in the sibling `daml-contracts` directory;
 
 - Keep examples generic. Do not commit local machine paths, usernames, hostnames, or personal temp paths. Use placeholders such as `<path-to-daml-project>`, `<path-to-canton.jar>`, `<package-dir>`, and `<party-id>`.
 - Do not commit `.venv/`, `.dpm-home/`, `.dpm-trace.json`, `tests/.lit/`, or generated caches.
-- Stdlib only: `go.mod` stays free of requires. The test drivers under `tests/` are Python and must run on a clean Python 3.10+ with no pip installs beyond `lit`.
+- Stdlib only: `go.mod` stays free of requires. The test drivers under `tests/` are Python and must run on a clean Python 3.10+ with no pip installs beyond `lit` and `filecheck`.
 - Keep the tool participant-scoped in wording and behavior. Do not describe output as a global Canton transaction.
 - Failed submissions may not have an update id. Use completion/error data for those workflows.
 - Source diagnostics should prefer `damlc inspect` plus local project/source metadata when available, with local source matching only as a fallback.
@@ -78,11 +78,9 @@ Do not commit `.dpm-trace.json`.
 
 ## Tests
 
-Run the fast suite before handing off changes:
-
-```bash
-lit tests
-```
+`lit` and `FileCheck` come from pip -- `pip install lit filecheck` -- so no
+LLVM install is needed. `filecheck` installs lowercase; symlink it as
+`FileCheck`, which is the name the suites invoke.
 
 Run the suites (the binary is required; both refuse to run without it):
 

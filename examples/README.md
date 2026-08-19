@@ -72,7 +72,27 @@ dpm trace compare --prepared examples/transfer.prepared.json \
 
 The output pairs the prepared operation with the committed one, diffs the choice
 arguments field by field, and prints the preparation hash alongside the update
-id and offset.
+id and offset. Here the two agree, which is the answer you want.
+
+`transfer-drifted.trace.json` is the answer you do not want. It is
+`transfer.trace.json` with the transfer's `newOwner` changed by hand — a stand-in
+for a commit that does not match what was authorized:
+
+```bash
+dpm trace compare --prepared examples/transfer.prepared.json \
+  --update examples/transfer-drifted.trace.json
+```
+
+```
+✗ 1 difference (1 value)     kind: prepared-vs-update
+
+  Events
+    ~ exercise Asset:Asset.Transfer    newOwner: Bob::1220bc0a... → Mallory::1220ffff...
+```
+
+It is edited rather than captured, because producing a genuine mismatch would
+mean a compromised participant. Everything else in this directory is real
+output from the package in [`asset/`](asset).
 
 ## Reproducing them against a local Canton
 

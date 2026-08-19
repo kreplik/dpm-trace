@@ -1,18 +1,41 @@
 # dpm trace
 
-DPM component POC for participant-scoped Canton transaction visualization.
+Read Canton transactions the way you read a stack trace.
 
-It demonstrates the proposal surface:
+`dpm trace` turns a participant's view of a Daml transaction into a readable
+event tree, steps through it interactively, and maps failed submissions back to
+the line of Daml that rejected them.
 
-- `trace`: inspect a successful transaction by update id.
-- `trace --command-id`: inspect a failed submission through completion data.
-- `open`: reopen an exported trace artifact.
-- `prepare`: prepare a command without committing it.
-- `submit`: submit a command (submit-and-wait) and print the resulting update id.
-- `compare`: compare prepared transactions, successful transactions, or completions.
-- `test`: run Daml Script unit tests (unit mode) or an lit suite against a managed local Canton (integration mode).
+![dpm trace](docs/demo.gif)
 
-## Setup
+```
+Trace
+`-- [0] EXERCISE Asset:Asset.Split
+    |-- contract: 00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22c...
+    |-- actors: Alice
+    |-- argument: { splitQuantity: 40 }
+    |-- [1] CREATE Asset:Asset
+    |   `-- payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 60 }
+    `-- [2] CREATE Asset:Asset
+        `-- payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 40 }
+```
+
+When a submission fails there is no transaction to trace, so it reads the
+completion instead and points at the guard that rejected it:
+
+```
+  status:     DAML_FAILURE
+  message:    ... AssertionFailed (error category 9): Insufficient balance
+
+Source diagnostics
+  daml/Asset.daml:54:20
+    52 |       controller owner
+    53 |       do
+  > 54 |         assertMsg "Insufficient balance" (quantity >= amount)
+                            ^
+```
+
+## Install
 
 Download the archive for your platform from
 [Releases](https://github.com/walnuthq/dpm-trace/releases), or build it:
@@ -21,403 +44,146 @@ Download the archive for your platform from
 go build -o dpm-trace ./cmd/dpm-trace
 ```
 
-The binary is self-contained -- no runtime, no dependencies. Register it as a
-DPM component so it runs as `dpm trace`:
+The binary is self-contained — no runtime, no dependencies. Register it as a DPM
+component so it runs as `dpm trace`:
 
 ```bash
 ./dpm-trace install-plugin     # one-time
 dpm trace --help
 ```
 
-`install-plugin` writes the component into your DPM home (`$DPM_HOME` or
-`~/.dpm`) and adds it to the active SDK manifest. Without it the standalone CLI
-still works as `dpm-trace` (e.g. `dpm-trace test .`).
+Without that it still works standalone as `dpm-trace`.
 
-Optional local config:
+## Try it without a ledger
 
-```bash
-cp .dpm-trace.example.json .dpm-trace.json
-```
-
-Example config:
-
-```json
-{
-  "ledgerUrl": "http://localhost:<json-ledger-api-port>",
-  "readAs": "<party-id>",
-  "darPaths": ["./path/to/app.dar"]
-}
-```
-
-## Trace
-
-Inspect a successful transaction:
+The [`examples/`](examples) directory ships committed trace artifacts, so you
+can see real output before pointing it at anything:
 
 ```bash
-dpm trace <update-id>
+dpm trace open examples/exercise-child-create.trace.json
+dpm trace open examples/exercise-child-create.trace.json --visualize
 ```
 
-With explicit participant context:
-
-```bash
-dpm trace <update-id> \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --read-as '<party-id>' \
-  --access-token-file ./token.txt
-```
-
-The bearer token can also be passed with `--token`, `DPM_TRACE_TOKEN`, or `DPM_TRACE_TOKEN_FILE`.
-
-Inspect a failed submission by command id:
-
-```bash
-dpm trace --command-id <command-id> \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --act-as '<party-id>' \
-  --log-file /tmp/canton-participant.log \
-  --access-token-file ./token.txt
-```
-
-Or inspect captured completion JSON:
-
-```bash
-dpm trace --completion-file completion.json \
-  --log-file /tmp/canton-participant.log
-```
-
-With a local Daml project and DAR available, failed completions can point back
-to the contract line and column. When `--dar` is provided, `dpm trace` uses
-`damlc inspect` to confirm the failure text exists in the compiled package
-before resolving it against local sources.
-
-```bash
-dpm trace --completion-file completion.json \
-  --daml-yaml <path-to-daml-project>/daml.yaml \
-  --dar <path-to-daml-project>/.daml/dist/app.dar \
-  --damlc daml
-```
-
-### Event kinds
-
-The tree renders create, exercise, archive, and reassignment events. A
-reassignment update shows as `UNASSIGN` on the source synchronizer and `ASSIGN`
-on the target, each with the source/target synchronizer ids, the reassignment id
-and counter, and the submitter:
-
-```
-`-- [0] UNASSIGN Asset:Asset
-    |-- contract: 00aabbcc0011...
-    |-- reassignment: sync-a::... -> sync-b::...
-    |-- reassignment id: reassign-0001
-    |-- counter: 1
-    |-- submitter: Alice
-    `-- witnesses: Alice
-```
-
-An `ASSIGN` event also carries the reassigned contract's payload and
-stakeholders, which the Ledger API nests in the assigned event's created event.
-
-Export a trace artifact:
-
-```bash
-dpm trace <update-id> --export trace.json
-```
-
-Open the interactive transaction visualizer:
-
-```bash
-dpm trace <update-id> --visualize
-```
-
-## Open
-
-Reopen an exported trace artifact:
-
-```bash
-dpm trace open trace.json
-dpm trace open trace.json --visualize
-```
-
-## Prepare
-
-Prepare a command without committing it:
-
-```bash
-dpm trace prepare \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --act-as '<party-id>' \
-  --template '<package-id>:Counter:Counter' \
-  --arg owner='<party-id>' \
-  --arg count=0 \
-  --export prepared.json
-```
-
-Or pass a command file:
-
-```bash
-dpm trace prepare \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --act-as '<party-id>' \
-  --commands commands.json \
-  --export prepared.json
-```
-
-`prepare` calls Canton's non-committing prepare API. It does not submit to the ledger.
-
-## Compare
-
-Compare a prepared transaction with a successful transaction:
-
-```bash
-dpm trace compare \
-  --prepared prepared.json \
-  --update <update-id> \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --read-as '<party-id>'
-```
-
-Compare a prepared transaction with a failed submission:
-
-```bash
-dpm trace compare \
-  --prepared prepared.json \
-  --command-id <command-id> \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --act-as '<party-id>' \
-  --log-file /tmp/canton-participant.log
-```
-
-Compare two successful transactions:
-
-```bash
-dpm trace compare <update-id-a> <update-id-b> \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --read-as '<party-id>'
-```
-
-Compare a prepared transaction with a captured completion JSON:
-
-```bash
-dpm trace compare \
-  --prepared prepared.json \
-  --completion-file completion.json
-```
-
-## Test (Daml Script unit tests)
-
-Run a package's Daml Script unit tests, render each script's transaction tree,
-and map any failed test back to source. It wraps `daml test` on the in-memory
-IDE ledger, so it needs **no Canton node** and runs locally in CI/CD.
-
-```bash
-dpm trace test <package-dir> --daml daml
-```
-
-`daml test` already runs the tests and gates CI by exit code. `dpm trace test`
-adds what it does not:
-
-- **Failure triage.** A red test is resolved to source and rendered with a caret
-  — both the test call site *and* the contract invariant (`assertMsg` / `abort` /
-  `ensure`) that rejected it. With `--dar`, the contract match is verified against
-  the compiled package using `damlc inspect`, not just grepped from local files.
-- **Transaction trees in the terminal and as JSON.** `daml test` only writes these
-  to IDE-only HTML; here they appear inline and in `--print-json`.
-- **A structured report** to build CI automation on (PR comments, custom gates).
-
-### Usage
-
-```bash
-dpm trace test .                  # run all Script tests in the current package
-dpm trace test . --no-trees       # summary + failures only (compact CI logs)
-dpm trace test . --print-json     # machine-readable report (dpm-trace/test-report/v0)
-dpm trace test . --junit out.xml  # also write JUnit XML for CI
-dpm trace test . -p testSplit     # run a subset by test pattern
-dpm trace test . --dar .daml/dist/<pkg>.dar   # damlc-inspect-verified failure mapping
-```
-
-`--daml` selects the toolchain (`daml`, `damlc`, or `dpm`) and defaults to `daml`.
-
-### Output
-
-A passing run renders each script's decoded transaction tree and a per-test summary:
-
-```
-DPM trace test
-  package:  asset-tests
-  command:  daml test
-  result:   all 7 passed (7 total)
-
-Results
-  PASS  testTransfer         2 tx  +2 create  >1 exercise  x1 archive
-  PASS  testSplit            2 tx  +3 create  >1 exercise  x1 archive
-  PASS  testCannotIssueZero  1 tx  !1 expected-fail
-  ...
-```
-
-A failing run pinpoints the source and returns a non-zero exit code. When a
-contract guard rejects a submission, the report shows both where the test failed
-and why:
-
-```
-  FAIL  testSplitContractGuard
-        message: ... AssertionFailed: splitQuantity must be between 1 and quantity - 1 ...
-        daml/Test.daml:14:8      basis: daml test: Test        (where the test failed)
-        daml/Asset.daml:37:20    basis: damlc inspect: Asset   (the invariant that rejected it)
-        > 37 |   assertMsg "splitQuantity must be between 1 and quantity - 1"
-                          ^
-```
-
-### CI
-
-The command exits non-zero on any failure, so a CI step is a single line:
-
-```bash
-dpm trace test . --dar .daml/dist/<pkg>.dar --junit results.xml --no-trees
-```
-
-Three representative examples — a create, an exercise with a child create, and
-an archive — live in [`examples/`](examples), each with a committed trace
-artifact you can open without a Canton node, plus a rejected submission mapped
-back to source and a prepared-vs-committed comparison. See
-[`examples/README.md`](examples/README.md).
-
-### Integration tests (managed Canton + lit)
-
-Unit tests run on the in-memory IDE ledger. For integration tests against a
-**real local Canton node**, point `test` at an `lit` suite with `--integration`.
-
-Scaffold the test layout once with `--init` — it writes `itests/` (the lit
-integration suite) and a self-contained `unittests/` package:
-
-```bash
-dpm trace test . --init
-#   created itests/lit.cfg.py, itests/example.test
-#   created unittests/daml.yaml, unittests/daml/Example.daml
-#   created .github/workflows/dpm-trace.yml   (unit + integration jobs)
-```
-
-`--no-unittests` / `--no-ci` skip those parts.
-
-Then run the integration suite:
-
-```bash
-dpm trace test . --integration itests \
-  --canton-jar "$DPM_TRACE_CANTON_JAR" \
-  --daml daml
-```
-
-**Multiple participants.** `--parties` places parties on participants with
-`Name@N`, and the harness provisions that many participant nodes:
-
-```bash
-dpm trace test . --integration itests --canton-jar "$DPM_TRACE_CANTON_JAR" \
-  --parties Alice@1,Bob@2
-```
-
-Tests then reach the second participant via `%ledger2`. Because a committed
-update reaches the other participant asynchronously, trace it with `--wait <s>`
-(retries until it is visible).
-
-This builds the package DAR, boots an in-memory Canton on random ports, uploads
-the DAR, allocates parties (default `Alice,Bob`), then runs `lit` over the test
-directory against the live node and tears Canton down. One boot serves the whole
-suite, and the lit exit code gates CI.
-
-Connection details are exposed to tests as `lit` substitutions: `%dpm`
-(the CLI), `%ledger` (the participant JSON Ledger API URL), `%alice`, `%bob`,
-and `%dar`. A test submits against the live ledger and asserts on the trace:
-
-```
-# REQUIRES: canton
-# RUN: ID=$(%dpm submit --submitter %ledger --act-as %alice \
-# RUN:        --template '#asset-tests:Asset:Asset' \
-# RUN:        --arg issuer=%alice --arg owner=%alice --arg name=GOLD --arg quantity=100) \
-# RUN:   && %dpm trace "$ID" --submitter %ledger --read-as %alice --color never | FileCheck %s
-# CHECK: CREATE Asset:Asset
-# CHECK: name: GOLD{{.*}}quantity: 100
-```
-
-It needs a Canton jar (`--canton-jar` or `DPM_TRACE_CANTON_JAR`), plus `lit` and
-`FileCheck` on PATH. `--init` scaffolds a working suite to start from.
-
-## Submit
-
-Submit a command to a participant (submit-and-wait) and print the update id —
-the primitive integration tests use to create state and then trace it:
-
-```bash
-dpm trace submit \
-  --submitter http://localhost:<json-ledger-api-port> \
-  --act-as '<party-id>' \
-  --template '#<package-name>:Mod:Template' \
-  --arg owner='<party-id>' --arg count=0
-```
-
-Use `--print-json` for the full submit-and-wait response, or `--allow-fail` to
-capture a rejected submission as JSON (which `dpm trace --completion-file` then
-maps back to source) instead of erroring out.
-
-## Failed submission source demo
-
-A failed command never becomes a transaction, so there is no update id to trace.
-This is the CI-style path instead: consume the captured completion/error JSON
-and resolve it against local Daml sources, or verify it against a compiled DAR
-with `damlc inspect`.
+And the failure path, mapped back to source:
 
 ```bash
 dpm trace --completion-file examples/failed-withdraw.completion.json \
   --daml-yaml examples/asset/daml.yaml
 ```
 
-Against a compiled package rather than a source tree:
+See [`examples/README.md`](examples/README.md) for the full set, including a
+prepared-vs-committed comparison.
+
+## Commands
+
+| | |
+|---|---|
+| `dpm trace <update-id>` | inspect a committed transaction |
+| `dpm trace --command-id <id>` | inspect a **failed** submission via completion data |
+| `dpm trace open <artifact>` | reopen an exported trace |
+| `dpm trace compare` | diff two transactions, or prepared vs committed |
+| `dpm trace prepare` | prepare a command without committing it |
+| `dpm trace submit` | submit-and-wait, print the update id |
+| `dpm trace test` | run Daml Script tests as a source-mapped CI gate |
+
+Add `--visualize` to any trace to step through it, `--export trace.json` to save
+it, and `--print-json` for machine-readable output.
+
+Pointing at a live participant:
 
 ```bash
-dpm trace --completion-file examples/failed-withdraw.completion.json \
-  --dar <path-to-daml-project>/.daml/dist/app.dar \
-  --damlc daml
+dpm trace <update-id> \
+  --submitter http://localhost:<json-ledger-api-port> \
+  --read-as '<party-id>'
 ```
 
-The output includes a `Source diagnostics` block with `file:line:column` and a
-caret under the matching Daml code.
+Full flags and workflows: **[docs/commands.md](docs/commands.md)**.
 
-## Tests
+## Interactive visualizer
 
-Fast source-diagnostic tests:
+`--visualize` opens a stepper over the transaction:
+
+```
+dpm-trace> n            # next / prev / j <n> to jump
+dpm-trace> vars         # the event's fields
+dpm-trace> s            # the Daml source behind this step
+dpm-trace> b Transfer   # break on a template, choice or party; c to continue
+```
+
+**Search.** Large transactions are mostly noise for any given question, so
+navigation can be narrowed to what you care about:
+
+```
+dpm-trace> filter party Alice     # n/p now visit only Alice's events
+dpm-trace> filter GOLD            # unqualified: searches every field, payloads included
+dpm-trace> matches                # list what the filter selects
+dpm-trace> find Transfer          # jump to the next match, leaving the filter alone
+dpm-trace> filter                 # clear
+```
+
+Fields are `template`, `choice`, `party`, `contract`, `kind`, `package`, `id`
+and `payload`, all matched case-insensitively on a substring — the values you
+have to hand are usually partial.
+
+**Folding.** Deep trees collapse so the tree fits on a screen:
+
+```
+dpm-trace> tree 1                 # fold everything below depth 1
+dpm-trace> collapse #5:1          # or one subtree; bare form acts on the current step
+dpm-trace> expand all
+```
+
+With a filter set, matches are marked in the left gutter, so you keep the
+structure and can see which branch to open:
+
+```
+         EXERCISE #5:0 Settlement:Settlement.Settle
+           EXERCISE #5:1 Asset:Asset.Transfer
+             ARCHIVE  #5:2 Asset:Asset
+* =>         CREATE   #5:3 Asset:Asset
+*              CREATE   #5:4 Receipt:Receipt
+         +   EXERCISE #5:5 Fee:Fee.Charge
+             ... 1 event hidden (expand #5:5)
+```
+
+`help` lists every command.
+
+## Daml Script tests as a CI gate
+
+`dpm trace test` wraps `daml test` on the in-memory IDE ledger — no Canton node
+— and adds what it does not: failed tests resolved to source with a caret,
+transaction trees in the terminal and as JSON, and a structured report to
+automate on.
 
 ```bash
-lit tests
+dpm trace test .                              # all Script tests in the package
+dpm trace test . --no-trees --junit out.xml   # compact CI logs + JUnit XML
 ```
 
-Inspect-backed source diagnostic test:
+It exits non-zero on any failure, so a CI step is one line. For integration
+tests against a **real local Canton**, `--integration` boots a node, uploads the
+DAR, allocates parties and runs a `lit` suite against it.
 
-```bash
-DPM_TRACE_RUN_DAMLC_INSPECT=1 \
-DPM_TRACE_DAMLC=daml \
-lit tests/completion-source-inspect.test
-```
-
-Opt-in Daml Script test-runner integration test. It needs a real Daml toolchain
-and a Daml package to run against; `DPM_TRACE_DAML_TESTS_DIR` selects one:
-
-```bash
-DPM_TRACE_RUN_DAML_TEST=1 \
-DPM_TRACE_DAML=daml \
-lit tests/daml-script-test.test
-```
-
-Opt-in local Canton integration test:
-
-```bash
-DPM_TRACE_RUN_REAL_CANTON=1 \
-DPM_TRACE_DAML=daml \
-DPM_TRACE_DAMLC=daml \
-DPM_TRACE_CANTON_JAR=<path-to-canton.jar> \
-DPM_TRACE_DAML_HELPER=<path-to-daml-helper> \
-lit tests/real-canton-failed-completion.test
-```
+- **[docs/unit-tests.md](docs/unit-tests.md)** — the unit-test workflow
+- **[docs/integration-tests.md](docs/integration-tests.md)** — managed Canton + lit
 
 ## Notes
 
-- Output is participant-scoped. It is not a global Canton transaction.
-- Failed submissions may not have an update id. In that case comparison uses completion/error data.
-- Source diagnostics use `damlc inspect` plus local source/project metadata when available, with local source matching as a fallback. Compiler debug-info generation is out of scope for this PoC.
+- Output is participant-scoped. It is not a global Canton transaction view.
+- Failed submissions may have no update id; those workflows use completion data.
+- Source diagnostics prefer `damlc inspect` plus local project metadata, falling
+  back to local source matching.
+
+## Development
+
+Build, then run the suites:
+
+```bash
+go build -o /tmp/dpm-trace ./cmd/dpm-trace
+DPM_TRACE_BIN=/tmp/dpm-trace lit tests
+go test ./...
+```
+
+`lit` and `FileCheck` come from pip: `pip install lit filecheck`. See
+[AGENTS.md](AGENTS.md) for the code layout and contribution rules, and
+[docs/](docs) for the rest.
