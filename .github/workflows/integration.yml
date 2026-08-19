@@ -65,7 +65,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/unitcov"
           go test ./... -cover -args -test.gocoverdir="$RUNNER_TEMP/unitcov"
 
-          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/dpm-trace
+          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/trace
           mkdir -p "$RUNNER_TEMP/covdata"
           export GOCOVERDIR="$RUNNER_TEMP/covdata"
           export DPM_TRACE_BIN="$RUNNER_TEMP/dpm-cov"

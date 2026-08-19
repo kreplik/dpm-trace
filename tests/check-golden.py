@@ -237,7 +237,7 @@ def main() -> int:
     binary_env = os.environ.get("DPM_TRACE_BIN", "").strip()
     if not binary_env:
         print("error: DPM_TRACE_BIN must point at the dpm-trace binary "
-              "(go build -o /tmp/dpm-trace ./cmd/dpm-trace)", file=sys.stderr)
+              "(go build -o /tmp/dpm-trace ./cmd/trace)", file=sys.stderr)
         return 2
     binary = binary_env.split()
 

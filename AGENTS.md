@@ -26,7 +26,7 @@ the plugin's `dpm trace <id>`.
 ## Code layout
 
 Go, standard library only -- no cobra, no viper, so `go.mod` stays free of
-requires. `cmd/dpm-trace/` is one file per subcommand; `internal/` holds model,
+requires. `cmd/trace/` is one file per subcommand; `internal/` holds model,
 ledger, render, source, testrunner, integration, scaffold, plugin, visualizer
 and config.
 
@@ -64,7 +64,7 @@ CI workflow + regression demo) lives in the sibling `daml-contracts` directory;
 ## Setup
 
 ```bash
-go build -o /tmp/dpm-trace ./cmd/dpm-trace
+go build -o /tmp/dpm-trace ./cmd/trace
 /tmp/dpm-trace install-plugin     # registers `dpm trace`
 ```
 
@@ -85,7 +85,7 @@ LLVM install is needed. `filecheck` installs lowercase; symlink it as
 Run the suites (the binary is required; both refuse to run without it):
 
 ```bash
-go build -o /tmp/dpm-trace ./cmd/dpm-trace
+go build -o /tmp/dpm-trace ./cmd/trace
 DPM_TRACE_BIN=/tmp/dpm-trace lit tests -v
 DPM_TRACE_BIN=/tmp/dpm-trace python3 tests/check-golden.py .
 ```

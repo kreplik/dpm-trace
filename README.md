@@ -41,7 +41,7 @@ Download the archive for your platform from
 [Releases](https://github.com/walnuthq/dpm-trace/releases), or build it:
 
 ```bash
-go build -o dpm-trace ./cmd/dpm-trace
+go build -o dpm-trace ./cmd/trace
 ```
 
 The binary is self-contained — no runtime, no dependencies. Register it as a DPM
@@ -179,7 +179,7 @@ DAR, allocates parties and runs a `lit` suite against it.
 Build, then run the suites:
 
 ```bash
-go build -o /tmp/dpm-trace ./cmd/dpm-trace
+go build -o /tmp/dpm-trace ./cmd/trace
 DPM_TRACE_BIN=/tmp/dpm-trace lit tests
 go test ./...
 ```

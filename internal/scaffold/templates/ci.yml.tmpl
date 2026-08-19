@@ -25,7 +25,7 @@ jobs:
           go-version-file: dpm-trace/go.mod
       - name: Build dpm-trace
         run: |
-          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/trace
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install Daml SDK
         run: |
@@ -53,7 +53,7 @@ jobs:
           go-version-file: dpm-trace/go.mod
       - name: Build dpm-trace
         run: |
-          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          go build -C dpm-trace -o "$RUNNER_TEMP/dpm-trace" ./cmd/trace
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Install Daml SDK
         run: |
