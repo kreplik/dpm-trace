@@ -1,0 +1,43 @@
+# The expandable tree is interactive, so drive the REPL over stdin. The unit
+# tests cover the collapse rules; this pins the layout a reader actually sees.
+#
+# --strict-whitespace is the point: the gutter and the two-space-per-level
+# indentation are the feature. Without it FileCheck canonicalizes horizontal
+# whitespace and every column assertion below passes vacuously.
+
+# RUN: printf 'tree\ntree 1\nexpand all\nfilter kind create\ntree\nq\n' | %dpm open %root/tests/fixtures/nested-tree.trace.json --visualize --color never | FileCheck --strict-whitespace %s
+
+# The banner has to advertise the commands: a reader who never types `help`
+# learns them only from here.
+# CHECK:tree: tree [depth], collapse [id|all], expand [id|all]
+
+# A fully expanded tree carries no markers at all -- an open node is evident
+# from the children beneath it.
+# CHECK:=>   EXERCISE #5:0 Settlement:Settlement.Settle
+# CHECK-NEXT:       EXERCISE #5:1 Asset:Asset.Transfer
+# CHECK-NEXT:         ARCHIVE  #5:2 Asset:Asset
+# CHECK-NEXT:         CREATE   #5:3 Asset:Asset
+# CHECK-NEXT:           CREATE   #5:4 Receipt:Receipt
+# CHECK-NEXT:       EXERCISE #5:5 Fee:Fee.Charge
+# CHECK-NEXT:         CREATE   #5:6 Fee:Fee
+
+# `tree 1` keeps the top levels and folds the rest behind "+" and a transitive
+# count: 3 for #5:1 means #5:2, #5:3 and #5:4, not just the direct children.
+# CHECK:     + EXERCISE #5:1 Asset:Asset.Transfer
+# CHECK-NEXT:         ... 3 events hidden (expand #5:1)
+# CHECK-NEXT:     + EXERCISE #5:5 Fee:Fee.Charge
+# CHECK-NEXT:         ... 1 event hidden (expand #5:5)
+
+# CHECK:expanded all
+
+# With a filter set, matches are marked in a fixed left gutter so they can be
+# scanned straight down the page, and the structure survives: the reader sees
+# which branch to open rather than a flat list.
+# CHECK:filter: kind create  (3 of 7 steps)
+# CHECK:       EXERCISE #5:0 Settlement:Settlement.Settle
+# CHECK-NEXT:         EXERCISE #5:1 Asset:Asset.Transfer
+# CHECK-NEXT:           ARCHIVE  #5:2 Asset:Asset
+# CHECK-NEXT:* =>       CREATE   #5:3 Asset:Asset
+# CHECK-NEXT:*            CREATE   #5:4 Receipt:Receipt
+# CHECK-NEXT:         EXERCISE #5:5 Fee:Fee.Charge
+# CHECK-NEXT:*          CREATE   #5:6 Fee:Fee

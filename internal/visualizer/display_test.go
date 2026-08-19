@@ -148,6 +148,8 @@ func TestDispatchHandlesEveryCommand(t *testing.T) {
 		"c", "continue", "tree", "context", "json", "help",
 		"filter", "filter kind create", "filter nothing-matches-this",
 		"filter choice", "find Counter", "find nothing-matches-this", "matches",
+		"tree 0", "tree 2", "tree nonsense", "collapse", "collapse all",
+		"collapse #nope", "expand", "expand all",
 	} {
 		s, buf := newStepper(t)
 		if quit := s.Dispatch(cmd); quit {
