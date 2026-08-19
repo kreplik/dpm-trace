@@ -1,0 +1,99 @@
+name: integration
+
+# Integration tests against a real local Canton node, measured for coverage.
+# Heavier than the ci.yml gate (boots Canton, installs the Daml SDK), so it runs
+# on pushes to main and on demand -- never on pull requests.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  integration:
+    name: integration coverage
+    # Reports coverage rather than gating on it -- ci.yml is the gate.
+    runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      SDK_VERSION: '3.4.11'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check out the Daml package the suite runs against
+        uses: actions/checkout@v4
+        with:
+          repository: walnuthq/daml-contracts
+          path: daml-contracts
+
+      - name: Install Daml SDK (ships the Canton jar)
+        run: |
+          curl -sSL https://get.daml.com/ | sh -s "$SDK_VERSION"
+          echo "$HOME/.daml/bin" >> "$GITHUB_PATH"
+          # Exported here rather than in an env: block, which is not shell
+          # expanded -- and hardcoding the runner's home is a path leak.
+          echo "DPM_TRACE_CANTON_JAR=$HOME/.daml/sdk/$SDK_VERSION/canton/canton.jar" >> "$GITHUB_ENV"
+
+      - name: Install lit + FileCheck
+        run: |
+          # filecheck is a pure-Python FileCheck. The LLVM package pulls ~650MB
+          # through apt for one binary, and an apt mirror stall is what hung
+          # this job before. It installs lowercase; the suites call FileCheck.
+          python3 -m pip install --upgrade pip lit filecheck
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$(command -v filecheck)" "$RUNNER_TEMP/bin/FileCheck"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Coverage across every layer
+        # One instrumented binary covers all three: `go test`, the lit +
+        # golden suites, and the integration run. The runner hands its own
+        # executable to the suite as %dpm, so it covers both itself and every
+        # command the tests invoke. GOCOVERDIR must name an existing directory
+        # -- otherwise the binary writes an error to stderr and corrupts the
+        # output the goldens compare.
+        env:
+          DPM_TRACE_DAML_TESTS_DIR: ${{ github.workspace }}/daml-contracts
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/unitcov"
+          go test ./... -cover -args -test.gocoverdir="$RUNNER_TEMP/unitcov"
+
+          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/dpm-trace
+          mkdir -p "$RUNNER_TEMP/covdata"
+          export GOCOVERDIR="$RUNNER_TEMP/covdata"
+          export DPM_TRACE_BIN="$RUNNER_TEMP/dpm-cov"
+
+          lit tests -q || echo "::warning::lit reported failures under instrumentation"
+          python3 tests/check-golden.py .
+
+          (cd "$DPM_TRACE_DAML_TESTS_DIR" \
+             && "$RUNNER_TEMP/dpm-cov" trace test --integration itests/ \
+                  --canton-jar "$DPM_TRACE_CANTON_JAR" \
+                  --parties Alice@1,Bob@2,Issuer@1) \
+            || echo "::warning::the integration suite reported failures"
+
+          # covdata merge, not concatenation: shared blocks would otherwise
+          # be counted twice.
+          go tool covdata textfmt -i="$RUNNER_TEMP/unitcov,$RUNNER_TEMP/covdata" -o=coverage.out
+
+          {
+            echo "### Coverage including a real Canton run"
+            echo
+            echo "| scope | statements |"
+            echo "| --- | --- |"
+            echo "| unit tests only | $(go tool covdata func -i="$RUNNER_TEMP/unitcov" | tail -1 | awk '{print $NF}') |"
+            echo "| all layers | **$(go tool covdata func -i="$RUNNER_TEMP/unitcov,$RUNNER_TEMP/covdata" | tail -1 | awk '{print $NF}')** |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && !env.ACT
+        with:
+          name: integration-coverage
+          path: coverage.out

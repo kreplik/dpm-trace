@@ -14,25 +14,24 @@ It demonstrates the proposal surface:
 
 ## Setup
 
-Install from GitHub (Python 3.10+, no dependencies) and register it as a DPM
-plugin so it runs as `dpm trace`:
+Download the archive for your platform from
+[Releases](https://github.com/walnuthq/dpm-trace/releases), or build it:
 
 ```bash
-pip install git+https://github.com/walnuthq/dpm-trace.git
-dpm-trace install-plugin     # registers the `dpm trace` plugin (one-time)
+go build -o dpm-trace ./cmd/dpm-trace
+```
+
+The binary is self-contained -- no runtime, no dependencies. Register it as a
+DPM component so it runs as `dpm trace`:
+
+```bash
+./dpm-trace install-plugin     # one-time
 dpm trace --help
 ```
 
-`dpm-trace install-plugin` writes the component into your DPM home (`$DPM_HOME`
-or `~/.dpm`) and adds it to the active SDK manifest. Without it, the standalone
-CLI is still available as `dpm-trace` (e.g. `dpm-trace test .`).
-
-From a clone, the equivalent of the two steps above is:
-
-```bash
-pip install -e .
-./scripts/install-local-dpm-trace.sh
-```
+`install-plugin` writes the component into your DPM home (`$DPM_HOME` or
+`~/.dpm`) and adds it to the active SDK manifest. Without it the standalone CLI
+still works as `dpm-trace` (e.g. `dpm-trace test .`).
 
 Optional local config:
 
@@ -244,7 +243,7 @@ A passing run renders each script's decoded transaction tree and a per-test summ
 
 ```
 DPM trace test
-  package:  daml-tests
+  package:  asset-tests
   command:  daml test
   result:   all 7 passed (7 total)
 
@@ -276,8 +275,11 @@ The command exits non-zero on any failure, so a CI step is a single line:
 dpm trace test . --dar .daml/dist/<pkg>.dar --junit results.xml --no-trees
 ```
 
-A worked example — an Asset contract, a Daml Script test suite, a GitHub Actions
-workflow, and a regression demo — lives in the sibling `daml-tests` package.
+Three representative examples — a create, an exercise with a child create, and
+an archive — live in [`examples/`](examples), each with a committed trace
+artifact you can open without a Canton node, plus a rejected submission mapped
+back to source and a prepared-vs-committed comparison. See
+[`examples/README.md`](examples/README.md).
 
 ### Integration tests (managed Canton + lit)
 
@@ -314,8 +316,7 @@ dpm trace test . --integration itests --canton-jar "$DPM_TRACE_CANTON_JAR" \
 
 Tests then reach the second participant via `%ledger2`. Because a committed
 update reaches the other participant asynchronously, trace it with `--wait <s>`
-(retries until it is visible). See `daml-tests/itests/asset-issue-to-bob.test`
-for a cross-participant example.
+(retries until it is visible).
 
 This builds the package DAR, boots an in-memory Canton on random ports, uploads
 the DAR, allocates parties (default `Alice,Bob`), then runs `lit` over the test
@@ -337,7 +338,7 @@ and `%dar`. A test submits against the live ledger and asserts on the trace:
 ```
 
 It needs a Canton jar (`--canton-jar` or `DPM_TRACE_CANTON_JAR`), plus `lit` and
-`FileCheck` on PATH. See `daml-tests/itests/` for a working suite.
+`FileCheck` on PATH. `--init` scaffolds a working suite to start from.
 
 ## Submit
 
@@ -358,13 +359,20 @@ maps back to source) instead of erroring out.
 
 ## Failed submission source demo
 
-This fixture shows the CI-style path: consume a captured completion/error JSON,
-verify it against a compiled DAR with `damlc inspect`, and resolve it against
-local Daml sources.
+A failed command never becomes a transaction, so there is no update id to trace.
+This is the CI-style path instead: consume the captured completion/error JSON
+and resolve it against local Daml sources, or verify it against a compiled DAR
+with `damlc inspect`.
 
 ```bash
-dpm trace --completion-file examples/failed-with-source.completion.json \
-  --daml-yaml <path-to-daml-project>/daml.yaml \
+dpm trace --completion-file examples/failed-withdraw.completion.json \
+  --daml-yaml examples/asset/daml.yaml
+```
+
+Against a compiled package rather than a source tree:
+
+```bash
+dpm trace --completion-file examples/failed-withdraw.completion.json \
   --dar <path-to-daml-project>/.daml/dist/app.dar \
   --damlc daml
 ```
@@ -388,8 +396,8 @@ DPM_TRACE_DAMLC=daml \
 lit tests/completion-source-inspect.test
 ```
 
-Opt-in Daml Script test-runner integration test (uses a real Daml toolchain
-against the sibling `daml-tests` package):
+Opt-in Daml Script test-runner integration test. It needs a real Daml toolchain
+and a Daml package to run against; `DPM_TRACE_DAML_TESTS_DIR` selects one:
 
 ```bash
 DPM_TRACE_RUN_DAML_TEST=1 \

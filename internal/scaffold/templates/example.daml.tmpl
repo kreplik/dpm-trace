@@ -1,0 +1,29 @@
+-- Unit test package scaffolded by `dpm trace test --init`.
+-- Run with:  dpm trace test unittests
+--
+-- This is self-contained. To test your own templates, add the package under
+-- test as a data-dependency in daml.yaml and import its modules here.
+module Example where
+
+import Daml.Script
+import DA.Assert ((===))
+
+template Box
+  with
+    owner : Party
+    value : Int
+  where
+    signatory owner
+    ensure value >= 0
+
+testBoxHoldsValue : Script ()
+testBoxHoldsValue = do
+  alice <- allocateParty "Alice"
+  cid <- submit alice do createCmd Box with owner = alice; value = 5
+  Some box <- queryContractId alice cid
+  box.value === 5
+
+testBoxRejectsNegative : Script ()
+testBoxRejectsNegative = do
+  alice <- allocateParty "Alice"
+  submitMustFail alice do createCmd Box with owner = alice; value = -1

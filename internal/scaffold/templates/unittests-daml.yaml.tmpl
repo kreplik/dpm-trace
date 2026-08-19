@@ -1,0 +1,11 @@
+sdk-version: {{.SDKVersion}}
+name: {{.PackageName}}-unittests
+source: daml
+version: 1.0.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+# To test the package under test, build it and add its DAR here:
+# data-dependencies:
+#   - ../.daml/dist/{{.PackageName}}-1.0.0.dar

@@ -8,6 +8,7 @@ fixtures, so it needs no Canton node, no Daml toolchain, and no network.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,12 +41,17 @@ def check(
 
 
 def _invoke(*flags: str, src: str) -> subprocess.CompletedProcess:
+    # Drives the CLI as a black box. DPM_TRACE_BIN is required: there is no
+    # second implementation to fall back to.
+    binary_env = os.environ.get("DPM_TRACE_BIN", "").strip()
+    if not binary_env:
+        raise SystemExit("DPM_TRACE_BIN must point at the dpm-trace binary")
+    binary = binary_env.split()
     result = subprocess.run(
-        [sys.executable, "-m", "dpm_trace.cli", "compare", "--color", "never"]
-        + list(flags),
+        binary + ["compare", "--color", "never"] + list(flags),
         capture_output=True,
         text=True,
-        env={**__import__("os").environ, "PYTHONPATH": src},
+        env={**os.environ, "PYTHONPATH": src},
     )
     if result.returncode != 0:
         raise RuntimeError(f"rc={result.returncode}\n{result.stderr}")

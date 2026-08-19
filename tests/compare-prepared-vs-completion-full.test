@@ -1,6 +1,6 @@
 # Exercises print_prepared_completion_comparison: full completion field set
 # including trace context and synchronizer time.
-# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-fail.json --color never --full | FileCheck %s
+# RUN: %dpm compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-fail.json --color never --full | FileCheck %s
 
 # CHECK: DPM trace comparison
 # CHECK: kind:   prepared-vs-completion

@@ -1,6 +1,6 @@
 # Compact prepared-vs-completion comparison: failed and committed cases.
-# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-fail.json --color never | FileCheck %s --check-prefix=FAIL
-# RUN: env PYTHONPATH=%root/src %python -m dpm_trace.cli compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-ok.json --color never | FileCheck %s --check-prefix=OK
+# RUN: %dpm compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-fail.json --color never | FileCheck %s --check-prefix=FAIL
+# RUN: %dpm compare --prepared %root/tests/fixtures/compare/prepared.json --completion-file %root/tests/fixtures/compare/completion-ok.json --color never | FileCheck %s --check-prefix=OK
 
 # FAIL: ✗ completion failed — FAILED_PRECONDITION{{.*}}kind: prepared-vs-completion
 # FAIL: A  command{{.*}}(prepared)

@@ -18,48 +18,54 @@ Command surface:
 - `dpm trace compare`: compare prepared transactions, successful transactions, or completion data.
 - `dpm trace test`: run Daml Script unit tests (unit mode) or an lit suite against a managed local Canton (`--integration`).
 - `dpm trace ... --visualize`: open the interactive CLI visualizer.
-- `dpm-trace install-plugin`: register the pip-installed CLI as a DPM plugin (so `dpm trace` works without a repo clone); mirrors `scripts/install-local-dpm-trace.sh`.
+- `dpm-trace install-plugin`: install the binary as a DPM component, so `dpm trace` works without a repo clone.
 
-`main()` strips a leading `trace` arg, so `dpm_trace.cli trace <id>` behaves like
+`main()` strips a leading `trace` arg, so `dpm-trace trace <id>` behaves like
 the plugin's `dpm trace <id>`.
 
 ## Code layout
 
-The whole tool is a single, stdlib-only module: `src/dpm_trace/cli.py` (no
-third-party runtime dependencies). Subcommands are dispatched by the first
-argument in `main()`; everything else is plain functions.
+Go, standard library only -- no cobra, no viper, so `go.mod` stays free of
+requires. `cmd/dpm-trace/` is one file per subcommand; `internal/` holds model,
+ledger, render, source, testrunner, integration, scaffold, plugin, visualizer
+and config.
 
-Key areas to orient in the file:
+The lit suite and the golden harness drive the compiled binary and locate it
+through `DPM_TRACE_BIN`; both refuse to run without it. The Python
+implementation this was ported from has been removed.
 
-- Transaction model + normalization: `NormalizedTrace`, `TraceEvent`, `normalize_trace`, `load_update`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `EVENT_VARIANT_KINDS`; add new Ledger API variant wrappers there rather than in `normalize_event`.
-- Pretty + interactive rendering: `print_pretty_trace`, `Stepper` (the `--visualize` REPL).
-- Failed submissions / completions: `fetch_completion_by_command_id`, `normalize_completion`, `print_completion_trace`.
-- Source mapping: `SourceIndex` (loads `daml.yaml` sources and, with `--dar`, `damlc inspect`), `completion_source_needles`, `render_source_diagnostic`.
-- Test runner (`dpm trace test`): `test_main` → `run_test` → `daml_test_command`, `parse_junit`, `transaction_html_to_text`, `transaction_stats`, `test_failure_locations`, `print_test_report` / `test_report_json`.
-- Integration runner (`--integration`): `run_integration_tests` boots a local Canton (`canton_config_text`, `canton_bootstrap_text`, `find_free_ports`, `wait_for_parties`, `build_dar`), exports `DPM_TRACE_IT_*` env, runs `lit`, tears down. `--parties Name@N` (`parse_party_placements`) provisions N participants; tests reach participant K via `%ledger{K}` and tolerate ingestion lag with `dpm trace --wait`.
-- Scaffolder (`--init`): `run_init` writes `itests/` (from `integration_lit_cfg_text` / `integration_example_test_text` — keep `daml-tests/itests/lit.cfg.py` in sync) and a self-contained `unittests/` package (`unit_test_daml_yaml_text` / `unit_test_example_text`).
-- Submit primitive (`dpm trace submit`): `submit_main` → `run_submit` (submit-and-wait, prints the update id).
-- Spawning daml/damlc/canton: `daml_child_env()` (drops `DPM_RESOLUTION_FILE`, forces a UTF-8 locale).
+Key areas to orient in the tree:
+
+- Transaction model + normalization: `internal/model` -- `Trace`, `Event`, `NormalizeTrace`, `NormalizeEvent`. Event kinds (`create`/`exercise`/`archive`/`assign`/`unassign`) come from `eventVariantKinds`; add new Ledger API variant wrappers there rather than in `NormalizeEvent`. `linkRangeChildren` reconstructs the tree from `lastDescendantNodeId`, and `inferRoots` keeps document order because `compare` pairs roots positionally.
+- Ledger access: `internal/ledger` -- the JSON Ledger API client with bounded retry (`JSON`, `LoadUpdate`, `Prepare`, `SubmitAndWait`, `FetchCompletion`), plus command building (`CommandSpec`). Decode through `internal/model`, never `encoding/json`: the latter loses numeric precision and key order.
+- Pretty + interactive rendering: `internal/render` (`PrettyTrace`, `CompletionTrace`, `SubmitFailure`, the compare views) and `internal/visualizer` (the `--visualize` REPL: `Stepper`, `Breakpoint`).
+- Source mapping: `internal/source` -- `Index` loads `daml.yaml` sources, `--debug-info` files and, with `--dar`, `damlc inspect` output; `FindFailureText`, `EntityContaining`, `Snippet`.
+- Test runner (`dpm trace test`): `internal/testrunner` -- `Run` → `Command`, `ParseJUnit`, `TransactionHTMLToText`, `FailureLocations`, `ReportJSON` (`dpm-trace/test-report/v0`). Exit 1 means tests failed; operational errors exit 2.
+- Integration runner (`--integration`): `internal/integration` -- `Run` boots a local Canton (`ConfigText`, `BootstrapText`, `FreePorts`, `WaitForParties`, `BuildDAR`), exports `DPM_TRACE_IT_*`, runs `lit`, tears down. `--parties Name@N` (`ParsePlacements`) provisions N participants; tests reach participant K via `%ledger{K}` and tolerate ingestion lag with `dpm trace --wait`.
+- Scaffolder (`--init`): `internal/scaffold` writes `itests/` and a self-contained `unittests/` package from the embedded templates. `templates/lit.cfg.py.tmpl` is kept in sync with the canonical `daml-contracts/itests/lit.cfg.py` by `tests/check-scaffolder-sync.py`.
+- DPM component: `internal/plugin` -- `Install` writes the component into the DPM home and registers it in the SDK manifest.
+- Spawning daml/damlc/canton: `testrunner.ChildEnv` (drops `DPM_RESOLUTION_FILE`, forces a UTF-8 locale).
 
 A worked example package for the test runner (Asset contract + Script tests +
-CI workflow + regression demo) lives in the sibling `daml-tests` directory.
+CI workflow + regression demo) lives in the sibling `daml-contracts` directory;
+`examples/` in this repo carries a copy plus committed trace artifacts.
 
 ## Development Rules
 
 - Keep examples generic. Do not commit local machine paths, usernames, hostnames, or personal temp paths. Use placeholders such as `<path-to-daml-project>`, `<path-to-canton.jar>`, `<package-dir>`, and `<party-id>`.
 - Do not commit `.venv/`, `.dpm-home/`, `.dpm-trace.json`, `tests/.lit/`, or generated caches.
-- Stdlib only. The tool must run on a clean Python 3.10+ with no pip installs; do not add third-party runtime imports.
+- Stdlib only: `go.mod` stays free of requires. The test drivers under `tests/` are Python and must run on a clean Python 3.10+ with no pip installs beyond `lit`.
 - Keep the tool participant-scoped in wording and behavior. Do not describe output as a global Canton transaction.
 - Failed submissions may not have an update id. Use completion/error data for those workflows.
 - Source diagnostics should prefer `damlc inspect` plus local project/source metadata when available, with local source matching only as a fallback.
-- When spawning `daml`/`damlc`, build the child environment with `daml_child_env()`, which drops `DPM_RESOLUTION_FILE` so the child resolves the target package rather than the dpm-trace component's plugin resolution context.
+- When spawning `daml`/`damlc`, build the child environment with `testrunner.ChildEnv`, which drops `DPM_RESOLUTION_FILE` so the child resolves the target package rather than the dpm-trace component's plugin resolution context.
 - `dpm trace test` is a CI gate: it must exit non-zero when any test fails. Keep the `--print-json` report (`dpm-trace/test-report/v0`) and `--junit` output stable for downstream consumers.
 
 ## Setup
 
 ```bash
-.venv/bin/python -m pip install -e .
-./scripts/install-local-dpm-trace.sh
+go build -o /tmp/dpm-trace ./cmd/dpm-trace
+/tmp/dpm-trace install-plugin     # registers `dpm trace`
 ```
 
 Optional local config:
@@ -78,10 +84,12 @@ Run the fast suite before handing off changes:
 lit tests
 ```
 
-Run Python syntax checks when editing Python files:
+Run the suites (the binary is required; both refuse to run without it):
 
 ```bash
-.venv/bin/python -m py_compile src/dpm_trace/cli.py tests/check-no-local-paths.py tests/check-test-report.py
+go build -o /tmp/dpm-trace ./cmd/dpm-trace
+DPM_TRACE_BIN=/tmp/dpm-trace lit tests -v
+DPM_TRACE_BIN=/tmp/dpm-trace python3 tests/check-golden.py .
 ```
 
 Run whitespace checks before commit:
@@ -101,7 +109,7 @@ lit tests/completion-source-inspect.test
 The `dpm trace test` parsing and source mapping are covered by the
 daml-independent `tests/test-report-parse.test` (committed fixtures in
 `tests/fixtures/`, always run). The end-to-end runner is opt-in and uses the
-sibling `daml-tests` package:
+sibling `daml-contracts` package:
 
 ```bash
 DPM_TRACE_RUN_DAML_TEST=1 \

@@ -1,3 +1,4 @@
+.DS_Store
 .venv/
 .dpm-home/
 .dpm-trace.json
@@ -7,3 +8,16 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 tests/.lit/
+
+# Daml build output for the examples package
+examples/asset/.daml/
+
+# Dumped into the working directory by the Canton jar
+reference.conf
+
+# Go port
+cover.out
+coverage.out
+merged.out
+/dpm-trace
+/dist/
