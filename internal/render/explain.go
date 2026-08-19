@@ -13,16 +13,16 @@ func ExplainAPIs(scanUpdatePath, updateByIDPath string) string {
 Scan API:
 - Public/indexed network data from Super Validator Scan services.
 - Useful for CantonScan-like flows and public update lookup.
-- Endpoint used by this POC: GET %s
+- Endpoint used by dpm trace: GET %s
 - Does not prove access to a bank/private participant projection.
 
 Ledger JSON API:
 - Authenticated participant/validator API.
 - Requires participant URL, bearer token, and read-as/party context.
-- Endpoint used by this POC: POST %s
+- Endpoint used by dpm trace: POST %s
 - Returns the participant-visible projection; it is not a global trace.
 
-In proposal terms:
+In short:
 - Scan is the public entry point.
 - Ledger API is the authorized participant inspection entry point.`,
 		scanUpdatePath, updateByIDPath)

@@ -18,7 +18,7 @@ _binary = os.environ.get("DPM_TRACE_BIN", "").strip()
 if not _binary:
     lit_config.fatal(
         "DPM_TRACE_BIN must point at the dpm-trace binary; build it with "
-        "`go build -o /tmp/dpm-trace ./cmd/dpm-trace`")
+        "`go build -o /tmp/dpm-trace ./cmd/trace`")
 dpm = os.path.abspath(os.path.expanduser(_binary))
 
 config.substitutions.append(("%dpm", dpm))

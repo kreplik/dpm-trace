@@ -29,7 +29,7 @@ jobs:
         run: |
           for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
             GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 \
-              go build -o /dev/null ./cmd/dpm-trace || exit 1
+              go build -o /dev/null ./cmd/trace || exit 1
             echo "built $target"
           done
 
@@ -60,7 +60,7 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Build the binary
         run: |
-          go build -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
+          go build -o "$RUNNER_TEMP/dpm-trace" ./cmd/trace
           echo "DPM_TRACE_BIN=$RUNNER_TEMP/dpm-trace" >> "$GITHUB_ENV"
       - name: lit tests
         # golden.test runs tests/check-golden.py, so the byte-exact goldens are
@@ -105,7 +105,7 @@ jobs:
 
           go test ./... -cover -args -test.gocoverdir="$RUNNER_TEMP/unitcov"
 
-          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/dpm-trace
+          go build -cover -o "$RUNNER_TEMP/dpm-cov" ./cmd/trace
           export GOCOVERDIR="$RUNNER_TEMP/suitecov"
           export DPM_TRACE_BIN="$RUNNER_TEMP/dpm-cov"
           lit tests -q || echo "::warning::lit reported failures under instrumentation"

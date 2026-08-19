@@ -8,7 +8,7 @@ before:
 
 builds:
   - id: dpm-trace
-    main: ./cmd/dpm-trace
+    main: ./cmd/trace
     binary: dpm-trace
     # Static binaries: a DPM component must run with no runtime prerequisite.
     # Removing the Python interpreter requirement is the point of the port.
