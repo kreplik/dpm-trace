@@ -32,6 +32,9 @@ type Stepper struct {
 	// filter expects step 7 to be the same event.
 	Active *Filter
 
+	// Collapsed holds the event ids whose descendants the tree hides.
+	Collapsed map[string]bool
+
 	out io.Writer
 }
 
@@ -91,6 +94,8 @@ func (s *Stepper) Run(in io.Reader) {
 		" n/next, p/prev, j <n>, s/source, vars, b <spec>, c/continue, tree, context, json, q")
 	fmt.Fprintln(s.out, s.Color.Apply("search:", "bold"),
 		"filter <value>, find <value>, matches -- `help` for the full form")
+	fmt.Fprintln(s.out, s.Color.Apply("tree:", "bold"),
+		"tree [depth], collapse [id|all], expand [id|all]")
 	if s.SourceIndex.HasSources() {
 		fmt.Fprintln(s.out, s.Color.Apply("source roots:", "cyan"), strings.Join(s.SourceIndex.Roots, ", "))
 	}
@@ -151,8 +156,12 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		s.ClearBreakpoints(cmd)
 	case cmd == "c" || cmd == "continue":
 		s.ContinueToBreakpoint()
-	case cmd == "tree":
-		s.ShowTree()
+	case cmd == "tree" || strings.HasPrefix(cmd, "tree "):
+		s.ShowTree(strings.TrimPrefix(cmd, "tree"))
+	case cmd == "collapse" || strings.HasPrefix(cmd, "collapse "):
+		s.Collapse(strings.TrimPrefix(cmd, "collapse"))
+	case cmd == "expand" || strings.HasPrefix(cmd, "expand "):
+		s.Expand(strings.TrimPrefix(cmd, "expand"))
 	case cmd == "context":
 		fmt.Fprintln(s.out, render.DebugContextReport(s.Trace))
 	case cmd == "json":
@@ -169,6 +178,8 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		fmt.Fprintln(s.out, "  filter                                                            clear the filter")
 		fmt.Fprintln(s.out, "  find <value>                                                      jump to the next match")
 		fmt.Fprintln(s.out, "  matches                                                           list what the filter selects")
+		fmt.Fprintln(s.out, "  tree [depth]                                                      collapse below a depth")
+		fmt.Fprintln(s.out, "  collapse|expand [event-id|all]                                    hide or reveal a subtree")
 		fmt.Fprintln(s.out, "  source-linked replay is best-effort: unsupported expressions are shown as (not evaluated)")
 	default:
 		fmt.Fprintln(s.out, "unknown command; try `help`")
@@ -433,51 +444,6 @@ func (s *Stepper) ContinueToBreakpoint() {
 		}
 	}
 	fmt.Fprintln(s.out, s.Color.Apply("no later breakpoint hit", "yellow"))
-}
-
-// ShowTree prints the trace as a nested tree with a cursor on the current step.
-// Ports Stepper.show_tree.
-func (s *Stepper) ShowTree() {
-	current := ""
-	if len(s.Order) > 0 {
-		current = s.Order[s.Index]
-	}
-
-	var visit func(string, int)
-	visit = func(eventID string, depth int) {
-		ev, ok := s.Trace.EventsByID[eventID]
-		if !ok {
-			return
-		}
-		isCurrent := eventID == current
-		cursor := "  "
-		if isCurrent {
-			cursor = s.Color.Apply("=>", "magenta", "bold")
-		}
-		target := render.ShortTemplate(ev.Template)
-		if target == "" {
-			target = ev.Template
-		}
-		label := target
-		if ev.Choice != "" && target != "" {
-			label = target + "." + ev.Choice
-		} else if ev.Choice != "" {
-			label = ev.Choice
-		}
-		kind := fmt.Sprintf("%-8s", strings.ToUpper(ev.Kind))
-		if isCurrent {
-			kind = s.Color.Apply(kind, render.EventColor(ev.Kind), "bold")
-			label = s.Color.Apply(label, "bold")
-		}
-		fmt.Fprintf(s.out, "%s%s %s %s %s\n", strings.Repeat("  ", depth), cursor, kind, ev.EventID, label)
-		for _, child := range ev.ChildEventIDs {
-			visit(child, depth+1)
-		}
-	}
-
-	for _, root := range s.Trace.RootEventIDs {
-		visit(root, 0)
-	}
 }
 
 // ShowJSON prints the current event in the artifact encoding.
