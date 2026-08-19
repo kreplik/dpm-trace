@@ -34,7 +34,9 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *sourc
 	fmt.Fprintf(w, "  offset:     %s\n", orDash(scalarText(c.Get("offset"))))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(statusCode))
 	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(message)))
-	if hasLookup {
+	// `if lookup:` is falsy for an empty object, so {} suppresses both lines
+	// rather than printing "parties: -" and "source: -".
+	if hasLookup && lookup.Len() > 0 {
 		fmt.Fprintf(w, "  parties:    %s\n", partyListSummary(model.ObjectStrings(lookup, "parties")))
 		fmt.Fprintf(w, "  source:     %s\n", orDash(model.ObjectString(c.Raw, "source")))
 	}
@@ -329,20 +331,29 @@ func SubmitFailure(w io.Writer, c *model.Completion, request map[string]any, col
 }
 
 // formatCommandSummary renders one submitted command. Ports _format_command_summary.
+// fieldText renders a command field, treating an absent one as empty rather
+// than printing Go's "<nil>".
+func fieldText(value any) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
 func formatCommandSummary(command any) string {
 	obj, ok := command.(map[string]any)
 	if !ok {
 		return fmt.Sprint(command)
 	}
 	if body, ok := commandBody(obj, "ExerciseCommand", "exerciseCommand"); ok {
-		template := orQuestion(ShortTemplate(fmt.Sprint(body["templateId"])))
-		choice := orQuestion(fmt.Sprint(body["choice"]))
-		contract := Short(fmt.Sprint(body["contractId"]), 10)
+		template := orQuestion(ShortTemplate(fieldText(body["templateId"])))
+		choice := orQuestion(fieldText(body["choice"]))
+		contract := Short(fieldText(body["contractId"]), 10)
 		return strings.TrimRight(fmt.Sprintf("exercise %s:%s on %s  %s",
 			template, choice, contract, summarizeArgs(body["choiceArgument"])), " ")
 	}
 	if body, ok := commandBody(obj, "CreateCommand", "createCommand"); ok {
-		template := orQuestion(ShortTemplate(fmt.Sprint(body["templateId"])))
+		template := orQuestion(ShortTemplate(fieldText(body["templateId"])))
 		return strings.TrimRight(fmt.Sprintf("create %s  %s",
 			template, summarizeArgs(body["createArguments"])), " ")
 	}
