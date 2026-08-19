@@ -51,11 +51,13 @@ jobs:
           python-version: '3.11'
       - name: Install lit + FileCheck
         run: |
-          python3 -m pip install --upgrade pip lit
-          sudo apt-get update && sudo apt-get install -y llvm
-          command -v FileCheck || sudo ln -sf \
-            "$(find /usr/lib -path '*/llvm-*/bin/FileCheck' -type f -print -quit)" \
-            /usr/local/bin/FileCheck
+          # filecheck is a pure-Python FileCheck. The LLVM package pulls ~650MB
+          # through apt for one binary, and an apt mirror stall is what hung
+          # this job before. It installs lowercase; the suites call FileCheck.
+          python3 -m pip install --upgrade pip lit filecheck
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$(command -v filecheck)" "$RUNNER_TEMP/bin/FileCheck"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Build the binary
         run: |
           go build -o "$RUNNER_TEMP/dpm-trace" ./cmd/dpm-trace
@@ -84,11 +86,13 @@ jobs:
           python-version: '3.11'
       - name: Install lit + FileCheck
         run: |
-          python3 -m pip install --upgrade pip lit
-          sudo apt-get update && sudo apt-get install -y llvm
-          command -v FileCheck || sudo ln -sf \
-            "$(find /usr/lib -path '*/llvm-*/bin/FileCheck' -type f -print -quit)" \
-            /usr/local/bin/FileCheck
+          # filecheck is a pure-Python FileCheck. The LLVM package pulls ~650MB
+          # through apt for one binary, and an apt mirror stall is what hung
+          # this job before. It installs lowercase; the suites call FileCheck.
+          python3 -m pip install --upgrade pip lit filecheck
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$(command -v filecheck)" "$RUNNER_TEMP/bin/FileCheck"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Coverage
         # Both layers write covdata, so `covdata merge` deduplicates blocks
