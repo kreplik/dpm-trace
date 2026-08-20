@@ -22,26 +22,26 @@ Canton trace
     Issuer = Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
 
 Trace
-`-- [0] EXERCISE Asset:Asset.Split
-    |-- contract: 00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22c...
-    |-- consuming: true
-    |-- actors: Alice
-    |-- witnesses: Issuer
-    |-- argument: { splitQuantity: 40 }
-    |-- result:
-    |--   {
-    |--     "_1": "00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a80838eca121220365f0f9715623d58074a91edb4dd121855cc10b7f90e256e65536412bb7f9bec",
-    |--     "_2": "00f0bcfd7bdd9440fd53d1f70f21c7e4c9afafe8c82120b7e2d002a51f4c392720ca121220ed6b6b0515d255be94b5a6e366c7a4d87e7a23355d5a7db9c3d5fb8c770eef85"
-    |--   }
-    |-- [1] CREATE Asset:Asset
-    |   |-- contract: 00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a808...
-    |   |-- signatories: Issuer
-    |   |-- observers: Alice
-    |   |-- witnesses: Issuer
-    |   `-- payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 60 }
-    `-- [2] CREATE Asset:Asset
-        |-- contract: 00f0bcfd7bdd9440fd53d1f70f21c7e4c9afafe8c82120b7e2d002a51f4c392...
-        |-- signatories: Issuer
-        |-- observers: Alice
-        |-- witnesses: Issuer
-        `-- payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 40 }
+└── [0] EXERCISE Asset:Asset.Split
+    ├── contract: 00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22c...
+    ├── consuming: true
+    ├── actors: Alice
+    ├── witnesses: Issuer
+    ├── argument: { splitQuantity: 40 }
+    ├── result:
+    ├──   {
+    ├──     "_1": "00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a80838eca121220365f0f9715623d58074a91edb4dd121855cc10b7f90e256e65536412bb7f9bec",
+    ├──     "_2": "00f0bcfd7bdd9440fd53d1f70f21c7e4c9afafe8c82120b7e2d002a51f4c392720ca121220ed6b6b0515d255be94b5a6e366c7a4d87e7a23355d5a7db9c3d5fb8c770eef85"
+    ├──   }
+    ├── [1] CREATE Asset:Asset
+    │   ├── contract: 00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a808...
+    │   ├── signatories: Issuer
+    │   ├── observers: Alice
+    │   ├── witnesses: Issuer
+    │   └── payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 60 }
+    └── [2] CREATE Asset:Asset
+        ├── contract: 00f0bcfd7bdd9440fd53d1f70f21c7e4c9afafe8c82120b7e2d002a51f4c392...
+        ├── signatories: Issuer
+        ├── observers: Alice
+        ├── witnesses: Issuer
+        └── payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 40 }

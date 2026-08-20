@@ -52,38 +52,33 @@ func commandRows(commands []commandDoc) [][2]string {
 }
 
 // rootHelp documents the whole tool.
+var listedCommands = []commandDoc{
+	{"open", "Reopen an exported trace artifact."},
+	{"install-plugin", "Register this binary as a DPM component."},
+}
+
 func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "dpm-trace inspects participant-scoped Canton transactions.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  dpm trace <update-id> [flags]")
-	fmt.Fprintln(w, "  dpm trace --completion-file <file> [flags]")
 	fmt.Fprintln(w, "  dpm trace <command> [flags]")
 
-	writeSection(w, "Commands", commandRows([]commandDoc{
-		{"open", "Reopen an exported trace artifact."},
-		{"compare", "Compare prepared transactions, updates, or completions."},
-		{"prepare", "Prepare a command without committing it."},
-		{"submit", "Submit a command and print the resulting update id."},
-		{"test", "Run Daml Script unit tests."},
-		{"install-plugin", "Register this binary as a DPM component."},
-	}))
+	writeSection(w, "Commands", commandRows(listedCommands))
 
 	writeSection(w, "Flags", flagRows(traceFlags))
 
 	fmt.Fprintln(w, "\nExamples:")
 	for _, example := range []string{
 		"dpm trace <update-id> --submitter http://localhost:7575 --read-as '<party>'",
-		"dpm trace --completion-file completion.json --daml-yaml ./daml.yaml",
 		"dpm trace open trace.json",
-		"dpm trace compare a.json b.json --full",
+		"dpm trace <update-id> --export trace.json",
 	} {
 		fmt.Fprintf(w, "  %s\n", example)
 	}
 
 	fmt.Fprintln(w, "\nOutput is participant-scoped: it is one participant's projection, not a")
-	fmt.Fprintln(w, "global Canton transaction. A failed submission has no update id, so those")
-	fmt.Fprintln(w, "workflows use completion data instead.")
+	fmt.Fprintln(w, "global Canton transaction.")
 }
 
 var traceFlags = []flagDoc{
@@ -100,7 +95,6 @@ var traceFlags = []flagDoc{
 	{"--wait SECONDS", "Retry while the update is not yet visible on this participant."},
 	{"--export PATH", "Write a portable trace artifact. Alias of --out."},
 	{"--print-json", "Print the normalized trace JSON and exit."},
-	{"--visualize", "Open the interactive transaction visualizer."},
 	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
 	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
 	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
@@ -126,7 +120,6 @@ func commandHelp(w io.Writer, usage, description string, flags []flagDoc, notPor
 
 var openFlags = []flagDoc{
 	{"--print-json", "Print the artifact JSON and exit."},
-	{"--visualize", "Open the interactive transaction visualizer."},
 	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
