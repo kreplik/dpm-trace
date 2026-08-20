@@ -81,7 +81,13 @@ func SummarizeTrace(trace *Trace) TraceSummary {
 	}
 }
 
-// StateDiffCounts counts events per kind. Ports state_diff_counts.
+// StateDiffCounts counts what the transaction did, per event kind.
+//
+// A consuming exercise is counted as both an exercise and an archive, matching
+// render.StateDiffSummary: a transaction tree reports an archive as
+// `consuming: true` rather than as a separate archived event. The two tallies
+// have to agree, or the compare view and the trace view disagree about the same
+// transaction.
 func StateDiffCounts(trace *Trace) map[string]int {
 	counts := map[string]int{"create": 0, "exercise": 0, "archive": 0, "assign": 0, "unassign": 0, "other": 0}
 	for _, ev := range trace.EventsByID {
@@ -89,6 +95,9 @@ func StateDiffCounts(trace *Trace) map[string]int {
 			counts[ev.Kind]++
 		} else {
 			counts["other"]++
+		}
+		if ev.Kind == KindExercise && ev.Consuming != nil && *ev.Consuming {
+			counts[KindArchive]++
 		}
 	}
 	return counts

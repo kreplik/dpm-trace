@@ -207,7 +207,15 @@ func BlockLines(label string, value any, color Color, ctx *Context) []string {
 	return lines
 }
 
-// StateDiffSummary renders the per-kind event counts. Ports state_diff_summary.
+// StateDiffSummary renders what the transaction did, per event kind.
+//
+// The counts describe effects rather than partitioning the event list, so they
+// can total more than the event count: a consuming exercise both exercises and
+// archives, and is counted in each. A transaction tree never carries a separate
+// archived event -- the Ledger API reports the archive as `consuming: true` on
+// the exercise, and only synthesizes ArchivedEvent in the flat/ACS views -- so
+// counting kinds alone reports "x0 archive" for a transaction that plainly
+// archived a contract.
 func StateDiffSummary(trace *model.Trace, color Color) string {
 	counts := map[string]int{}
 	for _, ev := range trace.EventsByID {
@@ -216,6 +224,9 @@ func StateDiffSummary(trace *model.Trace, color Color) string {
 			counts[ev.Kind]++
 		default:
 			counts[model.KindEvent]++
+		}
+		if isConsumingExercise(ev) {
+			counts[model.KindArchive]++
 		}
 	}
 	parts := []string{
@@ -233,6 +244,16 @@ func StateDiffSummary(trace *model.Trace, color Color) string {
 		parts = append(parts, color.Apply(fmt.Sprintf("%d other", counts[model.KindEvent]), "blue"))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// isConsumingExercise reports whether an event archives its contract.
+//
+// Consuming is a *bool: nil means the field was absent, which is not the same
+// as false, so an event that never carried the flag is not treated as an
+// archive. The kind check guards against a consuming flag on something that is
+// not an exercise, where it would carry no meaning.
+func isConsumingExercise(ev *model.Event) bool {
+	return ev.Kind == model.KindExercise && ev.Consuming != nil && *ev.Consuming
 }
 
 // EventKindLabel is the uppercase marker shown in the tree.

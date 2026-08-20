@@ -108,3 +108,62 @@ func TestEqualStringSlices(t *testing.T) {
 		t.Error("different slices reported equal")
 	}
 }
+
+// A transaction tree carries no archived event: the Ledger API reports an
+// archive as `consuming: true` on the exercise. Counting kinds alone therefore
+// reported "x0 archive" for examples/archive.trace.json, which is a consuming
+// Burn and archives exactly one contract.
+func TestStateDiffSummaryCountsConsumingExercisesAsArchives(t *testing.T) {
+	for _, tc := range []struct {
+		artifact string
+		want     string
+	}{
+		{"examples/archive.trace.json", "x1 archive"},
+		// Split is consuming too: it archives the original and creates two.
+		{"examples/exercise-child-create.trace.json", "x1 archive"},
+		// A plain create archives nothing.
+		{"examples/create.trace.json", "x0 archive"},
+	} {
+		trace := loadTrace(t, tc.artifact)
+		got := StateDiffSummary(trace, Color{})
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("%s = %q, want %q", tc.artifact, got, tc.want)
+		}
+	}
+}
+
+// The consuming exercise stays in the exercise count as well: it really is an
+// exercise, and dropping it there would make the exercise example report none.
+func TestStateDiffSummaryKeepsConsumingExercisesInTheExerciseCount(t *testing.T) {
+	trace := loadTrace(t, "examples/exercise-child-create.trace.json")
+	if got := StateDiffSummary(trace, Color{}); !strings.Contains(got, ">1 exercise") {
+		t.Errorf("got %q, want >1 exercise", got)
+	}
+}
+
+// Consuming is a *bool, so an absent flag must not read as an archive.
+func TestIsConsumingExerciseRequiresAnExplicitTrue(t *testing.T) {
+	yes, no := true, false
+	for _, tc := range []struct {
+		name string
+		ev   *model.Event
+		want bool
+	}{
+		{"consuming exercise", &model.Event{Kind: model.KindExercise, Consuming: &yes}, true},
+		{"non-consuming exercise", &model.Event{Kind: model.KindExercise, Consuming: &no}, false},
+		{"flag absent", &model.Event{Kind: model.KindExercise}, false},
+		{"create with the flag set", &model.Event{Kind: model.KindCreate, Consuming: &yes}, false},
+	} {
+		if got := isConsumingExercise(tc.ev); got != tc.want {
+			t.Errorf("%s = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// The trace view and the compare view must not disagree about one transaction.
+func TestStateDiffCountsAgreesWithTheSummary(t *testing.T) {
+	trace := loadTrace(t, "examples/archive.trace.json")
+	if got := model.StateDiffCounts(trace)["archive"]; got != 1 {
+		t.Errorf("StateDiffCounts archive = %d, want 1 to match the summary", got)
+	}
+}

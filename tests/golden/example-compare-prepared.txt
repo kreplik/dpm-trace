@@ -29,5 +29,5 @@ Context
 Committed state diff
   create   1
   exercise 1
-  archive  0
+  archive  1
   other    0
