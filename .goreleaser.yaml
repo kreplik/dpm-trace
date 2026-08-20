@@ -40,9 +40,20 @@ archives:
       - goos: windows
         formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    
     files:
       - LICENSE
       - README.md
+      - docs/*.md
+      # The committed trace artifacts the README tells the reader to open.
+      - examples/*.json
+      - examples/README.md
+      # Source for the example package, so the DAR can be rebuilt.
+      - examples/asset/daml.yaml
+      - examples/asset/daml/*
+      # The Canton config both READMEs tell the reader to boot.
+      - examples/devnet-trace.conf
+      - examples/devnet-trace.bootstrap.canton
 
 checksum:
   name_template: checksums.txt
