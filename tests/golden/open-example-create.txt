@@ -22,9 +22,9 @@ Canton trace
     Issuer = Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
 
 Trace
-`-- [0] CREATE Asset:Asset
-    |-- contract: 00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22c...
-    |-- signatories: Issuer
-    |-- observers: Alice
-    |-- witnesses: Issuer
-    `-- payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 100 }
+└── [0] CREATE Asset:Asset
+    ├── contract: 00bcdba8f2bfd71330d170818b8226a39621d34b50699d05f23fc25a200c22c...
+    ├── signatories: Issuer
+    ├── observers: Alice
+    ├── witnesses: Issuer
+    └── payload: { issuer: Issuer, name: GOLD, owner: Alice, quantity: 100 }

@@ -21,9 +21,9 @@ Canton trace
     Alice = Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
 
 Trace
-`-- [#1:0] CREATE Counter:Counter
-    |-- contract: 00aabbcc001122334455667788990011aabbcc001122334455667788990011aa
-    |-- actors: Alice
-    |-- signatories: Alice
-    |-- witnesses: Alice
-    `-- payload: { owner: Alice, count: 0 }
+└── [#1:0] CREATE Counter:Counter
+    ├── contract: 00aabbcc001122334455667788990011aabbcc001122334455667788990011aa
+    ├── actors: Alice
+    ├── signatories: Alice
+    ├── witnesses: Alice
+    └── payload: { owner: Alice, count: 0 }

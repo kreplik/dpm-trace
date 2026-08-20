@@ -3,7 +3,9 @@ package render
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,6 +72,42 @@ func PrettyTrace(w io.Writer, trace *model.Trace, color Color, index *source.Ind
 	}
 }
 
+// glyphSet is the four pieces a tree is drawn from.
+type glyphSet struct {
+	branch   string // a child with siblings after it
+	last     string // the final child
+	vertical string // the column under a branch, carrying the line down
+	blank    string // the column under the last child
+}
+
+var (
+	unicodeGlyphs = glyphSet{branch: "\u251c\u2500\u2500 ", last: "\u2514\u2500\u2500 ", vertical: "\u2502   ", blank: "    "}
+	asciiGlyphs   = glyphSet{branch: "|-- ", last: "`-- ", vertical: "|   ", blank: "    "}
+)
+
+// TreeGlyphs picks the glyphs to draw with.
+//
+// Box-drawing characters need a UTF-8 console, which Windows does not
+// guarantee: cmd.exe on a legacy code page renders them as mojibake, which is
+// worse than the ASCII it replaced. Detection is by platform rather than by
+// locale on purpose -- a locale-sensitive default would render differently on
+// a developer's machine and in CI, and the goldens assert every byte.
+//
+// DPM_TRACE_ASCII overrides in both directions, so a Windows terminal that does
+// support UTF-8 can opt in, and a pipeline that cannot can opt out anywhere.
+func TreeGlyphs() glyphSet {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("DPM_TRACE_ASCII"))) {
+	case "1", "true", "yes":
+		return asciiGlyphs
+	case "0", "false", "no":
+		return unicodeGlyphs
+	}
+	if runtime.GOOS == "windows" {
+		return asciiGlyphs
+	}
+	return unicodeGlyphs
+}
+
 // eventTree writes one event and its descendants. Ports print_event_tree.
 func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast bool, color Color, ctx *Context, index *source.Index) {
 	ev, ok := trace.Event(eventID)
@@ -77,19 +115,20 @@ func eventTree(w io.Writer, trace *model.Trace, eventID, prefix string, isLast b
 		return
 	}
 
-	connector := "|-- "
-	childPrefix := "|   "
+	glyphs := TreeGlyphs()
+	connector := glyphs.branch
+	childPrefix := glyphs.vertical
 	if isLast {
-		connector = "`-- "
-		childPrefix = "    "
+		connector = glyphs.last
+		childPrefix = glyphs.blank
 	}
 	fmt.Fprintln(w, prefix+connector+EventTitle(ev, color))
 
 	details := EventDetailLines(ev, color, ctx, index)
 	for i, line := range details {
-		detailConnector := "|-- "
+		detailConnector := glyphs.branch
 		if i == len(details)-1 && len(ev.ChildEventIDs) == 0 {
-			detailConnector = "`-- "
+			detailConnector = glyphs.last
 		}
 		fmt.Fprintln(w, prefix+childPrefix+detailConnector+line)
 	}

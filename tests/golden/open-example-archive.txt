@@ -22,10 +22,10 @@ Canton trace
     Issuer = Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
 
 Trace
-`-- [0] EXERCISE Asset:Asset.Burn
-    |-- contract: 00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a808...
-    |-- consuming: true
-    |-- actors: Alice
-    |-- witnesses: Issuer
-    |-- argument: {}
-    `-- result: {}
+└── [0] EXERCISE Asset:Asset.Burn
+    ├── contract: 00ae317721d55e2c16d1a2507ea941df0deaaeac8a84d6e4a664c0cc993a808...
+    ├── consuming: true
+    ├── actors: Alice
+    ├── witnesses: Issuer
+    ├── argument: {}
+    └── result: {}

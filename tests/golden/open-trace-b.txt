@@ -22,16 +22,16 @@ Canton trace
     Bob = Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002
 
 Trace
-`-- [#2:0] EXERCISE Token:Token.Transfer
-    |-- contract: 00ccddee001122334455667788990011ccddee001122334455667788990011cc
-    |-- consuming: true
-    |-- actors: Alice
-    |-- signatories: Alice
-    |-- observers: Bob
-    |-- witnesses: Alice, Bob
-    |-- argument: { newOwner: Bob }
-    `-- [#2:1] CREATE Token:Token
-        |-- contract: 00ccddee001122334455667788990011ccddee001122334455667788990022dd
-        |-- signatories: Bob
-        |-- witnesses: Alice, Bob
-        `-- payload: { owner: Bob }
+└── [#2:0] EXERCISE Token:Token.Transfer
+    ├── contract: 00ccddee001122334455667788990011ccddee001122334455667788990011cc
+    ├── consuming: true
+    ├── actors: Alice
+    ├── signatories: Alice
+    ├── observers: Bob
+    ├── witnesses: Alice, Bob
+    ├── argument: { newOwner: Bob }
+    └── [#2:1] CREATE Token:Token
+        ├── contract: 00ccddee001122334455667788990011ccddee001122334455667788990022dd
+        ├── signatories: Bob
+        ├── witnesses: Alice, Bob
+        └── payload: { owner: Bob }
