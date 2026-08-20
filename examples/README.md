@@ -12,19 +12,6 @@ dpm trace open examples/exercise-child-create.trace.json
 dpm trace open examples/archive.trace.json
 ```
 
-Two further examples show what the tool is for beyond rendering a tree — a
-rejected submission mapped back to the line of Daml that rejected it, and a
-prepared command compared against what the ledger actually committed. Both also
-run offline:
-
-```bash
-dpm trace --completion-file examples/failed-withdraw.completion.json \
-  --daml-yaml examples/asset/daml.yaml
-
-dpm trace compare --prepared examples/transfer.prepared.json \
-  --update examples/transfer.trace.json --full
-```
-
 The Daml package that produced them is in [`asset/`](asset), and the steps below
 rebuild them from it — nothing outside this repository is required.
 
@@ -38,61 +25,6 @@ rebuild them from it — nothing outside this repository is required.
 
 `Asset` is signed by `issuer` and observed by `owner`, so the projections differ
 per party — which is the point of the participant-scoped labelling in the output.
-
-## Failed submission, mapped to source
-
-A failed command never becomes a transaction, so there is no update id and no
-tree to render. `dpm trace` reads the completion instead and resolves the
-rejection back to source:
-
-```
-Source diagnostics
-  examples/asset/daml/Asset.daml:54:20
-  basis: local source
-    52 |       controller owner
-    53 |       do
-  > 54 |         assertMsg "Insufficient balance" (quantity >= amount)
-                            ^
-```
-
-`failed-withdraw.completion.json` is a real Canton rejection: `Withdraw` of 500
-from an asset holding 100. `--daml-yaml` points at local source; `--dar` with
-`--damlc` resolves through `damlc inspect` instead, which also works when the
-source tree is not the one that built the package.
-
-## Prepared vs committed
-
-`prepare` returns what *would* happen without committing it. Comparing that
-against the committed update answers "did the ledger do what I asked":
-
-```bash
-dpm trace compare --prepared examples/transfer.prepared.json \
-  --update examples/transfer.trace.json --full
-```
-
-The output pairs the prepared operation with the committed one, diffs the choice
-arguments field by field, and prints the preparation hash alongside the update
-id and offset. Here the two agree, which is the answer you want.
-
-`transfer-drifted.trace.json` is the answer you do not want. It is
-`transfer.trace.json` with the transfer's `newOwner` changed by hand — a stand-in
-for a commit that does not match what was authorized:
-
-```bash
-dpm trace compare --prepared examples/transfer.prepared.json \
-  --update examples/transfer-drifted.trace.json
-```
-
-```
-✗ 1 difference (1 value)     kind: prepared-vs-update
-
-  Events
-    ~ exercise Asset:Asset.Transfer    newOwner: Bob::1220bc0a... → Mallory::1220ffff...
-```
-
-It is edited rather than captured, because producing a genuine mismatch would
-mean a compromised participant. Everything else in this directory is real
-output from the package in [`asset/`](asset).
 
 ## Reproducing them against a local Canton
 
@@ -187,7 +119,8 @@ dpm trace "$UPDATE_ID" \
 
 `DPM_TRACE_TOKEN_FILE` sets the same thing in the environment, and
 `.dpm-trace.json` can hold the participant URL and party so they need not be
-repeated on every invocation. See the repository README for that file's shape.
+repeated on every invocation — see
+[Configuration](../docs/commands.md#configuration) for its shape.
 
 Output is always **one participant's projection** — what that participant is
 authorized to see, not a global view of the transaction. A remote participant
