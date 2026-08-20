@@ -16,7 +16,7 @@ Canton trace
   synchronizer: synchronizer::sync0000000000000000000000000000000000000000000001
   read-as:      Alice (Alice::aaaaaaaa...000001)
   visibility:   Authorized participant projection. Private data outside these party rights is not available.
-  events:       +1 create, >1 exercise, x0 archive
+  events:       +1 create, >1 exercise, x1 archive
   parties:
     Alice = Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001
     Bob = Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002

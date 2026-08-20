@@ -54,7 +54,7 @@ $ dpm trace compare --prepared tests/fixtures/compare/prepared.json --update tes
       }
     ],
     "stateDiff": {
-      "archive": 0,
+      "archive": 1,
       "assign": 0,
       "create": 1,
       "exercise": 1,

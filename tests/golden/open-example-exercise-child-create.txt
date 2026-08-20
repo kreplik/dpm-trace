@@ -16,7 +16,7 @@ Canton trace
   synchronizer: local::122056c72f69a17036aa76225941950f9218232eae01374241e268d983c995cc7172
   read-as:      Issuer (Issuer::122036f5...7213a4)
   visibility:   Authorized participant projection. Private data outside these party rights is not available.
-  events:       +2 create, >1 exercise, x0 archive
+  events:       +2 create, >1 exercise, x1 archive
   parties:
     Alice = Alice::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4
     Issuer = Issuer::122036f58f09b1879fdc99a950478166fd73076d1aab38de51f9aec4282dc17213a4

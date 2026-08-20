@@ -13,7 +13,7 @@ $ dpm trace compare tests/fixtures/compare/trace-a.json tests/fixtures/compare/t
         "unassign": 0
       },
       "right": {
-        "archive": 0,
+        "archive": 1,
         "assign": 0,
         "create": 1,
         "exercise": 1,
