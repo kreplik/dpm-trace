@@ -35,6 +35,9 @@ type Stepper struct {
 	// Collapsed holds the event ids whose descendants the tree hides.
 	Collapsed map[string]bool
 
+	// ExpandPayloads renders value blocks in full instead of bounded.
+	ExpandPayloads bool
+
 	out io.Writer
 }
 
@@ -96,6 +99,8 @@ func (s *Stepper) Run(in io.Reader) {
 		"filter <value>, find <value>, matches -- `help` for the full form")
 	fmt.Fprintln(s.out, s.Color.Apply("tree:", "bold"),
 		"tree [depth], collapse [id|all], expand [id|all]")
+	fmt.Fprintln(s.out, s.Color.Apply("values:", "bold"),
+		"payload to expand a truncated value, payload <text> to search this event's fields")
 	if s.SourceIndex.HasSources() {
 		fmt.Fprintln(s.out, s.Color.Apply("source roots:", "cyan"), strings.Join(s.SourceIndex.Roots, ", "))
 	}
@@ -172,12 +177,15 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		s.Find(strings.TrimPrefix(cmd, "find "))
 	case cmd == "matches":
 		s.ShowMatches()
+	case cmd == "payload" || strings.HasPrefix(cmd, "payload "):
+		s.SearchPayload(strings.TrimPrefix(cmd, "payload"))
 	case cmd == "help":
 		fmt.Fprintln(s.out, "n/next, p/prev, j <index>, s/source, vars, b <spec>, bp, clear [n], c/continue, tree, context, json, q")
 		fmt.Fprintln(s.out, "  filter ["+strings.Join(filterFields, "|")+"] <value>   narrow navigation")
 		fmt.Fprintln(s.out, "  filter                                                            clear the filter")
 		fmt.Fprintln(s.out, "  find <value>                                                      jump to the next match")
 		fmt.Fprintln(s.out, "  matches                                                           list what the filter selects")
+		fmt.Fprintln(s.out, "  payload [text]                                                    expand values, or search this event's fields")
 		fmt.Fprintln(s.out, "  tree [depth]                                                      collapse below a depth")
 		fmt.Fprintln(s.out, "  collapse|expand [event-id|all]                                    hide or reveal a subtree")
 		fmt.Fprintln(s.out, "  source-linked replay is best-effort: unsupported expressions are shown as (not evaluated)")
@@ -226,19 +234,11 @@ func (s *Stepper) ShowCurrent() {
 			fmt.Sprintf("signatories=%s observers=%s",
 				pythonList(ctx, ev.Signatories), pythonList(ctx, ev.Observers)), color))
 	}
-	for _, block := range []struct {
-		label string
-		value any
-	}{
-		{"payload", ev.Payload},
-		{"choice argument", ev.Argument},
-		{"choice result", ev.Result},
-	} {
+	for _, block := range eventBlocks(ev) {
 		if block.value == nil {
 			continue
 		}
-		fmt.Fprintln(s.out, color.Apply(block.label+":", "cyan"))
-		fmt.Fprintln(s.out, render.IndentText(render.RenderPrettyValue(block.value, ctx)))
+		s.writeBlock(block, ctx)
 	}
 	if len(ev.ChildEventIDs) > 0 {
 		fmt.Fprintln(s.out, render.LabelValue("children", strings.Join(ev.ChildEventIDs, ", "), color))
