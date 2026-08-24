@@ -12,21 +12,23 @@ and payloads that participant can see.
 ## Install
 
 Download the archive for your platform from
-[Releases](https://github.com/walnuthq/dpm-trace/releases), or build it:
+[Releases](https://github.com/walnuthq/dpm-trace/releases) and unpack it, or
+build it. Either way the binary is self-contained and lands in the current
+directory:
 
 ```bash
-go build -o dpm-trace ./cmd/trace
+tar xzf dpm-trace_<version>_<os>_<arch>.tar.gz    # downloaded
+go build -o dpm-trace ./cmd/trace                 # or built
 ```
 
-The binary is self-contained. Register it as a DPM component so it runs as
-`dpm trace`:
+Register it as a DPM component so it runs as `dpm trace`:
 
 ```bash
 ./dpm-trace install-plugin
 dpm trace --help
 ```
 
-Without that it still works standalone as `dpm-trace`.
+Without that it still works as a standalone binary.
 
 ## Usage
 
