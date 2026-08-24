@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -277,7 +278,11 @@ func (s *Stepper) ShowVariables() {
 		rendered := render.RenderPrettyValue(vars[key], ctx)
 		if strings.Contains(rendered, "\n") {
 			fmt.Fprintf(s.out, "  %s\n", s.Color.Apply(key+":", "cyan"))
-			fmt.Fprintln(s.out, render.IndentText(rendered))
+			// The same bound as the step view. Without it `vars` printed
+			// fifty lines for an event the step view had just shown in
+			// seventeen, which made the bounding look broken rather than
+			// deliberate.
+			s.writeBounded(render.IndentText(rendered))
 			continue
 		}
 		fmt.Fprintf(s.out, "  %s %s\n", s.Color.Apply(key+":", "cyan"), rendered)
@@ -304,10 +309,15 @@ func (s *Stepper) StepVariables(ev *model.Event, ctx *render.Context) (map[strin
 		set("template", ev.Template)
 	}
 	if ev.ContractID != "" {
-		set("contractId", ev.ContractID)
+		// Shortened, as the tree and the step view show it: a full id is 130
+		// characters and wraps, and the reader who wants it whole has `json`.
+		set("contractId", render.Short(ev.ContractID, 66))
 	}
 	if ev.Choice != "" {
 		set("choice", ev.Choice)
+	}
+	if ev.Consuming != nil && ev.Kind == model.KindExercise {
+		set("consuming", *ev.Consuming)
 	}
 	if len(ev.ActingParties) > 0 {
 		set("actors", ev.ActingParties)
@@ -326,6 +336,15 @@ func (s *Stepper) StepVariables(ev *model.Event, ctx *render.Context) (map[strin
 	}
 	if ev.Result != nil {
 		set("choiceResult", render.SimplifyLFValue(ev.Result))
+	}
+	if len(ev.Observers) > 0 {
+		set("observers", ev.Observers)
+	}
+	if len(ev.ChildEventIDs) > 0 {
+		set("children", strings.Join(ev.ChildEventIDs, ", "))
+	}
+	if loc := s.location(ev); loc != nil {
+		set("source", fmt.Sprintf("%s:%d", filepath.Base(loc.Path), loc.Line))
 	}
 	if payload := s.inputContractPayload(ev.ContractID); payload != nil {
 		set("inputContract", payload)
