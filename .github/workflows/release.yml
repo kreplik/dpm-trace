@@ -47,8 +47,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Proves the archive a user downloads actually runs, and that the binary
-      # sits where component.yaml will declare it.
+      # is where the README says it is.
       - name: Smoke-test the linux archive
         run: |
           tar xzf dist/dpm-trace_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
-          "$RUNNER_TEMP/bin/dpm-trace" --version
+          "$RUNNER_TEMP/dpm-trace" --version
