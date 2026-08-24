@@ -171,7 +171,7 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 	case cmd == "expand" || strings.HasPrefix(cmd, "expand "):
 		s.Expand(strings.TrimPrefix(cmd, "expand"))
 	case cmd == "context":
-		fmt.Fprintln(s.out, render.DebugContextReport(s.Trace))
+		fmt.Fprintln(s.out, render.DebugContextReport(s.Trace, s.SourceIndex))
 	case cmd == "json":
 		s.ShowJSON()
 	case cmd == "filter" || strings.HasPrefix(cmd, "filter "):

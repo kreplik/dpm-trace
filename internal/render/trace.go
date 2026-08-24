@@ -444,7 +444,7 @@ func PrintSummary(w io.Writer, trace *model.Trace) {
 //
 // The "not present" half is the point: an artifact is a participant projection,
 // and a reader must not mistake absence for evidence. Ports debug_context_report.
-func DebugContextReport(trace *model.Trace) string {
+func DebugContextReport(trace *model.Trace, index *source.Index) string {
 	seen := map[string]bool{}
 	var packageIDs []string
 	for _, ev := range trace.EventsByID {
@@ -474,10 +474,20 @@ func DebugContextReport(trace *model.Trace) string {
 	}
 
 	missing := []string{
-		"source metadata unless provided by the local project or registry",
 		"full original command envelope unless captured separately",
 		"private subtransactions outside this projection",
 		"operator logs unless attached separately",
+	}
+
+	// Source metadata is the one item here that can be supplied from outside
+	// the artifact. Listing it as absent while `s` was rendering a snippet
+	// read as a contradiction, so say which of the two is true.
+	if index != nil && index.HasSources() {
+		present = append(present, "source metadata, loaded from "+strings.Join(index.Roots, ", "))
+	} else {
+		missing = append([]string{
+			"source metadata, unless supplied with --debug-info",
+		}, missing...)
 	}
 
 	var b strings.Builder

@@ -63,6 +63,23 @@ connection.
 
 Flags and usage in full: **[docs/commands.md](docs/commands.md)**.
 
+## Interactive visualizer
+
+`--visualize` opens a session over the transaction instead of printing it:
+
+```bash
+dpm trace <update-id> --submitter <url> --read-as '<party-id>' --visualize
+dpm trace open trace.json --visualize
+```
+
+Step through events, fold deep trees, filter by template, choice, party or
+contract id, search inside large payloads, and list what the transaction
+created and archived. The prompt names the parties you are reading as, because
+the session shows one participant's projection and not a global record of the
+transaction.
+
+**[docs/visualizer.md](docs/visualizer.md)** covers the session in full.
+
 ## Examples
 
 [`examples/`](examples) contains three Daml examples — a create, an exercise

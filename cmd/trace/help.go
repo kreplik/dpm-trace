@@ -72,6 +72,7 @@ func rootHelp(w io.Writer) {
 	for _, example := range []string{
 		"dpm trace <update-id> --submitter http://localhost:7575 --read-as '<party>'",
 		"dpm trace open trace.json",
+		"dpm trace open trace.json --visualize",
 		"dpm trace <update-id> --export trace.json",
 	} {
 		fmt.Fprintf(w, "  %s\n", example)
@@ -93,6 +94,7 @@ var traceFlags = []flagDoc{
 	{"--damlc PATH", "damlc or daml executable for inspection. Defaults to daml."},
 	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--wait SECONDS", "Retry while the update is not yet visible on this participant."},
+	{"--visualize", "Open the interactive visualizer over the trace."},
 	{"--export PATH", "Write a portable trace artifact. Alias of --out."},
 	{"--print-json", "Print the normalized trace JSON and exit."},
 	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
@@ -119,6 +121,7 @@ func commandHelp(w io.Writer, usage, description string, flags []flagDoc, notPor
 }
 
 var openFlags = []flagDoc{
+	{"--visualize", "Open the interactive visualizer over the artifact."},
 	{"--print-json", "Print the artifact JSON and exit."},
 	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
