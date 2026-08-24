@@ -88,14 +88,15 @@ func runOpen(args []string) int {
 	}
 
 	color := render.ColorFromMode(colorMode, isTTY())
-	// The summary is printed for both paths, as run_open does.
-	fmt.Println(render.TraceArtifactSummary(artifact))
 	if visualize {
+		// The stepper prints its own header. Printing the artifact summary
+		// first repeated update, source, read-as and events verbatim.
 		stepper := visualizer.New(trace, color, index, os.Stdout)
 		stepper.Bundle = artifact
 		stepper.Run(os.Stdin)
 		return 0
 	}
+	fmt.Println(render.TraceArtifactSummary(artifact))
 	render.PrettyTrace(os.Stdout, trace, color, index)
 	return 0
 }

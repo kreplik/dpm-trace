@@ -119,7 +119,7 @@ func (s *Stepper) Run(in io.Reader) {
 
 	scanner := bufio.NewScanner(in)
 	for {
-		fmt.Fprint(s.out, "dpm-trace> ")
+		fmt.Fprint(s.out, s.prompt())
 		if !scanner.Scan() {
 			fmt.Fprintln(s.out)
 			return
@@ -627,4 +627,30 @@ func (s *Stepper) matchingSteps(filter Filter) []int {
 		}
 	}
 	return matches
+}
+
+// prompt names the parties the session is reading as.
+//
+// The projection is stated in the header, but the header scrolls away: a
+// reader ten steps in is looking at contract payloads with no reminder that
+// this is one participant's view and that absence is not evidence. Naming the
+// parties in the prompt keeps it in front of them for the whole session, which
+// is what "participant/projection labels shown in the visualizer" is for.
+//
+// It also doubles as a filter indicator, so the two pieces of state that
+// change what is on screen are visible in the same place.
+func (s *Stepper) prompt() string {
+	label := "dpm-trace"
+	if parties := s.Trace.Projection.ReadAs; len(parties) > 0 {
+		ctx := render.NewContext(s.Trace)
+		short := make([]string, 0, len(parties))
+		for _, party := range parties {
+			short = append(short, ctx.Party(party))
+		}
+		label += "[" + strings.Join(short, ",") + "]"
+	}
+	if s.Active != nil {
+		label += " filter:" + s.Active.Describe()
+	}
+	return label + "> "
 }

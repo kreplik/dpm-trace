@@ -417,8 +417,13 @@ func joinField(obj map[string]any, key string) string {
 }
 
 // PrintSummary writes the header the visualizer opens with.
-// Ports print_summary.
+//
+// Parties are rendered through a Context, as everywhere else: the visualizer
+// printing a raw 70-character party id while the trace view printed
+// "Issuer (Issuer::122036f5...7213a4)" was one tool with two opinions about
+// how a party looks. Ports print_summary.
 func PrintSummary(w io.Writer, trace *model.Trace) {
+	ctx := NewContext(trace)
 	fmt.Fprintf(w, "update:      %s\n", trace.UpdateID)
 	fmt.Fprintf(w, "source:      %s (%s)\n", trace.Source, orDash(trace.SourceURL))
 	fmt.Fprintf(w, "record time: %s\n", orDash(trace.RecordTime))
@@ -426,7 +431,11 @@ func PrintSummary(w io.Writer, trace *model.Trace) {
 	fmt.Fprintf(w, "synchronizer:%s\n", orDash(trace.SynchronizerID))
 	fmt.Fprintf(w, "projection:  %s\n", trace.Projection.Note)
 	if len(trace.Projection.ReadAs) > 0 {
-		fmt.Fprintf(w, "read-as:     %s\n", strings.Join(trace.Projection.ReadAs, ", "))
+		rendered := make([]string, 0, len(trace.Projection.ReadAs))
+		for _, party := range trace.Projection.ReadAs {
+			rendered = append(rendered, ctx.PartyWithFull(party))
+		}
+		fmt.Fprintf(w, "read-as:     %s\n", strings.Join(rendered, ", "))
 	}
 	fmt.Fprintf(w, "events:      %d\n", len(trace.EventsByID))
 }
