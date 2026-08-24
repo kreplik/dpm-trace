@@ -9,11 +9,12 @@ before:
 builds:
   - id: dpm-trace
     main: ./cmd/trace
-    # bin/dpm-trace, not dpm-trace: internal/plugin installs to
-    # <component>/bin/dpm-trace and component.yaml declares that path, so an
-    # archive with the binary at its root describes a layout it does not have.
-    # goreleaser appends .exe on Windows, matching plugin.BinaryName().
-    binary: bin/dpm-trace
+    # The archive puts the binary at its root, which is what a downloaded CLI
+    # tarball conventionally does and what the README documents. It does not
+    # need to mirror the installed component layout: install-plugin copies the
+    # running executable into <component>/bin/ itself, and component.yaml is
+    # generated there rather than shipped here.
+    binary: dpm-trace
     # Static binaries: a DPM component must run with no runtime prerequisite.
     # Removing the Python interpreter requirement is the point of the port.
     env:
