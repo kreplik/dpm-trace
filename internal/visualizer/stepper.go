@@ -603,11 +603,17 @@ func (s *Stepper) ShowMatches() {
 		if i == s.Index {
 			marker = ">"
 		}
+		// Both numbers, because they are different numbers and each addresses
+		// a different command: [step] is what `j` takes, the event id is what
+		// `collapse` and the tree show. Printing only the step left a reader
+		// unable to tell which tree line a match referred to.
+		//
 		// The kind carries as much signal as the template here: a filter on a
 		// party typically selects a mix of creates and exercises.
-		fmt.Fprintf(s.out, " %s %s %s %s\n",
+		fmt.Fprintf(s.out, " %s %s %s %s %s\n",
 			marker,
 			s.Color.Apply(fmt.Sprintf("[%d]", i+1), "gray"),
+			s.Color.Apply(fmt.Sprintf("%-4s", ev.EventID), "gray"),
 			s.Color.Apply(render.EventKindLabel(ev.Kind), render.EventColor(ev.Kind)),
 			render.EventTarget(ev))
 	}

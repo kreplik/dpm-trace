@@ -136,20 +136,20 @@ func (s *Stepper) setCollapsed(arg string, collapsed bool) {
 		return
 	}
 
-	eventID := arg
-	if eventID == "" {
+	if arg == "" {
 		if len(s.Order) == 0 {
 			fmt.Fprintln(s.out, s.Color.Apply("no events", "yellow"))
 			return
 		}
-		eventID = s.Order[s.Index]
+		arg = s.Order[s.Index]
 	}
 
-	ev, ok := s.Trace.EventsByID[eventID]
+	eventID, ok := s.ResolveEvent(arg)
 	if !ok {
-		fmt.Fprintf(s.out, "%s\n", s.Color.Apply("no event "+eventID, "yellow"))
+		fmt.Fprintf(s.out, "%s\n", s.Color.Apply("no event "+arg, "yellow"))
 		return
 	}
+	ev := s.Trace.EventsByID[eventID]
 	if len(ev.ChildEventIDs) == 0 {
 		// Silently succeeding would look like the command did nothing.
 		fmt.Fprintf(s.out, "%s\n", s.Color.Apply(eventID+" has no children", "yellow"))
@@ -244,4 +244,41 @@ func plural(n int, noun string) string {
 		return fmt.Sprintf("%d %s", n, noun)
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// ResolveEvent turns what a reader typed into an event id.
+//
+// A ledger's event ids are not one shape: an update fetched from Canton uses
+// bare integers ("0", "1"), while other sources use "#2:0". On top of that the
+// stepper numbers steps from 1, so the number on screen next to an event is
+// often not its id. Breakpoints have always accepted all three forms
+// (Breakpoint.Matches), and collapse/expand accepting fewer meant the same
+// event had a different name depending on which command you were typing.
+//
+// Accepted: the event id, the id with a leading "#", and the 1-based step
+// number.
+func (s *Stepper) ResolveEvent(spec string) (string, bool) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return "", false
+	}
+	if _, ok := s.Trace.EventsByID[spec]; ok {
+		return spec, true
+	}
+	if trimmed := strings.TrimPrefix(spec, "#"); trimmed != spec {
+		if _, ok := s.Trace.EventsByID[trimmed]; ok {
+			return trimmed, true
+		}
+	}
+	// The "#" is punctuation a reader drops as often as types, so match with
+	// it added as well as removed.
+	if _, ok := s.Trace.EventsByID["#"+spec]; ok {
+		return "#" + spec, true
+	}
+	for i, id := range s.Order {
+		if spec == strconv.Itoa(i+1) {
+			return id, true
+		}
+	}
+	return "", false
 }

@@ -16,7 +16,9 @@
 # CHECK: filter: kind exercise  (1 of 2 steps)
 
 # CHECK: matches: kind exercise
-# CHECK: > [1] EXERCISE Token:Token.Transfer
+# The step number and the event id are both shown: [step] is what `j`
+# takes, the id is what `collapse` and the tree use.
+# CHECK: > [1] #2:0 EXERCISE Token:Token.Transfer
 
 # CHECK: filter cleared
 

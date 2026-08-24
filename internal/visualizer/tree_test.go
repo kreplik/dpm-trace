@@ -240,3 +240,53 @@ func TestPlural(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// A ledger's event ids are not one shape: Canton updates use bare integers,
+// other sources use "#2:0". Breakpoints have always taken any of the three
+// forms, and collapse/expand taking fewer meant one event had a different name
+// depending on which command you were typing.
+func TestResolveEventAcceptsIDHashAndStepNumber(t *testing.T) {
+	s, _ := nestedStepper(t)
+
+	for _, spec := range []string{"#5:1", "5:1"} {
+		if got, ok := s.ResolveEvent(spec); !ok || got != "#5:1" {
+			t.Errorf("ResolveEvent(%q) = (%q, %v), want #5:1", spec, got, ok)
+		}
+	}
+
+	// Step numbers are 1-based, so step 1 is the first event in Order.
+	if got, ok := s.ResolveEvent("1"); !ok || got != s.Order[0] {
+		t.Errorf("ResolveEvent(\"1\") = (%q, %v), want %q", got, ok, s.Order[0])
+	}
+
+	for _, absent := range []string{"", "  ", "#nope", "999"} {
+		if got, ok := s.ResolveEvent(absent); ok {
+			t.Errorf("ResolveEvent(%q) resolved to %q, want no match", absent, got)
+		}
+	}
+}
+
+// When ids are bare integers -- which is what a Canton update gives -- a digit
+// is both a plausible id and a plausible step number. The id wins, because it
+// is what the tree prints next to the event.
+func TestResolveEventPrefersAnExactIDOverAStepNumber(t *testing.T) {
+	var buf bytes.Buffer
+	trace := load(t, "tests/fixtures/compare/trace-b.json")
+	s := New(trace, render.Color{Enabled: false}, source.NewIndex(), &buf)
+
+	// trace-b uses "#2:0"-style ids, so a digit can only be a step number.
+	if got, ok := s.ResolveEvent("1"); !ok || got != s.Order[0] {
+		t.Errorf("with no numeric ids, \"1\" should be step 1: got %q, %v", got, ok)
+	}
+}
+
+// collapse and expand accept whatever ResolveEvent accepts.
+func TestCollapseAcceptsEveryIDForm(t *testing.T) {
+	for _, spec := range []string{"#5:1", "5:1"} {
+		s, buf := nestedStepper(t)
+		s.Collapse(spec)
+		if !s.Collapsed["#5:1"] {
+			t.Errorf("collapse %q did not collapse #5:1:\n%s", spec, buf.String())
+		}
+	}
+}
