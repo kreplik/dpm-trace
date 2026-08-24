@@ -1,0 +1,236 @@
+{
+  "schema": "dpm-trace/trace-artifact/v0",
+  "createdAt": "2024-01-15T10:05:00Z",
+  "kind": "committed-update",
+  "trace": {
+    "updateId": "update-fixture-nested-0005",
+    "source": "ledger-json-api",
+    "sourceUrl": "http://localhost:7575/v2/updates/update-by-id",
+    "projection": {
+      "source": "ledger-json-api",
+      "participantScoped": true,
+      "readAs": [
+        "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+      ],
+      "notGlobal": true,
+      "note": "Authorized participant projection. Private data outside these party rights is not available."
+    },
+    "recordTime": "2024-01-15T10:04:55Z",
+    "offset": "505",
+    "synchronizerId": "synchronizer::sync0000000000000000000000000000000000000000000000001",
+    "rootEventIds": [
+      "#5:0"
+    ],
+    "eventsById": {
+      "#5:0": {
+        "eventId": "#5:0",
+        "kind": "exercise",
+        "template": "pkgset01:Settlement:Settlement",
+        "contractId": "0050dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": "Settle",
+        "consuming": true,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [
+          "#5:1",
+          "#5:5"
+        ],
+        "payload": null,
+        "argument": {
+          "amount": "100"
+        },
+        "result": null
+      },
+      "#5:1": {
+        "eventId": "#5:1",
+        "kind": "exercise",
+        "template": "pkgset01:Asset:Asset",
+        "contractId": "0051dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": "Transfer",
+        "consuming": true,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [
+          "#5:2",
+          "#5:3"
+        ],
+        "payload": null,
+        "argument": {
+          "newOwner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        },
+        "result": null
+      },
+      "#5:2": {
+        "eventId": "#5:2",
+        "kind": "archive",
+        "template": "pkgset01:Asset:Asset",
+        "contractId": "0052dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": null,
+        "consuming": false,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [],
+        "payload": null,
+        "argument": null,
+        "result": null
+      },
+      "#5:3": {
+        "eventId": "#5:3",
+        "kind": "create",
+        "template": "pkgset01:Asset:Asset",
+        "contractId": "0053dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": null,
+        "consuming": false,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [
+          "#5:4"
+        ],
+        "payload": {
+          "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002",
+          "quantity": "100",
+          "name": "GOLD"
+        },
+        "argument": null,
+        "result": null
+      },
+      "#5:4": {
+        "eventId": "#5:4",
+        "kind": "create",
+        "template": "pkgset01:Receipt:Receipt",
+        "contractId": "0054dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": null,
+        "consuming": false,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [],
+        "payload": {
+          "recipient": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002",
+          "note": "transfer leg"
+        },
+        "argument": null,
+        "result": null
+      },
+      "#5:5": {
+        "eventId": "#5:5",
+        "kind": "exercise",
+        "template": "pkgset01:Fee:Fee",
+        "contractId": "0055dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": "Charge",
+        "consuming": true,
+        "actingParties": [
+          "Bank::ccccccccccccccccccccccccccccccccccccccccccccccccccccccc000003"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [
+          "#5:6"
+        ],
+        "payload": null,
+        "argument": {
+          "fee": "2"
+        },
+        "result": null
+      },
+      "#5:6": {
+        "eventId": "#5:6",
+        "kind": "create",
+        "template": "pkgset01:Fee:Fee",
+        "contractId": "0056dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "choice": null,
+        "consuming": false,
+        "actingParties": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "witnesses": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "signatories": [
+          "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+        ],
+        "observers": [
+          "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+        ],
+        "childEventIds": [],
+        "payload": {
+          "payer": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+          "collector": "Bank::ccccccccccccccccccccccccccccccccccccccccccccccccccccccc000003",
+          "amount": "2"
+        },
+        "argument": null,
+        "result": null
+      }
+    }
+  },
+  "participant": {
+    "url": "http://localhost:7575"
+  },
+  "packages": {},
+  "privacy": {
+    "participantScoped": true
+  }
+}

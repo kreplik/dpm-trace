@@ -27,6 +27,14 @@ type Stepper struct {
 	Index       int
 	Breakpoints []Breakpoint
 
+	// Active narrows navigation to matching steps. Order is left whole so step
+	// numbers stay stable: a reader who filters, reads step 7, then clears the
+	// filter expects step 7 to be the same event.
+	Active *Filter
+
+	// Collapsed holds the event ids whose descendants the tree hides.
+	Collapsed map[string]bool
+
 	out io.Writer
 }
 
@@ -84,6 +92,10 @@ func (s *Stepper) Run(in io.Reader) {
 	render.PrintSummary(s.out, s.Trace)
 	fmt.Fprintln(s.out, "\n"+s.Color.Apply("Visualizer commands:", "bold")+
 		" n/next, p/prev, j <n>, s/source, vars, b <spec>, c/continue, tree, context, json, q")
+	fmt.Fprintln(s.out, s.Color.Apply("search:", "bold"),
+		"filter <value>, find <value>, matches -- `help` for the full form")
+	fmt.Fprintln(s.out, s.Color.Apply("tree:", "bold"),
+		"tree [depth], collapse [id|all], expand [id|all]")
 	if s.SourceIndex.HasSources() {
 		fmt.Fprintln(s.out, s.Color.Apply("source roots:", "cyan"), strings.Join(s.SourceIndex.Roots, ", "))
 	}
@@ -125,14 +137,10 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 	case cmd == "q" || cmd == "quit" || cmd == "exit":
 		return true
 	case cmd == "" || cmd == "n" || cmd == "next":
-		if s.Index < len(s.Order)-1 {
-			s.Index++
-		}
+		s.step(1)
 		s.ShowCurrent()
 	case cmd == "p" || cmd == "prev":
-		if s.Index > 0 {
-			s.Index--
-		}
+		s.step(-1)
 		s.ShowCurrent()
 	case strings.HasPrefix(cmd, "j "):
 		s.Jump(cmd)
@@ -148,14 +156,30 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		s.ClearBreakpoints(cmd)
 	case cmd == "c" || cmd == "continue":
 		s.ContinueToBreakpoint()
-	case cmd == "tree":
-		s.ShowTree()
+	case cmd == "tree" || strings.HasPrefix(cmd, "tree "):
+		s.ShowTree(strings.TrimPrefix(cmd, "tree"))
+	case cmd == "collapse" || strings.HasPrefix(cmd, "collapse "):
+		s.Collapse(strings.TrimPrefix(cmd, "collapse"))
+	case cmd == "expand" || strings.HasPrefix(cmd, "expand "):
+		s.Expand(strings.TrimPrefix(cmd, "expand"))
 	case cmd == "context":
 		fmt.Fprintln(s.out, render.DebugContextReport(s.Trace))
 	case cmd == "json":
 		s.ShowJSON()
+	case cmd == "filter" || strings.HasPrefix(cmd, "filter "):
+		s.SetFilter(strings.TrimPrefix(cmd, "filter"))
+	case strings.HasPrefix(cmd, "find "):
+		s.Find(strings.TrimPrefix(cmd, "find "))
+	case cmd == "matches":
+		s.ShowMatches()
 	case cmd == "help":
 		fmt.Fprintln(s.out, "n/next, p/prev, j <index>, s/source, vars, b <spec>, bp, clear [n], c/continue, tree, context, json, q")
+		fmt.Fprintln(s.out, "  filter ["+strings.Join(filterFields, "|")+"] <value>   narrow navigation")
+		fmt.Fprintln(s.out, "  filter                                                            clear the filter")
+		fmt.Fprintln(s.out, "  find <value>                                                      jump to the next match")
+		fmt.Fprintln(s.out, "  matches                                                           list what the filter selects")
+		fmt.Fprintln(s.out, "  tree [depth]                                                      collapse below a depth")
+		fmt.Fprintln(s.out, "  collapse|expand [event-id|all]                                    hide or reveal a subtree")
 		fmt.Fprintln(s.out, "  source-linked replay is best-effort: unsupported expressions are shown as (not evaluated)")
 	default:
 		fmt.Fprintln(s.out, "unknown command; try `help`")
@@ -422,51 +446,6 @@ func (s *Stepper) ContinueToBreakpoint() {
 	fmt.Fprintln(s.out, s.Color.Apply("no later breakpoint hit", "yellow"))
 }
 
-// ShowTree prints the trace as a nested tree with a cursor on the current step.
-// Ports Stepper.show_tree.
-func (s *Stepper) ShowTree() {
-	current := ""
-	if len(s.Order) > 0 {
-		current = s.Order[s.Index]
-	}
-
-	var visit func(string, int)
-	visit = func(eventID string, depth int) {
-		ev, ok := s.Trace.EventsByID[eventID]
-		if !ok {
-			return
-		}
-		isCurrent := eventID == current
-		cursor := "  "
-		if isCurrent {
-			cursor = s.Color.Apply("=>", "magenta", "bold")
-		}
-		target := render.ShortTemplate(ev.Template)
-		if target == "" {
-			target = ev.Template
-		}
-		label := target
-		if ev.Choice != "" && target != "" {
-			label = target + "." + ev.Choice
-		} else if ev.Choice != "" {
-			label = ev.Choice
-		}
-		kind := fmt.Sprintf("%-8s", strings.ToUpper(ev.Kind))
-		if isCurrent {
-			kind = s.Color.Apply(kind, render.EventColor(ev.Kind), "bold")
-			label = s.Color.Apply(label, "bold")
-		}
-		fmt.Fprintf(s.out, "%s%s %s %s %s\n", strings.Repeat("  ", depth), cursor, kind, ev.EventID, label)
-		for _, child := range ev.ChildEventIDs {
-			visit(child, depth+1)
-		}
-	}
-
-	for _, root := range s.Trace.RootEventIDs {
-		visit(root, 0)
-	}
-}
-
 // ShowJSON prints the current event in the artifact encoding.
 func (s *Stepper) ShowJSON() {
 	encoded, err := model.Encode(model.EventToJSON(s.Current()))
@@ -529,4 +508,123 @@ func pythonList(ctx *render.Context, parties []string) string {
 		quoted = append(quoted, "'"+ctx.Party(party)+"'")
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
+}
+
+// step moves by one position, skipping events the active filter excludes and
+// stopping at the ends rather than wrapping.
+func (s *Stepper) step(delta int) {
+	for i := s.Index + delta; i >= 0 && i < len(s.Order); i += delta {
+		if s.matchesActive(i) {
+			s.Index = i
+			return
+		}
+	}
+	// No further match: stay put rather than jumping somewhere unrelated.
+	if s.Active != nil {
+		fmt.Fprintln(s.out, s.Color.Apply("no further match for filter "+s.Active.Describe(), "yellow"))
+	}
+}
+
+func (s *Stepper) matchesActive(i int) bool {
+	if s.Active == nil {
+		return true
+	}
+	ev, ok := s.Trace.EventsByID[s.Order[i]]
+	return ok && s.Active.Matches(ev)
+}
+
+// SetFilter applies `filter ...`, or clears it when given no argument.
+func (s *Stepper) SetFilter(arg string) {
+	if strings.TrimSpace(arg) == "" {
+		if s.Active == nil {
+			fmt.Fprintln(s.out, s.Color.Apply("no filter set", "yellow"))
+			return
+		}
+		s.Active = nil
+		fmt.Fprintln(s.out, s.Color.Apply("filter cleared", "yellow"))
+		return
+	}
+
+	filter, err := ParseFilter(arg)
+	if err != nil {
+		fmt.Fprintln(s.out, s.Color.Apply(err.Error(), "yellow"))
+		return
+	}
+
+	matches := s.matchingSteps(filter)
+	if len(matches) == 0 {
+		// Not applied: a filter that selects nothing would strand navigation
+		// with no way to see why.
+		fmt.Fprintln(s.out, s.Color.Apply("no events match "+filter.Describe()+"; filter not applied", "yellow"))
+		return
+	}
+
+	s.Active = &filter
+	fmt.Fprintf(s.out, "%s %s\n",
+		s.Color.Apply("filter:", "cyan"),
+		fmt.Sprintf("%s  (%d of %d steps)", filter.Describe(), len(matches), len(s.Order)))
+
+	// Land on a matching step so the view agrees with the filter.
+	if !s.matchesActive(s.Index) {
+		s.Index = matches[0]
+	}
+	s.ShowCurrent()
+}
+
+// Find jumps to the next matching step without changing the active filter.
+func (s *Stepper) Find(arg string) {
+	filter, err := ParseFilter(arg)
+	if err != nil {
+		fmt.Fprintln(s.out, s.Color.Apply(err.Error(), "yellow"))
+		return
+	}
+	for i := s.Index + 1; i < len(s.Order); i++ {
+		if ev, ok := s.Trace.EventsByID[s.Order[i]]; ok && filter.Matches(ev) {
+			s.Index = i
+			s.ShowCurrent()
+			return
+		}
+	}
+	fmt.Fprintln(s.out, s.Color.Apply("no match after this step for "+filter.Describe(), "yellow"))
+}
+
+// ShowMatches lists the steps the active filter selects, so a reader can see
+// the shape of the result before walking it.
+func (s *Stepper) ShowMatches() {
+	if s.Active == nil {
+		fmt.Fprintln(s.out, s.Color.Apply("no filter set; use `filter <value>`", "yellow"))
+		return
+	}
+	matches := s.matchingSteps(*s.Active)
+	fmt.Fprintf(s.out, "%s %s\n", s.Color.Apply("matches:", "cyan"), s.Active.Describe())
+	for _, i := range matches {
+		ev := s.Trace.EventsByID[s.Order[i]]
+		marker := " "
+		if i == s.Index {
+			marker = ">"
+		}
+		// Both numbers, because they are different numbers and each addresses
+		// a different command: [step] is what `j` takes, the event id is what
+		// `collapse` and the tree show. Printing only the step left a reader
+		// unable to tell which tree line a match referred to.
+		//
+		// The kind carries as much signal as the template here: a filter on a
+		// party typically selects a mix of creates and exercises.
+		fmt.Fprintf(s.out, " %s %s %s %s %s\n",
+			marker,
+			s.Color.Apply(fmt.Sprintf("[%d]", i+1), "gray"),
+			s.Color.Apply(fmt.Sprintf("%-4s", ev.EventID), "gray"),
+			s.Color.Apply(render.EventKindLabel(ev.Kind), render.EventColor(ev.Kind)),
+			render.EventTarget(ev))
+	}
+}
+
+func (s *Stepper) matchingSteps(filter Filter) []int {
+	var matches []int
+	for i, id := range s.Order {
+		if ev, ok := s.Trace.EventsByID[id]; ok && filter.Matches(ev) {
+			matches = append(matches, i)
+		}
+	}
+	return matches
 }
