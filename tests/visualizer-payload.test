@@ -1,0 +1,20 @@
+# A forty-field contract printed seventy lines, so the event's own header
+# scrolled away before the reader saw it. This pins the bounded rendering, the
+# show-more affordance and the field search.
+
+# RUN: printf 'j 4\nq\n' | %dpm open %root/tests/fixtures/large-payload.trace.json --visualize --color never | FileCheck %s --check-prefix BOUNDED
+# RUN: printf 'j 4\npayload field37\nq\n' | %dpm open %root/tests/fixtures/large-payload.trace.json --visualize --color never | FileCheck %s --check-prefix SEARCH
+# RUN: printf 'j 4\npayload\nq\n' | %dpm open %root/tests/fixtures/large-payload.trace.json --visualize --color never | FileCheck %s --check-prefix EXPANDED
+
+# The value is cut, and the notice names the command that shows the rest.
+# BOUNDED: payload:
+# BOUNDED: "field01"
+# BOUNDED: hidden (`payload` to expand, `payload <text>` to search)
+# BOUNDED-NOT: "field40"
+
+# Searching reaches a field the bounded view hides, without printing the rest.
+# SEARCH: "field37"
+# SEARCH-NOT: "field01"
+
+# `payload` alone shows everything.
+# EXPANDED: "field40"
