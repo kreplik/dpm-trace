@@ -101,6 +101,8 @@ func (s *Stepper) Run(in io.Reader) {
 		"tree [depth], collapse [id|all], expand [id|all]")
 	fmt.Fprintln(s.out, s.Color.Apply("values:", "bold"),
 		"payload to expand a truncated value, payload <text> to search this event's fields")
+	fmt.Fprintln(s.out, s.Color.Apply("state:", "bold"),
+		"diff -- the contracts this transaction created and archived")
 	if s.SourceIndex.HasSources() {
 		fmt.Fprintln(s.out, s.Color.Apply("source roots:", "cyan"), strings.Join(s.SourceIndex.Roots, ", "))
 	}
@@ -177,6 +179,8 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		s.Find(strings.TrimPrefix(cmd, "find "))
 	case cmd == "matches":
 		s.ShowMatches()
+	case cmd == "diff" || cmd == "state":
+		s.ShowStateDiff()
 	case cmd == "payload" || strings.HasPrefix(cmd, "payload "):
 		s.SearchPayload(strings.TrimPrefix(cmd, "payload"))
 	case cmd == "help":
@@ -185,6 +189,7 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		fmt.Fprintln(s.out, "  filter                                                            clear the filter")
 		fmt.Fprintln(s.out, "  find <value>                                                      jump to the next match")
 		fmt.Fprintln(s.out, "  matches                                                           list what the filter selects")
+		fmt.Fprintln(s.out, "  diff/state                                                        contracts this transaction created and archived")
 		fmt.Fprintln(s.out, "  payload [text]                                                    expand values, or search this event's fields")
 		fmt.Fprintln(s.out, "  tree [depth]                                                      collapse below a depth")
 		fmt.Fprintln(s.out, "  collapse|expand [event-id|all]                                    hide or reveal a subtree")
