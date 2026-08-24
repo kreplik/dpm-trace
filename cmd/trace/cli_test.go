@@ -326,3 +326,39 @@ func TestResolvePath(t *testing.T) {
 		}
 	}
 }
+
+// An empty party value means the caller's variable was unset. Dropping it
+// silently gave a narrower projection than was asked for, with nothing in the
+// output naming the parties that were requested rather than used -- so a
+// mistyped $ALICE produced a plausible answer to a different question.
+func TestPartyFlagsRejectAnEmptyValue(t *testing.T) {
+	artifact := repoPath("examples", "create.trace.json")
+
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"trace read-as", []string{"some-update-id", "--submitter", "http://127.0.0.1:1", "--read-as", ""}},
+		{"trace party", []string{"some-update-id", "--submitter", "http://127.0.0.1:1", "--party", ""}},
+		// The mixed case is the one that bit: one good party hides one empty.
+		{"trace mixed", []string{"some-update-id", "--submitter", "http://127.0.0.1:1", "--read-as", "", "--read-as", "Alice::1220aa"}},
+		{"compare read-as", []string{"--update", artifact, "--submitter", "http://127.0.0.1:1", "--read-as", ""}},
+		{"compare act-as", []string{"--update", artifact, "--submitter", "http://127.0.0.1:1", "--act-as", ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var code int
+			var stderr string
+			if strings.HasPrefix(tc.name, "compare") {
+				_, stderr, code = capture(t, func() int { return runCompare(tc.args) })
+			} else {
+				_, stderr, code = capture(t, func() int { return runTrace(tc.args) })
+			}
+			if code == 0 {
+				t.Errorf("empty party accepted, exit 0")
+			}
+			if !strings.Contains(stderr, "requires a party id") {
+				t.Errorf("stderr = %q, want a party-id error", stderr)
+			}
+		})
+	}
+}

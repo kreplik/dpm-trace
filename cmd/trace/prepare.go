@@ -175,12 +175,19 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 		switch arg {
 		case "--submitter", "--participant-url", "--ledger-url":
 			opts.ledgerURL = value
-		case "--act-as":
-			opts.actAs = append(opts.actAs, value)
-		case "--read-as":
-			opts.readAs = append(opts.readAs, value)
-		case "--party":
-			opts.party = append(opts.party, value)
+		case "--act-as", "--read-as", "--party":
+			party, ok := partyFlag(arg, value)
+			if !ok {
+				return opts, spec, 2
+			}
+			switch arg {
+			case "--act-as":
+				opts.actAs = append(opts.actAs, party)
+			case "--read-as":
+				opts.readAs = append(opts.readAs, party)
+			default:
+				opts.party = append(opts.party, party)
+			}
 		case "--token":
 			opts.token = value
 		case "--token-file", "--access-token-file":

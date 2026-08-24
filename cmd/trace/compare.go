@@ -106,14 +106,22 @@ func runCompare(args []string) int {
 				return 2
 			}
 			i++
-			actAs = append(actAs, args[i])
+			party, ok := partyFlag(arg, args[i])
+			if !ok {
+				return 2
+			}
+			actAs = append(actAs, party)
 		case "--read-as", "--party":
 			if i+1 >= len(args) {
 				fmt.Fprintf(os.Stderr, "error: %s requires a party id\n", arg)
 				return 2
 			}
 			i++
-			readAs = append(readAs, args[i])
+			party, ok := partyFlag(arg, args[i])
+			if !ok {
+				return 2
+			}
+			readAs = append(readAs, party)
 		case "--token":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --token requires a value")
