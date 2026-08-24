@@ -114,3 +114,18 @@ func (s *Stepper) SearchPayload(needle string) {
 			"no field of this event matches "+needle, "yellow"))
 	}
 }
+
+// writeBounded prints an already-rendered block under the same limit as an
+// event's value blocks, so `vars` and the step view agree about how much of a
+// large value is shown.
+func (s *Stepper) writeBounded(text string) {
+	lines := strings.Split(text, "\n")
+	if s.ExpandPayloads || len(lines) <= payloadPreviewLines {
+		fmt.Fprintln(s.out, text)
+		return
+	}
+	fmt.Fprintln(s.out, strings.Join(lines[:payloadPreviewLines], "\n"))
+	fmt.Fprintln(s.out, s.Color.Apply(
+		fmt.Sprintf("  ... %s hidden (`payload` to expand, `payload <text>` to search)",
+			plural(len(lines)-payloadPreviewLines, "line")), "gray"))
+}
