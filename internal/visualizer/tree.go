@@ -17,9 +17,6 @@ import (
 // a reader who collapses a noisy subtree, steps away and comes back expects it
 // to still be collapsed.
 
-// markerWidth keeps the +/- column aligned with nodes that have no children.
-const markerWidth = 2
-
 // ShowTree prints the trace with a cursor on the current step, honouring the
 // collapsed set. `tree <depth>` collapses everything below the given depth,
 // which is the fastest way to get an overview of a trace seen for the first
@@ -37,8 +34,14 @@ func (s *Stepper) ShowTree(arg string) {
 		current = s.Order[s.Index]
 	}
 
-	var visit func(string, int)
-	visit = func(eventID string, depth int) {
+	// prefix carries the ancestors' vertical bars; isLast picks the corner.
+	// The connectors are render's, so the navigation tree and the printed
+	// trace draw nesting the same way: depth conveyed by indentation alone
+	// left a reader counting spaces to tell a sibling from a child.
+	glyphs := render.TreeGlyphs()
+
+	var visit func(string, string, bool)
+	visit = func(eventID, prefix string, isLast bool) {
 		ev, ok := s.Trace.EventsByID[eventID]
 		if !ok {
 			return
@@ -71,40 +74,34 @@ func (s *Stepper) ShowTree(arg string) {
 		// indentation. Placed after it they land in a different column at every
 		// depth, so a reader cannot scan down for the matches -- which is the
 		// whole point of marking them.
+		connector := glyphs.Branch()
+		childPrefix := glyphs.Vertical()
+		if isLast {
+			connector = glyphs.Last()
+			childPrefix = glyphs.Blank()
+		}
 		fmt.Fprintf(s.out, "%s%s %s%s%s %s %s\n",
-			match, cursor, strings.Repeat("  ", depth), s.marker(ev.EventID),
+			match, cursor, prefix, connector,
 			kind, ev.EventID, label)
 
 		if s.isCollapsed(eventID) {
 			if hidden := s.descendantCount(eventID); hidden > 0 {
 				fmt.Fprintf(s.out, "%s%s%s\n",
 					gutterPad(s.Active != nil),
-					strings.Repeat("  ", depth+1)+strings.Repeat(" ", markerWidth),
+					prefix+childPrefix,
 					s.Color.Apply(fmt.Sprintf("... %s hidden (expand %s)",
 						plural(hidden, "event"), eventID), "gray"))
 			}
 			return
 		}
-		for _, child := range ev.ChildEventIDs {
-			visit(child, depth+1)
+		for i, child := range ev.ChildEventIDs {
+			visit(child, prefix+childPrefix, i == len(ev.ChildEventIDs)-1)
 		}
 	}
 
-	for _, root := range s.Trace.RootEventIDs {
-		visit(root, 0)
+	for i, root := range s.Trace.RootEventIDs {
+		visit(root, "", i == len(s.Trace.RootEventIDs)-1)
 	}
-}
-
-// marker flags a collapsed node. Only "+" is drawn: an expanded node is already
-// evident from the children beneath it, so marking it too adds a column of
-// noise to every line of the common, fully-expanded case.
-func (s *Stepper) marker(eventID string) string {
-	if s.isCollapsed(eventID) {
-		if ev, ok := s.Trace.EventsByID[eventID]; ok && len(ev.ChildEventIDs) > 0 {
-			return s.Color.Apply("+", "yellow", "bold") + " "
-		}
-	}
-	return strings.Repeat(" ", markerWidth)
 }
 
 func (s *Stepper) isCollapsed(eventID string) bool {
@@ -164,6 +161,11 @@ func (s *Stepper) setCollapsed(arg string, collapsed bool) {
 	} else {
 		delete(s.Collapsed, eventID)
 	}
+	// Say which event this was, because the argument is ambiguous: `tree 2`
+	// means a depth while `collapse 2` means a step, and against a Canton
+	// update -- where ids are bare integers -- a digit is a plausible id too.
+	// Echoing what it resolved turns a silent wrong guess into a visible one.
+	fmt.Fprintln(s.out, s.Color.Apply(done+" "+s.describeEvent(eventID), "yellow"))
 	s.ShowTree("")
 }
 
@@ -281,4 +283,15 @@ func (s *Stepper) ResolveEvent(spec string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// describeEvent names an event the way the reader can address it again: the id
+// the tree prints, and the step number `j` takes when they differ.
+func (s *Stepper) describeEvent(eventID string) string {
+	for i, id := range s.Order {
+		if id == eventID {
+			return fmt.Sprintf("%s (step %d)", eventID, i+1)
+		}
+	}
+	return eventID
 }
