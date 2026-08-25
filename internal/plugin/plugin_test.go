@@ -187,8 +187,10 @@ func TestInstallWithoutAnySDKExplainsItself(t *testing.T) {
 	if err == nil {
 		t.Fatal("installing with no SDK returned no error")
 	}
-	if !strings.Contains(err.Error(), "--sdk-version") {
-		t.Errorf("error does not suggest a fix: %v", err)
+	for _, want := range []string{"no Daml SDK is installed", "dpm install", "standalone"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not mention %q: %v", want, err)
+		}
 	}
 }
 

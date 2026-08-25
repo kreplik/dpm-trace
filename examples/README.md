@@ -13,7 +13,9 @@ dpm trace open examples/archive.trace.json
 ```
 
 The Daml package that produced them is in [`asset/`](asset), and the steps below
-rebuild them from it — nothing outside this repository is required.
+rebuild them from it — nothing outside this repository is required, though
+reproducing them needs DPM and a Java runtime. Opening the committed artifacts
+above needs neither.
 
 ## The three shapes
 
@@ -36,10 +38,12 @@ Everything below needs only this repository and a Canton jar.
 
 ```bash
 # Build the example package (examples/asset), from the repo root:
-(cd examples/asset && daml build)
+(cd examples/asset && dpm build)
+
+CANTON=$(ls ~/.dpm/cache/components/canton-open-source/*/lib/canton-open-source-*.jar | sort -V | tail -1)
 
 java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
-  -jar /path/to/canton-open-source-<version>.jar daemon \
+  -jar "$CANTON" daemon \
   -c examples/devnet-trace.conf \
   --bootstrap examples/devnet-trace.bootstrap.canton --no-tty
 # => === dpm-trace examples ready: participant1 http://127.0.0.1:6113, participant2 http://127.0.0.1:6123 ===

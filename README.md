@@ -12,25 +12,45 @@ and payloads that participant can see.
 ## Install
 
 Download the archive for your platform from
-[Releases](https://github.com/walnuthq/dpm-trace/releases) and unpack it, or
-build it. Either way the binary is self-contained and lands in the current
-directory:
+[Releases](https://github.com/walnuthq/dpm-trace/releases) and unpack it. The
+binary is self-contained — no runtime, no dependencies:
 
 ```bash
-tar xzf dpm-trace_<version>_<os>_<arch>.tar.gz    # downloaded
-go build -o dpm-trace ./cmd/trace                 # or built
+tar xzf dpm-trace_<version>_<os>_<arch>.tar.gz
+./dpm-trace --version
 ```
 
-Register it as a DPM component so it runs as `dpm trace`:
+Building instead needs Go 1.25 or newer:
+
+```bash
+go build -o dpm-trace ./cmd/trace
+```
+
+**That is enough to use it.** Everything below works with `./dpm-trace`.
+
+Optionally, register it as a DPM component so it runs as `dpm trace`:
 
 ```bash
 ./dpm-trace install-plugin
 dpm trace --help
 ```
 
-Without that it still works as a standalone binary.
+Registration requires DPM with a Daml SDK installed. If you have neither:
+
+```bash
+curl https://get.digitalasset.com/install/install.sh | sh   # installs dpm
+dpm install 3.4.11                                          # installs an SDK
+```
+
+Otherwise keep using `./dpm-trace`; it is the same binary.
 
 ## Usage
+
+An update id identifies a committed transaction on a participant, in the format
+`1220e77482b473bfff30d376bd853f0a71df7ab6d41cc3f060dc5456603493acd06c`. Canton
+returns one from each successful submission, so if you have no ledger yet, start
+with the [examples](#examples) below — they need no update id and no
+participant.
 
 Against a local participant:
 
@@ -87,13 +107,18 @@ with a child create, and an archive — each with a trace artifact captured
 against a real Canton, so the output can be seen without a ledger:
 
 ```bash
-dpm trace open examples/create.trace.json
-dpm trace open examples/exercise-child-create.trace.json
-dpm trace open examples/archive.trace.json
+./dpm-trace open examples/create.trace.json
+./dpm-trace open examples/exercise-child-create.trace.json
+./dpm-trace open examples/archive.trace.json
 ```
 
+These need nothing but the binary — the artifacts are committed, so there is no
+ledger to reach and no Daml toolchain to install.
+
 [`examples/README.md`](examples/README.md) shows how to reproduce them against a
-local Canton, and how the same commands work against a remote participant.
+local Canton, and how the same commands work against a remote participant. That
+does need more: a Java runtime, a Canton jar, and a Daml SDK to build the
+example package's DAR.
 
 ## Notes
 
