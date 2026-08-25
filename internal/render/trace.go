@@ -80,6 +80,13 @@ type glyphSet struct {
 	blank    string // the column under the last child
 }
 
+// Branch, Last, Vertical and Blank expose the glyphs to other renderers, so a
+// second tree does not invent its own notation for the same nesting.
+func (g glyphSet) Branch() string   { return g.branch }
+func (g glyphSet) Last() string     { return g.last }
+func (g glyphSet) Vertical() string { return g.vertical }
+func (g glyphSet) Blank() string    { return g.blank }
+
 var (
 	unicodeGlyphs = glyphSet{branch: "\u251c\u2500\u2500 ", last: "\u2514\u2500\u2500 ", vertical: "\u2502   ", blank: "    "}
 	asciiGlyphs   = glyphSet{branch: "|-- ", last: "`-- ", vertical: "|   ", blank: "    "}

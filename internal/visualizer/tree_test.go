@@ -134,27 +134,25 @@ func TestTreeRejectsNonNumericDepth(t *testing.T) {
 	}
 }
 
-// Only collapsed nodes are marked. An expanded node is already evident from the
-// children beneath it, so marking it too puts a column of noise on every line
-// of the common, fully-expanded case.
-func TestOnlyCollapsedNodesAreMarked(t *testing.T) {
+// A collapsed node announces itself with the hidden-count line, which carries
+// the count and the command to reopen it. A separate "+" marker said the same
+// thing less usefully, and cost a reserved column on every line of the tree.
+func TestCollapsedNodeAnnouncesWhatIsHidden(t *testing.T) {
 	s, buf := nestedStepper(t)
 	s.ShowTree("")
-	if strings.Contains(buf.String(), "+") {
-		t.Errorf("a fully expanded tree carries a marker:\n%s", buf.String())
+	if strings.Contains(buf.String(), "hidden") {
+		t.Errorf("a fully expanded tree claims something is hidden:\n%s", buf.String())
 	}
 
 	buf.Reset()
 	s.Collapse("#5:1")
 	out := buf.String()
-	if !strings.Contains(out, "+ EXERCISE #5:1") {
-		t.Errorf("collapsed node is not marked:\n%s", out)
+	if !strings.Contains(out, "3 events hidden (expand #5:1)") {
+		t.Errorf("collapsed node does not say what it hides:\n%s", out)
 	}
-	// #5:5 is expanded, so it stays unmarked even while a sibling is closed.
-	for _, line := range strings.Split(out, "\n") {
-		if strings.Contains(line, "#5:5") && strings.Contains(line, "+") {
-			t.Errorf("expanded sibling was marked: %q", line)
-		}
+	// The sibling stays open.
+	if !strings.Contains(out, "#5:5") {
+		t.Errorf("sibling disappeared:\n%s", out)
 	}
 }
 
@@ -288,5 +286,30 @@ func TestCollapseAcceptsEveryIDForm(t *testing.T) {
 		if !s.Collapsed["#5:1"] {
 			t.Errorf("collapse %q did not collapse #5:1:\n%s", spec, buf.String())
 		}
+	}
+}
+
+// `tree 2` means a depth and `collapse 2` means a step, and against a Canton
+// update -- where ids are bare integers -- a digit is a plausible id as well.
+// Echoing what was resolved turns a silent wrong guess into a visible one.
+func TestCollapseEchoesWhatItResolved(t *testing.T) {
+	s, buf := nestedStepper(t)
+	s.Collapse("2")
+	out := buf.String()
+	if !strings.Contains(out, "collapsed #5:1 (step 2)") {
+		t.Errorf("collapse 2 did not say what it resolved:\n%s", out)
+	}
+
+	buf.Reset()
+	s.Expand("#5:1")
+	if !strings.Contains(buf.String(), "expanded #5:1 (step 2)") {
+		t.Errorf("expand did not echo:\n%s", buf.String())
+	}
+
+	// The bare form acts on the current event and says which that was.
+	buf.Reset()
+	s.Collapse("")
+	if !strings.Contains(buf.String(), "collapsed "+s.Order[s.Index]) {
+		t.Errorf("bare collapse did not echo:\n%s", buf.String())
 	}
 }
