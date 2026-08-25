@@ -274,3 +274,31 @@ func osErrorText(err error, path string) string {
 	}
 	return err.Error()
 }
+
+// LooksLikeCompletion reports whether a decoded object is completion data:
+// either a completion record, or the error body a rejected submission returns.
+func LooksLikeCompletion(obj *Object) bool {
+	if obj == nil {
+		return false
+	}
+	for _, key := range []string{"completionResponse", "completion", "status", "errorCategory", "grpcCodeValue"} {
+		if _, ok := obj.Get(key); ok {
+			return true
+		}
+	}
+	if _, ok := obj.Get("code"); ok {
+		if _, ok := obj.Get("cause"); ok {
+			return true
+		}
+	}
+	// A successful completion carries no status: it is identified by a command
+	// id alongside the fields the ledger stamps on it.
+	if _, ok := obj.Get("commandId"); ok {
+		for _, key := range []string{"offset", "submissionId", "synchronizerTime", "updateId"} {
+			if _, ok := obj.Get(key); ok {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -23,20 +23,20 @@ func LoadTraceArtifact(path string) (*Object, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if schema := pickString(artifact, "schema"); schema != TraceArtifactSchema {
-		return nil, fmt.Errorf("unsupported trace artifact schema in %s: %s", path, quoteOrNone(schema))
+		if LooksLikeCompletion(artifact) {
+			return nil, fmt.Errorf(
+				"%s is completion data, not a trace artifact.\nA failed submission has no "+
+					"transaction tree; read it with --completion-file instead of open", path)
+		}
+		if schema == "" {
+			return nil, fmt.Errorf("%s has no schema field, so it is not a trace artifact", path)
+		}
+		return nil, fmt.Errorf("unsupported trace artifact schema in %s: '%s'", path, schema)
 	}
 	if _, ok := pickObject(artifact, "trace"); !ok {
 		return nil, fmt.Errorf("trace artifact is missing trace object: %s", path)
 	}
 	return artifact, nil
-}
-
-// quoteOrNone renders a missing schema the way Python's %r renders None.
-func quoteOrNone(value string) string {
-	if value == "" {
-		return "None"
-	}
-	return "'" + value + "'"
 }
 
 // TraceFromArtifact extracts the trace from a loaded artifact.
