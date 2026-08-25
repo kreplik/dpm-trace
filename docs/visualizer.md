@@ -33,10 +33,10 @@ cannot see.
 Concretely, one transfer read two ways:
 
 ```
-dpm-trace[Alice]> =>   EXERCISE 0 Asset:Asset.Transfer
-                         CREATE   1 Asset:Asset
+dpm-trace[Alice]> => └── EXERCISE 0 Asset:Asset.Transfer
+                         └── CREATE   1 Asset:Asset
 
-dpm-trace[Bob]>   =>   CREATE   0 Asset:Asset
+dpm-trace[Bob]>   => └── CREATE   0 Asset:Asset
 ```
 
 Alice sees the consuming exercise and the create under it. Bob, on the other
@@ -66,14 +66,26 @@ event accept the id, the id with a leading `#`, or the step number.
 Folding is what makes a deep transaction readable:
 
 ```
-=> +  EXERCISE #5:0 Settlement:Settlement.Settle
-   +  EXERCISE #5:1 Asset:Asset.Transfer
-      ... 3 events hidden (expand #5:1)
+=> └── EXERCISE #5:0 Settlement:Settlement.Settle
+       ├── EXERCISE #5:1 Asset:Asset.Transfer
+       │   ... 3 events hidden (expand #5:1)
+       └── EXERCISE #5:5 Fee:Fee.Charge
+           ... 1 event hidden (expand #5:5)
 ```
 
 Counts are transitive — three hidden means three lines you cannot see, not
-three direct children. Collapse is keyed by event, so a subtree stays closed
-while you step away and come back.
+three direct children — and the line names the command that reopens it.
+Collapse is keyed by event, so a subtree stays closed while you step away and
+come back.
+
+`collapse` and `expand` echo the event they resolved, because the argument is
+ambiguous: `tree 2` means a depth, `collapse 2` means a step, and where event
+ids are bare integers a digit is a plausible id too.
+
+```
+dpm-trace[Alice]> collapse 2
+collapsed #5:1 (step 2)
+```
 
 ## Finding things
 
@@ -97,10 +109,11 @@ With a filter set, `tree` marks matches in a fixed left gutter, so the
 structure survives:
 
 ```
-         EXERCISE #5:0 Settlement:Settlement.Settle
-           ARCHIVE  #5:2 Asset:Asset
-* =>       CREATE   #5:3 Asset:Asset
-*          CREATE   #5:4 Receipt:Receipt
+     └── EXERCISE #5:0 Settlement:Settlement.Settle
+         ├── EXERCISE #5:1 Asset:Asset.Transfer
+         │   ├── ARCHIVE  #5:2 Asset:Asset
+* =>     │   └── CREATE   #5:3 Asset:Asset
+*        │       └── CREATE   #5:4 Receipt:Receipt
 ```
 
 A filter matching nothing is refused rather than applied — navigating with
