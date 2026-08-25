@@ -376,7 +376,9 @@ func orDashValue(value string) string {
 // Ports prepared_artifact_summary. The "committed: no" line and the closing
 // sentence are not decoration: prepared data must never read as committed.
 func PreparedArtifactSummary(artifact map[string]any) string {
-	request, _ := artifact["request"].(map[string]any)
+	// Nested values are plain maps when `prepare` builds the artifact and
+	// Objects when `open` loads it.
+	request := asFieldMap(artifact["request"])
 	response, _ := artifact["response"].(*model.Object)
 
 	commands, _ := request["commands"].([]any)
@@ -394,12 +396,25 @@ func PreparedArtifactSummary(artifact map[string]any) string {
 		if hash := model.ObjectString(response, "preparedTransactionHash"); hash != "" {
 			lines = append(lines, "  prepared hash:"+Short(hash, 80))
 		}
+		if version := model.ObjectString(response, "hashingSchemeVersion"); version != "" {
+			lines = append(lines, "  hashing:      "+version)
+		}
 		// Presence is not enough: a null costEstimation means none was
 		// returned, and printing the line then is misleading.
 		if value, present := response.Get("costEstimation"); present && value != nil {
-			lines = append(lines, "  cost:         returned")
+			lines = append(lines, "  cost:         "+summarizeCost(value))
 		}
 	}
+	if len(commands) > 0 {
+		lines = append(lines, "", "Commands")
+		for i, command := range commands {
+			if normalized := asFieldMap(command); normalized != nil {
+				command = normalized
+			}
+			lines = append(lines, fmt.Sprintf("  [%d] %s", i, formatCommandSummary(command)))
+		}
+	}
+
 	lines = append(lines, "", "This is prepared transaction data from a non-committing prepare call.")
 	return strings.Join(lines, "\n")
 }
@@ -419,8 +434,20 @@ func joinField(obj map[string]any, key string) string {
 	if obj == nil {
 		return ""
 	}
-	values, _ := obj[key].([]string)
-	return strings.Join(values, ", ")
+	// []string when built in memory, []any when decoded from disk.
+	switch values := obj[key].(type) {
+	case []string:
+		return strings.Join(values, ", ")
+	case []any:
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			if text := fieldText(value); text != "" {
+				out = append(out, text)
+			}
+		}
+		return strings.Join(out, ", ")
+	}
+	return ""
 }
 
 // PrintSummary writes the header the visualizer opens with.
@@ -513,4 +540,36 @@ func DebugContextReport(trace *model.Trace, index *source.Index) string {
 		b.WriteString("- " + item)
 	}
 	return b.String()
+}
+
+// asFieldMap reads a nested artifact value as a plain map, whether it arrived
+// as one or as an order-preserving Object.
+func asFieldMap(value any) map[string]any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed
+	case *model.Object:
+		return typed.ToMap()
+	}
+	return nil
+}
+
+// summarizeCost renders the traffic cost Canton estimated for a prepared
+// command. The total is what a reader is deciding on; the request and response
+// halves are shown because a surprising total is usually one of the two.
+func summarizeCost(value any) string {
+	cost := asFieldMap(value)
+	if cost == nil {
+		return "returned"
+	}
+	total := fieldText(cost["totalTrafficCostEstimation"])
+	if total == "" {
+		return "returned"
+	}
+	request := fieldText(cost["confirmationRequestTrafficCostEstimation"])
+	response := fieldText(cost["confirmationResponseTrafficCostEstimation"])
+	if request == "" && response == "" {
+		return total + " traffic"
+	}
+	return fmt.Sprintf("%s traffic (request %s, response %s)", total, orDash(request), orDash(response))
 }

@@ -362,3 +362,82 @@ func TestPartyFlagsRejectAnEmptyValue(t *testing.T) {
 		})
 	}
 }
+
+// A prepared artifact is the other thing --export writes. Refusing to reopen
+// it meant a prepared command could only ever be diffed against something,
+// never looked at again -- which is most of the point of exporting it.
+func TestOpenRendersAPreparedArtifact(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, stderr, code := capture(t, func() int { return runOpen([]string{prepared}) })
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+
+	for _, want := range []string{
+		"Prepared command",
+		"committed:    no",       // labelled prepared, not committed
+		"dpm-trace-prepare-001",  // the command id
+		"create Counter:Counter", // the command itself, not just a count
+		"owner=Alice",            // and its arguments
+		"non-committing prepare call",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+func TestOpenPreparedPrintJSON(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, code := capture(t, func() int { return runOpen([]string{prepared, "--print-json"}) })
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(stdout), &decoded); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	if decoded["schema"] != "dpm-trace/prepared-artifact/v0" {
+		t.Errorf("schema = %v", decoded["schema"])
+	}
+}
+
+// A live participant returns a cost estimation and a hashing scheme version;
+// the older fixture carries neither. "cost: returned" said a field existed
+// without saying what it was.
+func TestOpenPreparedReportsCostAndHashing(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared-with-cost.json")
+	stdout, _, code := capture(t, func() int { return runOpen([]string{prepared}) })
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	for _, want := range []string{
+		"hashing:      HASHING_SCHEME_VERSION_V2",
+		"cost:         0 traffic (request 0, response 0)",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// An artifact without those fields must not grow empty lines for them.
+func TestOpenPreparedOmitsAbsentCostAndHashing(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, _ := capture(t, func() int { return runOpen([]string{prepared}) })
+	for _, absent := range []string{"hashing:", "cost:"} {
+		if strings.Contains(stdout, absent) {
+			t.Errorf("reported %q for an artifact that has none:\n%s", absent, stdout)
+		}
+	}
+}
+
+// --visualize must not be silently ignored: a prepared command has no tree, so
+// say so rather than printing the summary as though the flag were absent.
+func TestOpenPreparedExplainsWhyThereIsNoSession(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, _ := capture(t, func() int { return runOpen([]string{prepared, "--visualize"}) })
+	if !strings.Contains(stdout, "no transaction tree to step through") {
+		t.Errorf("--visualize was ignored without explanation:\n%s", stdout)
+	}
+}

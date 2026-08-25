@@ -227,3 +227,18 @@ func ObjectValue(obj *Object, key string) any {
 func ObjectInt(obj *Object, key string) *int64 {
 	return asInt(pick(obj, key))
 }
+
+// ToMap copies an Object into a plain map, one level deep. Nested values stay
+// Objects: renderers below print them in their original order, which a deep
+// copy would lose.
+func (o *Object) ToMap() map[string]any {
+	if o == nil {
+		return nil
+	}
+	out := make(map[string]any, o.Len())
+	for _, key := range o.Keys() {
+		value, _ := o.Get(key)
+		out[key] = value
+	}
+	return out
+}
