@@ -74,8 +74,8 @@ func Install(w io.Writer, opts Options) error {
 	}
 	if sdkVersion == "" {
 		return fmt.Errorf(
-			"could not find an installed SDK manifest under %s; pass --sdk-version (e.g. 3.4.11)",
-			filepath.Join(home, "cache", "sdk", "open-source"))
+			"no Daml SDK is installed in %s\nInstall one first (e.g. `dpm install 3.4.11`), then run install-plugin again.\nThe binary also works standalone as ./dpm-trace, with no registration.",
+			home)
 	}
 
 	manifest := filepath.Join(home, "cache", "sdk", "open-source", sdkVersion+".yaml")

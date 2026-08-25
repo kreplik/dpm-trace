@@ -13,7 +13,9 @@ dpm trace open examples/archive.trace.json
 ```
 
 The Daml package that produced them is in [`asset/`](asset), and the steps below
-rebuild them from it — nothing outside this repository is required.
+rebuild them from it — nothing outside this repository is required, though
+reproducing them needs a Java runtime, a Canton jar, and a Daml SDK to build the
+DAR. Opening the committed artifacts above needs none of that.
 
 ## The three shapes
 
