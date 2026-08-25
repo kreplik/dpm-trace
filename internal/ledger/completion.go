@@ -90,8 +90,12 @@ func (c *Client) FetchCompletion(lookup CompletionLookup) (*model.Completion, er
 
 	// Single quotes, matching Python's !r formatting of the command id.
 	return nil, fmt.Errorf(
-		"completion '%s' not found in the queried completion window; "+
-			"try --begin-exclusive with an earlier offset or --completion-file with captured JSON",
+		"no completion for command '%s'.\n"+
+			"A command rejected during interpretation never reaches the ledger, so it has no "+
+			"completion to look up; capture the rejection with `submit --allow-fail --print-json` "+
+			"and read it with --completion-file.\n"+
+			"If the command was sequenced, it may be outside the queried window: widen it with "+
+			"--begin-exclusive or --completion-limit",
 		lookup.CommandID)
 }
 

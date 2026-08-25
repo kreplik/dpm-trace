@@ -21,7 +21,10 @@ func LoadPreparedArtifact(path string) (*Object, error) {
 		return nil, fmt.Errorf("prepared artifact must be a JSON object: %s", path)
 	}
 	if schema := pickString(artifact, "schema"); schema != PreparedArtifactSchema {
-		return nil, fmt.Errorf("unsupported prepared artifact schema in %s: %s", path, quoteOrNone(schema))
+		if schema == "" {
+			return nil, fmt.Errorf("%s has no schema field, so it is not a prepared artifact", path)
+		}
+		return nil, fmt.Errorf("unsupported prepared artifact schema in %s: '%s'", path, schema)
 	}
 	return artifact, nil
 }

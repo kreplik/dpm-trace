@@ -446,3 +446,32 @@ func TestOpenPreparedExplainsWhyThereIsNoSession(t *testing.T) {
 		t.Errorf("--visualize was ignored without explanation:\n%s", stdout)
 	}
 }
+
+func TestOpenPointsAtCompletionFile(t *testing.T) {
+	for _, artifact := range []string{
+		repoPath("tests", "fixtures", "compare", "completion-fail.json"),
+		repoPath("tests", "fixtures", "compare", "completion-ok.json"),
+	} {
+		_, stderr, code := capture(t, func() int { return runOpen([]string{artifact}) })
+		if code == 0 {
+			t.Errorf("%s: open accepted completion data", artifact)
+		}
+		if !strings.Contains(stderr, "--completion-file") {
+			t.Errorf("%s: error does not name the right flag: %s", artifact, stderr)
+		}
+	}
+}
+
+func TestOpenRejectsAFileWithNoSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "plain.json")
+	if err := os.WriteFile(path, []byte(`{"hello": "world"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, code := capture(t, func() int { return runOpen([]string{path}) })
+	if code == 0 {
+		t.Error("open accepted a file with no schema")
+	}
+	if !strings.Contains(stderr, "no schema field") || strings.Contains(stderr, "None") {
+		t.Errorf("unhelpful error: %s", stderr)
+	}
+}
