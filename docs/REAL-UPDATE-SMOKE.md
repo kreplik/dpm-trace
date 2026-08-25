@@ -1,22 +1,24 @@
 # Real Update Smoke Test
 
 Checklist for exercising `dpm trace` against a real local Canton participant.
-Replace `<path-to-canton.jar>` with a path from your workspace; do not commit
-concrete local values.
+Do not commit concrete local values from your workspace.
 
 ## Prerequisites
 
-- A Java runtime and a Canton jar as `<path-to-canton.jar>`. A DPM install has
-  one under `~/.dpm/cache/components/canton-open-source/<version>/lib/`.
-- A Daml toolchain, to build the example DAR.
+- DPM, which brings both the Canton jar and the Daml toolchain. Install it with
+  `curl https://get.digitalasset.com/install/install.sh | sh`, then
+  `dpm install 3.4.11`.
+- A Java runtime, to run Canton.
 
 ## Boot
 
 ```bash
-(cd examples/asset && daml build)
+(cd examples/asset && dpm build)
+
+CANTON=$(ls ~/.dpm/cache/components/canton-open-source/*/lib/canton-open-source-*.jar | sort -V | tail -1)
 
 java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
-  -jar <path-to-canton.jar> daemon \
+  -jar "$CANTON" daemon \
   -c examples/devnet-trace.conf \
   --bootstrap examples/devnet-trace.bootstrap.canton --no-tty
 ```

@@ -35,16 +35,22 @@ Optionally, register it as a DPM component so it runs as `dpm trace`:
 dpm trace --help
 ```
 
-This needs [DPM](https://docs.digitalasset.com/build/3.4/dpm/dpm.html) with a
-Daml SDK already installed — `install-plugin` writes into that SDK's manifest.
-If you have none, `dpm install 3.4.11` first, or skip this step and use the
-binary directly.
+Registration requires DPM with a Daml SDK installed. If you have neither:
+
+```bash
+curl https://get.digitalasset.com/install/install.sh | sh   # installs dpm
+dpm install 3.4.11                                          # installs an SDK
+```
+
+Otherwise keep using `./dpm-trace`; it is the same binary.
 
 ## Usage
 
-An update id identifies a committed transaction on a participant. Canton returns
-one from each successful submission, in the format
-`1220e77482b473bfff30d376bd853f0a71df7ab6d41cc3f060dc5456603493acd06c`.
+An update id identifies a committed transaction on a participant, in the format
+`1220e77482b473bfff30d376bd853f0a71df7ab6d41cc3f060dc5456603493acd06c`. Canton
+returns one from each successful submission, so if you have no ledger yet, start
+with the [examples](#examples) below — they need no update id and no
+participant.
 
 Against a local participant:
 
