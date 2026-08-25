@@ -1,0 +1,56 @@
+{
+  "committed": false,
+  "createdAt": "2026-06-25T09:28:57.462919Z",
+  "kind": "prepared-command",
+  "participant": {
+    "actAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "ledgerUrl": "http://127.0.0.1:6113",
+    "readAs": []
+  },
+  "privacy": {
+    "missingPrivateDataPolicy": "counterparty-private data outside this authorization context is not present in the artifact",
+    "scope": "Prepared command result from an authorized participant endpoint."
+  },
+  "request": {
+    "actAs": [
+      "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
+    ],
+    "commandId": "dpm-trace-prepare-live-001",
+    "commands": [
+      {
+        "CreateCommand": {
+          "createArguments": {
+            "issuer": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+            "name": "GOLD",
+            "owner": "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+            "quantity": "100"
+          },
+          "templateId": "#asset-tests:Asset:Asset"
+        }
+      }
+    ],
+    "disclosedContracts": [],
+    "packageIdSelectionPreference": [],
+    "readAs": [],
+    "synchronizerId": "",
+    "userId": "participant_admin",
+    "verboseHashing": true
+  },
+  "response": {
+    "costEstimation": {
+      "confirmationRequestTrafficCostEstimation": 0,
+      "confirmationResponseTrafficCostEstimation": 0,
+      "estimationTimestamp": "2026-08-24T15:03:58.645976Z",
+      "totalTrafficCostEstimation": 0
+    },
+    "hashingDetails": "Verbose hashing is disabled on this participant. Contact the node administrator for more details.",
+    "hashingSchemeVersion": "HASHING_SCHEME_VERSION_V2",
+    "preparedTransaction": "<base64 protobuf, elided>",
+    "preparedTransactionHash": "OVuZik+aByS1/6xTLn71rrjn484BQYQ7Wu9DwxFGeVc="
+  },
+  "schema": "dpm-trace/prepared-artifact/v0",
+  "source": "ledger-json-api",
+  "sourceUrl": "http://127.0.0.1:6113/v2/interactive-submission/prepare"
+}

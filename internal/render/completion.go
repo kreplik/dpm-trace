@@ -362,7 +362,7 @@ func formatCommandSummary(command any) string {
 
 func commandBody(obj map[string]any, keys ...string) (map[string]any, bool) {
 	for _, key := range keys {
-		if body, ok := obj[key].(map[string]any); ok {
+		if body := asFieldMap(obj[key]); body != nil {
 			return body, true
 		}
 	}
