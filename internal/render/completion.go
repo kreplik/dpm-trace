@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -25,13 +26,20 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *sourc
 	if commandID == "" && hasLookup {
 		commandID = model.ObjectString(lookup, "commandId")
 	}
+	if commandID == "" {
+		commandID = commandFieldFromContext(c, "commandId")
+	}
+	submissionID := c.String("submissionId", "submission_id")
+	if submissionID == "" {
+		submissionID = commandFieldFromContext(c, "submissionId")
+	}
 
 	fmt.Fprintln(w, color.Apply("DPM trace completion", "bold"))
 	fmt.Fprintf(w, "  result:     %s\n", completionResult(committed, failed, color))
 	fmt.Fprintf(w, "  command id: %s\n", orDash(commandID))
-	fmt.Fprintf(w, "  submission: %s\n", orDash(c.String("submissionId", "submission_id")))
+	fmt.Fprintf(w, "  submission: %s\n", orDash(submissionID))
 	fmt.Fprintf(w, "  update id:  %s\n", Short(orDashValue(updateID), 80))
-	fmt.Fprintf(w, "  offset:     %s\n", orDash(scalarText(c.Get("offset"))))
+	fmt.Fprintf(w, "  offset:     %s\n", orDash(scalarText(c.Get("offset", "completionOffset"))))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(statusCode))
 	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(message)))
 	// `if lookup:` is falsy for an empty object, so {} suppresses both lines
@@ -43,6 +51,7 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *sourc
 	if !committed {
 		fmt.Fprintln(w, "  trace:      no committed transaction tree is available for this completion")
 	}
+	writeErrorDetails(w, c, color)
 	locations, capped := CompletionSourceDiagnostics(c, index, maxSourceLocations)
 	PrintSourceDiagnostics(w, locations, capped, index, color)
 	printLogMatches(w, c.Get("logMatches"), color)
@@ -73,7 +82,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 
 		fmt.Fprintf(w, "  A  command %s   (prepared)\n", Short(orDashValue(c.Left.CommandID), 20))
 		completionID := Short(orDashValue(completion.String("commandId", "command_id")), 20)
-		offset := orDashFalsy(completion.Get("offset"))
+		offset := orDashFalsy(completion.Get("offset", "completionOffset"))
 		if committed {
 			updateID := Short(completion.String("updateId", "update_id"), 12)
 			fmt.Fprintf(w, "  B  completion %s   update %s   offset %s\n", completionID, updateID, offset)
@@ -117,7 +126,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	fmt.Fprintf(w, "  command id: %s%s\n", orDash(completion.String("commandId", "command_id")), marker)
 	fmt.Fprintf(w, "  submission: %s\n", orDash(completion.String("submissionId", "submission_id")))
 	fmt.Fprintf(w, "  update id:  %s\n", Short(orDashValue(completion.String("updateId", "update_id")), 80))
-	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset")))
+	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset", "completionOffset")))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(c.StatusCode))
 	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(c.Message)))
 
@@ -245,7 +254,7 @@ func SubmitFailure(w io.Writer, c *model.Completion, request map[string]any, col
 	if commandID == "" {
 		commandID = "-"
 	}
-	offset := orDash(scalarText(c.Get("offset")))
+	offset := orDash(scalarText(c.Get("offset", "completionOffset")))
 
 	statusText := scalarText(statusCode)
 	if statusText == "" {
@@ -456,4 +465,125 @@ func EntityFromRequest(request map[string]any) (kind, name string) {
 		}
 	}
 	return "", ""
+}
+
+// commandFieldFromContext reads a field out of the submitted-commands text a
+// rejection carries in its error context, where the ids are recorded rather
+// than at the top level.
+func commandFieldFromContext(c *model.Completion, field string) string {
+	context, ok := model.ObjectField(c.Raw, "context")
+	if !ok {
+		return ""
+	}
+	pattern, err := regexp.Compile(regexp.QuoteMeta(field) + `:\s*'?([^,}']+)`)
+	if err != nil {
+		return ""
+	}
+	match := pattern.FindStringSubmatch(model.ObjectString(context, "commands"))
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
+}
+
+// contextString reads a field the participant records alongside the error.
+// Context keys are snake_case where the top level is camelCase.
+func contextString(c *model.Completion, key string) string {
+	context, ok := model.ObjectField(c.Raw, "context")
+	if !ok {
+		return ""
+	}
+	return strings.Trim(model.ObjectString(context, key), "'")
+}
+
+// writeErrorDetails prints what a rejection says beyond its message: whether
+// retrying can help, whether the answer is final, and the ids that correlate
+// it with participant logs.
+func writeErrorDetails(w io.Writer, c *model.Completion, color Color) {
+	if category := scalarText(c.Get("errorCategory")); category != "" {
+		line := category
+		if grpc := scalarText(c.Get("grpcCodeValue")); grpc != "" {
+			line += " (gRPC " + grpc + ")"
+		}
+		fmt.Fprintf(w, "  category:   %s\n", line)
+	}
+	if errorID := contextString(c, "error_id"); errorID != "" {
+		fmt.Fprintf(w, "  error id:   %s\n", errorID)
+	}
+	definite := scalarText(c.Get("definiteAnswer"))
+	if definite == "" {
+		definite = contextString(c, "definite_answer")
+	}
+	if definite != "" {
+		fmt.Fprintf(w, "  definite:   %s\n", definite)
+	}
+	if participant := contextString(c, "participant"); participant != "" {
+		fmt.Fprintf(w, "  %-12s%s\n", "rejected:", participant)
+	}
+	if retry := c.Get("retryInfo"); retry != nil {
+		fmt.Fprintf(w, "  retry:      %s\n", scalarText(retry))
+	}
+	if resources := resourceSummary(c.Get("resources")); resources != "" {
+		fmt.Fprintf(w, "  resources:  %s\n", resources)
+	}
+	for _, field := range []struct{ label, key string }{
+		{"trace id:", "traceId"},
+		{"corr id:", "correlationId"},
+	} {
+		if value := scalarText(c.Get(field.key)); value != "" {
+			fmt.Fprintf(w, "  %-12s%s\n", field.label, value)
+		}
+	}
+
+	// The exercise trace names the choice and contract the failure happened
+	// in, which the message alone does not.
+	if trace := contextString(c, "exercise_trace"); trace != "" {
+		fmt.Fprintln(w, "  "+color.Apply("exercised:", "cyan"))
+		for _, line := range strings.Split(strings.TrimRight(trace, "\n"), "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				fmt.Fprintf(w, "    %s\n", line)
+			}
+		}
+	}
+}
+
+// resourceSummary names what a rejection was about -- the contract or party the
+// participant identified -- rather than printing the raw list.
+func resourceSummary(value any) string {
+	items, ok := value.([]any)
+	if !ok || len(items) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		kind, id := "", ""
+		switch typed := item.(type) {
+		case []any:
+			// A participant reports resources as [type, id] pairs, with the
+			// type wrapped as ErrorResource(CONTRACT_ID).
+			if len(typed) > 0 {
+				kind = strings.TrimSuffix(strings.TrimPrefix(fieldText(typed[0]), "ErrorResource("), ")")
+			}
+			if len(typed) > 1 {
+				id = fieldText(typed[1])
+			}
+		default:
+			obj := asFieldMap(item)
+			if obj == nil {
+				parts = append(parts, scalarText(item))
+				continue
+			}
+			kind = fieldText(obj["resourceType"])
+			id = fieldText(obj["resourceId"])
+		}
+		switch {
+		case kind != "" && id != "":
+			parts = append(parts, kind+" "+Short(id, 40))
+		case id != "":
+			parts = append(parts, Short(id, 40))
+		case kind != "":
+			parts = append(parts, kind)
+		}
+	}
+	return strings.Join(parts, ", ")
 }

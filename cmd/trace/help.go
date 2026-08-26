@@ -53,7 +53,10 @@ func commandRows(commands []commandDoc) [][2]string {
 
 // rootHelp documents the whole tool.
 var listedCommands = []commandDoc{
-	{"open", "Reopen an exported trace artifact."},
+	{"open", "Reopen an exported trace or prepared artifact."},
+	{"compare", "Compare prepared transactions, updates, or completions."},
+	{"prepare", "Prepare a command without committing it."},
+	{"submit", "Submit a command and print the resulting update id."},
 	{"install-plugin", "Register this binary as a DPM component."},
 }
 
@@ -62,6 +65,8 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  dpm trace <update-id> [flags]")
+	fmt.Fprintln(w, "  dpm trace --command-id <id> [flags]")
+	fmt.Fprintln(w, "  dpm trace --completion-file <file> [flags]")
 	fmt.Fprintln(w, "  dpm trace <command> [flags]")
 
 	writeSection(w, "Commands", commandRows(listedCommands))
@@ -71,15 +76,17 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "\nExamples:")
 	for _, example := range []string{
 		"dpm trace <update-id> --submitter http://localhost:7575 --read-as '<party>'",
-		"dpm trace open trace.json",
 		"dpm trace open trace.json --visualize",
+		"dpm trace --completion-file completion.json --daml-yaml ./daml.yaml",
+		"dpm trace compare --prepared prepared.json --update <update-id>",
 		"dpm trace <update-id> --export trace.json",
 	} {
 		fmt.Fprintf(w, "  %s\n", example)
 	}
 
 	fmt.Fprintln(w, "\nOutput is participant-scoped: it is one participant's projection, not a")
-	fmt.Fprintln(w, "global Canton transaction.")
+	fmt.Fprintln(w, "global Canton transaction. A failed submission has no update id, so those")
+	fmt.Fprintln(w, "workflows use completion data instead.")
 }
 
 var traceFlags = []flagDoc{
