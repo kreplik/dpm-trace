@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -473,5 +476,42 @@ func TestOpenRejectsAFileWithNoSchema(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "no schema field") || strings.Contains(stderr, "None") {
 		t.Errorf("unhelpful error: %s", stderr)
+	}
+}
+
+// submit parsed --export but only prepare ever used it, so the flag was
+// advertised in --help and silently ignored. The rejection path is the one
+// that matters: --completion-file reads the file back.
+func TestSubmitExportWritesTheResponse(t *testing.T) {
+	var body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, body)
+	}))
+	defer server.Close()
+	body = `{"code":"DAML_FAILURE","cause":"boom","errorCategory":9}`
+
+	export := filepath.Join(t.TempDir(), "rejection.json")
+	_, _, code := capture(t, func() int {
+		return runSubmit([]string{
+			"--submitter", server.URL, "--act-as", "Alice::1220aa",
+			"--template", "pkg:M:T", "--arg", "x=1",
+			"--allow-fail", "--export", export,
+		})
+	})
+	if code != 0 {
+		t.Fatalf("--allow-fail did not exit 0: %d", code)
+	}
+
+	written, err := os.ReadFile(export)
+	if err != nil {
+		t.Fatalf("--export wrote nothing: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(written, &decoded); err != nil {
+		t.Fatalf("exported file is not JSON: %v", err)
+	}
+	if decoded["code"] != "DAML_FAILURE" {
+		t.Errorf("exported %v, want the rejection body", decoded)
 	}
 }
