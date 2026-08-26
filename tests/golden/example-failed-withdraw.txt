@@ -3,13 +3,22 @@ $ dpm trace --completion-file examples/failed-withdraw.completion.json --daml-ya
 --- stdout:
 DPM trace completion
   result:     completion failed
-  command id: -
-  submission: -
+  command id: dpm-trace-<id>
+  submission: 2edc7ce7-6e00-4e09-84fe-b3f6926d262d
   update id:  -
   offset:     -
   status:     DAML_FAILURE
   message:    Interpretation error: Error: User failure: UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed (error category 9): Insufficient balance
   trace:      no committed transaction tree is available for this completion
+  category:   9 (gRPC 9)
+  error id:   UNHANDLED_EXCEPTION/DA.Exception.AssertionFailed:AssertionFailed
+  definite:   false
+  rejected:   participant1
+  trace id:   3051d9f0355445a8fa7b910f3ebecc7f
+  corr id:    2edc7ce7-6e00-4e09-84fe-b3f6926d262d
+  exercised:
+    in choice b9e9e043:Asset:Asset:Withdraw on contract 0059f0a55b (#0)
+    in exercise command b9e9e043:Asset:Asset:Withdraw on contract 0059f0a55b.
 
 Source diagnostics
   <root>/examples/asset/daml/Asset.daml:54:20

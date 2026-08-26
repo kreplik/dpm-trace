@@ -143,7 +143,7 @@ func (c *CompletionComparison) JSON() map[string]any {
 		"right": map[string]any{
 			"commandId":        nilIfBlank(c.Completion.String("commandId", "command_id")),
 			"updateId":         nilIfBlank(c.Completion.String("updateId", "update_id")),
-			"offset":           c.Completion.Get("offset"),
+			"offset":           c.Completion.Get("offset", "completionOffset"),
 			"submissionId":     nilIfBlank(c.Completion.String("submissionId", "submission_id")),
 			"statusCode":       c.StatusCode,
 			"message":          c.Message,
