@@ -68,6 +68,9 @@ func runSubmit(args []string) int {
 	}
 
 	if !ok {
+		if code := writeSubmitExport(opts.export, response); code != 0 {
+			return code
+		}
 		if opts.printJSON {
 			encoded, encodeErr := model.Encode(response)
 			if encodeErr != nil {
@@ -110,6 +113,9 @@ func runSubmit(args []string) int {
 		return 1
 	}
 
+	if code := writeSubmitExport(opts.export, response); code != 0 {
+		return code
+	}
 	if opts.printJSON {
 		encoded, err := model.Encode(response)
 		if err != nil {
@@ -132,5 +138,25 @@ func runSubmit(args []string) int {
 		return 1
 	}
 	fmt.Println(updateID)
+	return 0
+}
+
+// writeSubmitExport saves the participant's response. A rejection is the case
+// that matters: --completion-file reads the file back, and without this the
+// only way to keep one was to redirect --print-json.
+func writeSubmitExport(path string, response *model.Object) int {
+	if path == "" {
+		return 0
+	}
+	encoded, err := model.Encode(response)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stderr, "wrote %s\n", path)
 	return 0
 }
