@@ -3,7 +3,6 @@ package render
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -27,12 +26,9 @@ func CompletionTrace(w io.Writer, c *model.Completion, color Color, index *sourc
 		commandID = model.ObjectString(lookup, "commandId")
 	}
 	if commandID == "" {
-		commandID = commandFieldFromContext(c, "commandId")
+		commandID = c.CommandID()
 	}
-	submissionID := c.String("submissionId", "submission_id")
-	if submissionID == "" {
-		submissionID = commandFieldFromContext(c, "submissionId")
-	}
+	submissionID := c.SubmissionID()
 
 	fmt.Fprintln(w, color.Apply("DPM trace completion", "bold"))
 	fmt.Fprintf(w, "  result:     %s\n", completionResult(committed, failed, color))
@@ -123,8 +119,8 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	if c.CommandIDMatch {
 		marker = " " + color.Apply("match", "green")
 	}
-	fmt.Fprintf(w, "  command id: %s%s\n", orDash(completion.String("commandId", "command_id")), marker)
-	fmt.Fprintf(w, "  submission: %s\n", orDash(completion.String("submissionId", "submission_id")))
+	fmt.Fprintf(w, "  command id: %s%s\n", orDash(completion.CommandID()), marker)
+	fmt.Fprintf(w, "  submission: %s\n", orDash(completion.SubmissionID()))
 	fmt.Fprintf(w, "  update id:  %s\n", Short(orDashValue(completion.String("updateId", "update_id")), 80))
 	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset", "completionOffset")))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(c.StatusCode))
@@ -465,25 +461,6 @@ func EntityFromRequest(request map[string]any) (kind, name string) {
 		}
 	}
 	return "", ""
-}
-
-// commandFieldFromContext reads a field out of the submitted-commands text a
-// rejection carries in its error context, where the ids are recorded rather
-// than at the top level.
-func commandFieldFromContext(c *model.Completion, field string) string {
-	context, ok := model.ObjectField(c.Raw, "context")
-	if !ok {
-		return ""
-	}
-	pattern, err := regexp.Compile(regexp.QuoteMeta(field) + `:\s*'?([^,}']+)`)
-	if err != nil {
-		return ""
-	}
-	match := pattern.FindStringSubmatch(model.ObjectString(context, "commands"))
-	if len(match) < 2 {
-		return ""
-	}
-	return strings.TrimSpace(match[1])
 }
 
 // contextString reads a field the participant records alongside the error.

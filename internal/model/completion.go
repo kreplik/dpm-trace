@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -51,6 +52,47 @@ func NormalizeCompletion(raw *Object) *Object {
 		return NewObject()
 	}
 	return completion
+}
+
+// CommandID returns the submitted command id.
+//
+// A rejection -- the shape a failed submission actually arrives in -- carries
+// no top-level commandId: the participant records the submission under
+// `context.commands`, formatted rather than structured. Reading only the top
+// level reported no command id for exactly the submissions this tool exists to
+// explain, and left a prepared/completion comparison unable to say the two
+// were the same command.
+func (c *Completion) CommandID() string {
+	if id := c.String("commandId", "command_id"); id != "" {
+		return id
+	}
+	return commandFieldFromContext(c.Raw, "commandId")
+}
+
+// SubmissionID returns the submission id, with the same fallback.
+func (c *Completion) SubmissionID() string {
+	if id := c.String("submissionId", "submission_id"); id != "" {
+		return id
+	}
+	return commandFieldFromContext(c.Raw, "submissionId")
+}
+
+// commandFieldFromContext reads one field out of the formatted
+// `context.commands` blob a rejection carries.
+func commandFieldFromContext(raw *Object, field string) string {
+	context, ok := ObjectField(raw, "context")
+	if !ok {
+		return ""
+	}
+	pattern, err := regexp.Compile(regexp.QuoteMeta(field) + `:\s*'?([^,}']+)`)
+	if err != nil {
+		return ""
+	}
+	match := pattern.FindStringSubmatch(ObjectString(context, "commands"))
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
 }
 
 // Get exposes a field of the underlying completion object.
@@ -118,7 +160,7 @@ func ComparePreparedToCompletion(prepared *Object, completion *Completion) *Comp
 	code, message := completion.StatusFields()
 	request, _ := pickObject(prepared, "request")
 	preparedID := pickString(request, "commandId")
-	completionID := completion.String("commandId", "command_id")
+	completionID := completion.CommandID()
 
 	return &CompletionComparison{
 		Kind:                     KindPreparedVsCompletion,
@@ -141,10 +183,10 @@ func (c *CompletionComparison) JSON() map[string]any {
 		"kind": c.Kind,
 		"left": c.Left.json(),
 		"right": map[string]any{
-			"commandId":        nilIfBlank(c.Completion.String("commandId", "command_id")),
+			"commandId":        nilIfBlank(c.Completion.CommandID()),
 			"updateId":         nilIfBlank(c.Completion.String("updateId", "update_id")),
 			"offset":           c.Completion.Get("offset", "completionOffset"),
-			"submissionId":     nilIfBlank(c.Completion.String("submissionId", "submission_id")),
+			"submissionId":     nilIfBlank(c.Completion.SubmissionID()),
 			"statusCode":       c.StatusCode,
 			"message":          c.Message,
 			"source":           c.Completion.Get("source"),
@@ -227,6 +269,10 @@ func CorrelationTerms(completion *Object) map[string]bool {
 		"submissionId", "submission_id", "traceId", "correlationId"} {
 		add(pick(completion, key))
 	}
+	// A rejection keeps these inside context.commands, and the command id is
+	// the term an operator greps a participant log for.
+	add(commandFieldFromContext(completion, "commandId"))
+	add(commandFieldFromContext(completion, "submissionId"))
 	if status, ok := pickObject(completion, "status"); ok {
 		add(pick(status, "traceId"))
 		add(pick(status, "correlationId"))

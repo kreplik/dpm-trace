@@ -175,3 +175,57 @@ func TestCompletionOmitsAbsentErrorDetails(t *testing.T) {
 		}
 	}
 }
+
+// A rejection -- what a failed submission actually returns -- records the
+// submission under context.commands rather than at the top level. Reading only
+// the top level left a prepared/completion comparison unable to say the two
+// were the same command, which is the one link the comparison exists to make.
+func TestCompletionReadsIDsFromARejectionContext(t *testing.T) {
+	raw := `{
+		"code": "DAML_FAILURE",
+		"cause": "Interpretation error",
+		"context": {
+			"commands": "{actAs: ['Alice'], commandId: 'cmd-42', submissionId: 'sub-7', userId: 'admin'}"
+		}
+	}`
+	obj, err := model.Decode([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &model.Completion{Raw: model.NormalizeCompletion(obj)}
+
+	if got := c.CommandID(); got != "cmd-42" {
+		t.Errorf("CommandID = %q, want cmd-42", got)
+	}
+	if got := c.SubmissionID(); got != "sub-7" {
+		t.Errorf("SubmissionID = %q, want sub-7", got)
+	}
+
+	// A top-level id still wins: the context blob is the fallback, not the
+	// source of truth.
+	obj.Set("commandId", "cmd-top")
+	c = &model.Completion{Raw: model.NormalizeCompletion(obj)}
+	if got := c.CommandID(); got != "cmd-top" {
+		t.Errorf("CommandID = %q, want the top-level cmd-top", got)
+	}
+}
+
+// The comparison must report a match when the prepared command and the
+// rejection carry the same id.
+func TestComparePreparedToRejectionMatchesTheCommandID(t *testing.T) {
+	prepared, err := model.Decode([]byte(`{"request": {"commandId": "cmd-42"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := model.Decode([]byte(`{
+		"code": "DAML_FAILURE",
+		"context": {"commands": "{commandId: 'cmd-42'}"}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := model.ComparePreparedToCompletion(prepared, &model.Completion{Raw: model.NormalizeCompletion(obj)})
+	if !c.CommandIDMatch {
+		t.Error("identical command ids were not reported as a match")
+	}
+}
