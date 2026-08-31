@@ -84,3 +84,56 @@ func TestStateDiffWithNoChangesSaysSo(t *testing.T) {
 		t.Errorf("empty diff = %q", buf.String())
 	}
 }
+
+// A contract created and consumed by the same transaction leaves nothing
+// behind, but appears on both sides of the diff. Unmarked, it reads as two
+// unrelated contracts that a reader has to pair by eye.
+func TestStateDiffMarksTransientContracts(t *testing.T) {
+	created := []StateChange{{EventID: "#5:3", ContractID: "00aa", Template: "pkg:Asset:Asset"}}
+	archived := []StateChange{
+		{EventID: "#5:5", ContractID: "00aa", Template: "pkg:Asset:Asset"},
+		{EventID: "#5:1", ContractID: "00bb", Template: "pkg:Asset:Asset"},
+	}
+
+	transient := transientContracts(created, archived)
+	if len(transient) != 1 || !transient["00aa"] {
+		t.Fatalf("transient = %v, want just 00aa", transient)
+	}
+	if transient["00bb"] {
+		t.Error("a contract archived but not created was called transient")
+	}
+}
+
+// The id column is built to be scanned, so it has to fit the ids it holds:
+// real Canton ids are "#<txid>:<n>", not four characters.
+func TestStateDiffIDColumnFitsTheWidestID(t *testing.T) {
+	width := eventIDWidth(
+		[]StateChange{{EventID: "#5:3"}},
+		[]StateChange{{EventID: "#123:10"}},
+	)
+	if width != len("#123:10") {
+		t.Errorf("width = %d, want %d", width, len("#123:10"))
+	}
+}
+
+// An archived contract normally has no payload -- a consuming exercise names
+// what it destroyed, not its fields. A transient is the exception: this same
+// transaction created it, so the fields are already in the trace.
+func TestArchivedTransientKeepsItsPayload(t *testing.T) {
+	created := []StateChange{{EventID: "#5:3", ContractID: "00aa", Payload: "fields"}}
+	archived := []StateChange{
+		{EventID: "#5:5", ContractID: "00aa"},
+		{EventID: "#5:1", ContractID: "00bb"},
+	}
+
+	filled := withKnownPayloads(archived, created)
+	if filled[0].Payload != "fields" {
+		t.Errorf("transient payload = %v, want it filled from the create", filled[0].Payload)
+	}
+	if filled[1].Payload != nil {
+		t.Errorf("a contract this transaction did not create gained a payload: %v", filled[1].Payload)
+	}
+	if archived[0].Payload != nil {
+		t.Error("the caller's slice was mutated")
+	}
+}

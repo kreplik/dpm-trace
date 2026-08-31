@@ -58,10 +58,16 @@ func (s *Stepper) ShowStateDiff() {
 	created, archived := StateDiff(s.Trace, s.Order)
 	ctx := render.NewContext(s.Trace)
 
-	fmt.Fprintf(s.out, "%s %s\n",
-		s.Color.Apply("state diff:", "cyan"),
-		fmt.Sprintf("%s created, %s archived",
-			plural(len(created), "contract"), plural(len(archived), "contract")))
+	// A contract created and archived by the same transaction leaves nothing
+	// behind. It appears on both sides, which reads as two unrelated contracts
+	// until the reader pairs the ids by eye.
+	transient := transientContracts(created, archived)
+	summary := fmt.Sprintf("%s created, %s archived",
+		plural(len(created), "contract"), plural(len(archived), "contract"))
+	if len(transient) > 0 {
+		summary += fmt.Sprintf(" (%s transient)", plural(len(transient), "contract"))
+	}
+	fmt.Fprintf(s.out, "%s %s\n", s.Color.Apply("state diff:", "cyan"), summary)
 
 	if len(created) == 0 && len(archived) == 0 {
 		// A reassignment-only update changes no contract on this participant.
@@ -70,13 +76,17 @@ func (s *Stepper) ShowStateDiff() {
 		return
 	}
 
-	s.writeChanges("+ created", created, "green", ctx)
+	width := eventIDWidth(created, archived)
+	s.writeChanges("+ created", created, "green", ctx, width, transient)
 	// The archived entries carry no payload: a consuming exercise names the
 	// contract it destroyed, not its fields, and a transaction tree does not
 	// contain them. So the reader sees that a contract died, not what it was.
 	// Recovering it needs the contract state from somewhere else -- an ACS
 	// fetch -- which is not something this artifact has.
-	s.writeChanges("x archived", archived, "red", ctx)
+	//
+	// A transient is the exception: this transaction created it, so its fields
+	// are in the trace already.
+	s.writeChanges("x archived", withKnownPayloads(archived, created), "red", ctx, width, transient)
 
 	// The projection caveat matters more here than anywhere else: a reader
 	// looking at "what this transaction did to the ledger" is exactly the
@@ -102,7 +112,57 @@ func (s *Stepper) projectionCaveat() string {
 		strings.Join(names, " and "))
 }
 
-func (s *Stepper) writeChanges(heading string, changes []StateChange, color string, ctx *render.Context) {
+// transientContracts returns the contract ids that appear on both sides.
+func transientContracts(created, archived []StateChange) map[string]bool {
+	archivedIDs := make(map[string]bool, len(archived))
+	for _, change := range archived {
+		if change.ContractID != "" {
+			archivedIDs[change.ContractID] = true
+		}
+	}
+	transient := map[string]bool{}
+	for _, change := range created {
+		if archivedIDs[change.ContractID] {
+			transient[change.ContractID] = true
+		}
+	}
+	return transient
+}
+
+// withKnownPayloads fills in the payload of an archived contract this same
+// transaction created, leaving the rest untouched.
+func withKnownPayloads(archived, created []StateChange) []StateChange {
+	payloads := make(map[string]any, len(created))
+	for _, change := range created {
+		if change.ContractID != "" && change.Payload != nil {
+			payloads[change.ContractID] = change.Payload
+		}
+	}
+	filled := make([]StateChange, len(archived))
+	copy(filled, archived)
+	for i := range filled {
+		if filled[i].Payload == nil {
+			filled[i].Payload = payloads[filled[i].ContractID]
+		}
+	}
+	return filled
+}
+
+// eventIDWidth sizes the id column to the widest id on either side. Canton ids
+// are "#<txid>:<n>", so a fixed width misaligns the column built to be scanned.
+func eventIDWidth(sides ...[]StateChange) int {
+	width := 0
+	for _, changes := range sides {
+		for _, change := range changes {
+			if len(change.EventID) > width {
+				width = len(change.EventID)
+			}
+		}
+	}
+	return width
+}
+
+func (s *Stepper) writeChanges(heading string, changes []StateChange, color string, ctx *render.Context, width int, transient map[string]bool) {
 	if len(changes) == 0 {
 		return
 	}
@@ -112,19 +172,21 @@ func (s *Stepper) writeChanges(heading string, changes []StateChange, color stri
 		if template == "" {
 			template = "<unknown>"
 		}
-		fmt.Fprintf(s.out, "    %s %s %s\n",
-			s.Color.Apply(fmt.Sprintf("%-4s", change.EventID), "gray"),
+		marker := ""
+		if transient[change.ContractID] {
+			marker = s.Color.Apply("  ~ transient", "yellow")
+		}
+		fmt.Fprintf(s.out, "    %s %s %s%s\n",
+			s.Color.Apply(fmt.Sprintf("%-*s", width, change.EventID), "gray"),
 			template,
-			s.Color.Apply(render.Short(change.ContractID, 40), "gray"))
+			s.Color.Apply(render.Short(change.ContractID, 40), "gray"),
+			marker)
 
 		// The payload is what distinguishes two contracts of one template --
 		// which of the two Split outputs is the 40 and which the 60.
 		if change.Payload != nil {
-			line := strings.TrimSpace(render.RenderPrettyValue(change.Payload, ctx))
-			if first, _, cut := strings.Cut(line, "\n"); cut {
-				line = first + " ..."
-			}
-			fmt.Fprintf(s.out, "      %s\n", s.Color.Apply(render.Short(line, 100), "gray"))
+			line := render.PreviewValue(change.Payload, ctx, 100)
+			fmt.Fprintf(s.out, "      %s\n", s.Color.Apply(line, "gray"))
 		}
 	}
 }

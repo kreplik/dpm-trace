@@ -100,10 +100,15 @@ find Transfer             # jump to the next match, leaving the filter alone
 filter                    # clear
 ```
 
-Fields are `template`, `choice`, `party`, `contract`, `kind`, `package`, `id`
-and `payload`. Matching is substring and case-insensitive, because the values
-you have to hand are usually partial — the tail of a contract id copied from a
-log, a party without its fingerprint.
+Fields are `template`, `choice`, `party`, `contract`, `kind`, `package`, `id`,
+`payload` and `synchronizer`. Matching is substring and case-insensitive,
+because the values you have to hand are usually partial — the tail of a
+contract id copied from a log, a party without its fingerprint.
+
+Reassignments are searchable on their own terms: `party` covers the submitter,
+`id` covers the reassignment id, and `synchronizer` matches either end of the
+move, since you usually know one of the two synchronizers rather than which
+end of it you are holding.
 
 With a filter set, `tree` marks matches in a fixed left gutter, so the
 structure survives:
@@ -161,6 +166,17 @@ The archived side carries no payload. A transaction tree has no archived event:
 the Ledger API reports an archive as `consuming: true` on the exercise, which
 names the contract that ceased to exist but not its fields. So the diff can say
 a contract was archived, not what it contained.
+
+A contract created and archived by the same transaction is marked `~ transient`
+on both sides and counted in the summary, because it appears twice while
+leaving nothing behind. It is the one archived row that does keep its payload,
+since this transaction created it and the fields are already in the trace:
+
+```
+state diff: 2 contracts created, 2 contracts archived (1 contract transient)
+  + created
+    #5:3 Asset:Asset   0053dddddddddddd...  ~ transient
+```
 
 ## One event in detail
 
