@@ -81,7 +81,21 @@ dpm trace <update-id> --print-json
 `dpm trace open <artifact>` renders a saved artifact again, with no ledger
 connection.
 
-Flags and usage in full: **[docs/commands.md](docs/commands.md)**.
+Not every submission becomes a transaction, and not every question is about one
+transaction:
+
+```bash
+dpm trace prepare --submitter <url> --act-as '<party-id>' ...   # before committing
+dpm trace --command-id <command-id>                             # a failed submission
+dpm trace --completion-file completion.json                     # a captured failure
+dpm trace compare a.trace.json b.trace.json                     # what differs
+```
+
+A failed submission has no update id, so `dpm trace <update-id>` cannot find
+it — completion data is where its outcome lives.
+
+Flags and usage in full: **[docs/commands.md](docs/commands.md)**, including
+[what can and cannot be compared](docs/commands.md#what-cannot-be-compared).
 
 ## Interactive visualizer
 
