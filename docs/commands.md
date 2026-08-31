@@ -196,7 +196,8 @@ recorded.
 **Archived contracts carry no payload.** A transaction tree reports an archive
 as `consuming: true` on the exercise, which names the contract that ceased to
 exist but not its fields. A diff can say a contract was archived, not what it
-contained.
+contained — except for a contract this same transaction created, whose fields
+are already in the trace and which the state diff marks `~ transient`.
 
 **Two participants' projections are not directly comparable.** Each participant
 sees only what its parties are entitled to, and numbers only the events it
