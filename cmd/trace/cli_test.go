@@ -342,6 +342,11 @@ func TestPartyFlagsRejectAnEmptyValue(t *testing.T) {
 		{"trace party", []string{"some-update-id", "--submitter", "http://127.0.0.1:1", "--party", ""}},
 		// The mixed case is the one that bit: one good party hides one empty.
 		{"trace mixed", []string{"some-update-id", "--submitter", "http://127.0.0.1:1", "--read-as", "", "--read-as", "Alice::1220aa"}},
+		// On the completion path a narrowed party set reads as "your failed
+		// submission is not in this window" -- the same plausible-but-wrong
+		// answer, from a different command.
+		{"trace act-as", []string{"--command-id", "c1", "--submitter", "http://127.0.0.1:1", "--act-as", ""}},
+		{"trace act-as mixed", []string{"--command-id", "c1", "--submitter", "http://127.0.0.1:1", "--act-as", "", "--act-as", "Alice::1220aa"}},
 		{"compare read-as", []string{"--update", artifact, "--submitter", "http://127.0.0.1:1", "--read-as", ""}},
 		{"compare act-as", []string{"--update", artifact, "--submitter", "http://127.0.0.1:1", "--act-as", ""}},
 	} {

@@ -213,7 +213,11 @@ func runTrace(args []string) int {
 				return 2
 			}
 			i++
-			actAs = append(actAs, args[i])
+			party, ok := partyFlag(arg, args[i])
+			if !ok {
+				return 2
+			}
+			actAs = append(actAs, party)
 		case "--completion-user-id":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --completion-user-id requires a value")
