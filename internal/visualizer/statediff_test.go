@@ -78,7 +78,7 @@ func TestStateDiffOnEachShape(t *testing.T) {
 // An update that touches no contract on this participant must say so, rather
 // than printing an empty panel that looks broken.
 func TestStateDiffWithNoChangesSaysSo(t *testing.T) {
-	s, buf := stepperFor(t, "tests/fixtures/reassignment/real-unassign-artifact.json")
+	s, buf := stepperFor(t, "examples/unassign.trace.json")
 	s.ShowStateDiff()
 	if !strings.Contains(buf.String(), "no contract was created or archived") {
 		t.Errorf("empty diff = %q", buf.String())

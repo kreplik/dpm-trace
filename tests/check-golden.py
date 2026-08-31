@@ -50,16 +50,15 @@ CASES: dict[str, list[str]] = {
     "open-trace-b-json": ["open", "tests/fixtures/compare/trace-b.json", "--print-json"],
 
     # ── trace: reassignment rendering ────────────────────────────────────────
-    # Captured from a real two-synchronizer Canton, not hand-written. These stay
-    # skipped until the reassignment branch merges.
+    # Captured from a real two-synchronizer Canton, not hand-written.
     "open-reassign-unassign": [
-        "open", "tests/fixtures/reassignment/real-unassign-artifact.json", "--color", "never",
+        "open", "examples/unassign.trace.json", "--color", "never",
     ],
     "open-reassign-assign": [
-        "open", "tests/fixtures/reassignment/real-assign-artifact.json", "--color", "never",
+        "open", "examples/assign.trace.json", "--color", "never",
     ],
     "open-reassign-assign-json": [
-        "open", "tests/fixtures/reassignment/real-assign-artifact.json", "--print-json",
+        "open", "examples/assign.trace.json", "--print-json",
     ],
 
     # ── compare: prepared vs completion ──────────────────────────────────────

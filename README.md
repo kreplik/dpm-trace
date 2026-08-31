@@ -39,7 +39,7 @@ Registration requires DPM with a Daml SDK installed. If you have neither:
 
 ```bash
 curl https://get.digitalasset.com/install/install.sh | sh   # installs dpm
-dpm install 3.4.11                                          # installs an SDK
+dpm install 3.5.1                                           # installs an SDK
 ```
 
 Otherwise keep using `./dpm-trace`; it is the same binary.
@@ -102,23 +102,27 @@ transaction.
 
 ## Examples
 
-[`examples/`](examples) contains three Daml examples — a create, an exercise
-with a child create, and an archive — each with a trace artifact captured
-against a real Canton, so the output can be seen without a ledger:
+[`examples/`](examples) covers the four event kinds — a create, an exercise
+with a child create, an archive, and a reassignment — each with a trace
+artifact captured against a real Canton, so the output can be seen without a
+ledger:
 
 ```bash
 ./dpm-trace open examples/create.trace.json
 ./dpm-trace open examples/exercise-child-create.trace.json
 ./dpm-trace open examples/archive.trace.json
+./dpm-trace open examples/unassign.trace.json
+./dpm-trace open examples/assign.trace.json
 ```
 
 These need nothing but the binary — the artifacts are committed, so there is no
 ledger to reach and no Daml toolchain to install.
 
-[`examples/README.md`](examples/README.md) shows how to reproduce them against a
-local Canton, and how the same commands work against a remote participant. That
-does need more: a Java runtime, a Canton jar, and a Daml SDK to build the
-example package's DAR.
+[`examples/README.md`](examples/README.md) shows how to reproduce the first
+three against a local Canton, and how the same commands work against a remote
+participant. That does need more: a Java runtime, a Canton jar, and a Daml SDK
+to build the example package's DAR. The reassignment pair needs two
+synchronizers, which the shipped config does not set up.
 
 ## Notes
 

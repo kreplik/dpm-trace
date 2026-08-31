@@ -73,6 +73,10 @@ An `ASSIGN` event also carries the reassigned contract's payload and
 stakeholders, which the Ledger API nests inside the assigned event's created
 event.
 
+Both halves of one real reassignment are committed as
+[`examples/unassign.trace.json`](../examples/unassign.trace.json) and
+[`examples/assign.trace.json`](../examples/assign.trace.json).
+
 ## open
 
 Reopen an exported artifact, with no ledger connection:

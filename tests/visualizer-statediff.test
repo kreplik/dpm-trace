@@ -4,7 +4,7 @@
 
 # RUN: printf 'diff\nq\n' | %dpm open %root/examples/exercise-child-create.trace.json --visualize --color never | FileCheck %s --check-prefix SPLIT
 # RUN: printf 'diff\nq\n' | %dpm open %root/examples/create.trace.json --visualize --color never | FileCheck %s --check-prefix CREATE
-# RUN: printf 'diff\nq\n' | %dpm open %root/tests/fixtures/reassignment/real-unassign-artifact.json --visualize --color never | FileCheck %s --check-prefix EMPTY
+# RUN: printf 'diff\nq\n' | %dpm open %root/examples/unassign.trace.json --visualize --color never | FileCheck %s --check-prefix EMPTY
 
 # Split archives the original and creates two; the payloads tell them apart.
 # SPLIT: state diff: 2 contracts created, 1 contract archived
