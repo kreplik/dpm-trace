@@ -176,8 +176,8 @@ func (s *Stepper) Dispatch(cmd string) (quit bool) {
 		s.ShowJSON()
 	case cmd == "filter" || strings.HasPrefix(cmd, "filter "):
 		s.SetFilter(strings.TrimPrefix(cmd, "filter"))
-	case strings.HasPrefix(cmd, "find "):
-		s.Find(strings.TrimPrefix(cmd, "find "))
+	case cmd == "find" || strings.HasPrefix(cmd, "find "):
+		s.Find(strings.TrimPrefix(cmd, "find"))
 	case cmd == "matches":
 		s.ShowMatches()
 	case cmd == "diff" || cmd == "state":
@@ -574,6 +574,7 @@ func (s *Stepper) SetFilter(arg string) {
 		fmt.Fprintln(s.out, s.Color.Apply(err.Error(), "yellow"))
 		return
 	}
+	filter.Ctx = render.NewContext(s.Trace)
 
 	matches := s.matchingSteps(filter)
 	if len(matches) == 0 {
@@ -597,11 +598,17 @@ func (s *Stepper) SetFilter(arg string) {
 
 // Find jumps to the next matching step without changing the active filter.
 func (s *Stepper) Find(arg string) {
+	if strings.TrimSpace(arg) == "" {
+		fmt.Fprintln(s.out, s.Color.Apply(
+			"usage: find ["+strings.Join(filterFields, "|")+"] <value>", "yellow"))
+		return
+	}
 	filter, err := ParseFilter(arg)
 	if err != nil {
 		fmt.Fprintln(s.out, s.Color.Apply(err.Error(), "yellow"))
 		return
 	}
+	filter.Ctx = render.NewContext(s.Trace)
 	for i := s.Index + 1; i < len(s.Order); i++ {
 		if ev, ok := s.Trace.EventsByID[s.Order[i]]; ok && filter.Matches(ev) {
 			s.Index = i
@@ -621,6 +628,12 @@ func (s *Stepper) ShowMatches() {
 	}
 	matches := s.matchingSteps(*s.Active)
 	fmt.Fprintf(s.out, "%s %s\n", s.Color.Apply("matches:", "cyan"), s.Active.Describe())
+	width := 0
+	for _, i := range matches {
+		if id := s.Order[i]; len(id) > width {
+			width = len(id)
+		}
+	}
 	for _, i := range matches {
 		ev := s.Trace.EventsByID[s.Order[i]]
 		marker := " "
@@ -637,7 +650,7 @@ func (s *Stepper) ShowMatches() {
 		fmt.Fprintf(s.out, " %s %s %s %s %s\n",
 			marker,
 			s.Color.Apply(fmt.Sprintf("[%d]", i+1), "gray"),
-			s.Color.Apply(fmt.Sprintf("%-4s", ev.EventID), "gray"),
+			s.Color.Apply(fmt.Sprintf("%-*s", width, ev.EventID), "gray"),
 			s.Color.Apply(render.EventKindLabel(ev.Kind), render.EventColor(ev.Kind)),
 			render.EventTarget(ev))
 	}

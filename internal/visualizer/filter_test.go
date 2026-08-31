@@ -62,18 +62,18 @@ func TestFilterMatchesEachField(t *testing.T) {
 		want   bool
 		why    string
 	}{
-		{Filter{"template", "Asset"}, true, "short template"},
-		{Filter{"template", "pkg123"}, true, "full template includes the package"},
-		{Filter{"choice", "split"}, true, "case-insensitive"},
-		{Filter{"choice", "Burn"}, false, "different choice"},
-		{Filter{"party", "Alice"}, true, "acting party"},
-		{Filter{"party", "Issuer"}, true, "witness counts as a party"},
-		{Filter{"party", "Mallory"}, false, "absent party"},
-		{Filter{"contract", "abcdef"}, true, "contract id fragment"},
-		{Filter{"kind", "exercise"}, true, "event kind"},
-		{Filter{"kind", "create"}, false, "wrong kind"},
-		{Filter{"package", "pkg123"}, true, "package id"},
-		{Filter{"id", "0"}, true, "event id"},
+		{Filter{Field: "template", Value: "Asset"}, true, "short template"},
+		{Filter{Field: "template", Value: "pkg123"}, true, "full template includes the package"},
+		{Filter{Field: "choice", Value: "split"}, true, "case-insensitive"},
+		{Filter{Field: "choice", Value: "Burn"}, false, "different choice"},
+		{Filter{Field: "party", Value: "Alice"}, true, "acting party"},
+		{Filter{Field: "party", Value: "Issuer"}, true, "witness counts as a party"},
+		{Filter{Field: "party", Value: "Mallory"}, false, "absent party"},
+		{Filter{Field: "contract", Value: "abcdef"}, true, "contract id fragment"},
+		{Filter{Field: "kind", Value: "exercise"}, true, "event kind"},
+		{Filter{Field: "kind", Value: "create"}, false, "wrong kind"},
+		{Filter{Field: "package", Value: "pkg123"}, true, "package id"},
+		{Filter{Field: "id", Value: "0"}, true, "event id"},
 	} {
 		if got := tc.filter.Matches(ev); got != tc.want {
 			t.Errorf("%+v = %v, want %v (%s)", tc.filter, got, tc.want, tc.why)
@@ -109,11 +109,11 @@ func TestFilterMatchesRenderedValues(t *testing.T) {
 			t.Errorf("bare search for %q did not reach the payload", value)
 		}
 	}
-	if !(Filter{"payload", "GOLD"}).Matches(ev) {
+	if !(Filter{Field: "payload", Value: "GOLD"}).Matches(ev) {
 		t.Error("payload filter did not match")
 	}
 	// The payload field must not match metadata, or it is just another bare search.
-	if (Filter{"payload", "Asset:Asset"}).Matches(ev) {
+	if (Filter{Field: "payload", Value: "Asset:Asset"}).Matches(ev) {
 		t.Error("payload filter matched the template")
 	}
 }
@@ -125,7 +125,7 @@ func TestFilterEmptyValueMatchesEverything(t *testing.T) {
 }
 
 func TestFilterDescribe(t *testing.T) {
-	if got := (Filter{"party", "Alice"}).Describe(); got != "party Alice" {
+	if got := (Filter{Field: "party", Value: "Alice"}).Describe(); got != "party Alice" {
 		t.Errorf("got %q", got)
 	}
 	if got := (Filter{Value: "Alice"}).Describe(); got != "Alice" {

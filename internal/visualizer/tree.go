@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/walnuthq/dpm-trace/internal/model"
 	"github.com/walnuthq/dpm-trace/internal/render"
 )
 
@@ -99,8 +100,31 @@ func (s *Stepper) ShowTree(arg string) {
 		}
 	}
 
+	shown := map[string]bool{}
 	for i, root := range s.Trace.RootEventIDs {
+		markShown(s.Trace, root, shown)
 		visit(root, "", i == len(s.Trace.RootEventIDs)-1)
+	}
+
+	// The step view will happily show an event the roots cannot reach, and the
+	// tree then draws no cursor at all -- two views disagreeing in silence.
+	if current != "" && !shown[current] {
+		fmt.Fprintln(s.out, s.Color.Apply(
+			"  current step "+current+" is not reachable from the roots", "yellow"))
+	}
+}
+
+func markShown(trace *model.Trace, eventID string, shown map[string]bool) {
+	if shown[eventID] {
+		return
+	}
+	ev, ok := trace.EventsByID[eventID]
+	if !ok {
+		return
+	}
+	shown[eventID] = true
+	for _, child := range ev.ChildEventIDs {
+		markShown(trace, child, shown)
 	}
 }
 
