@@ -1,4 +1,4 @@
-$ dpm trace open tests/fixtures/reassignment/real-assign-artifact.json --print-json
+$ dpm trace open examples/assign.trace.json --print-json
 --- exit: 0
 --- stdout:
 {

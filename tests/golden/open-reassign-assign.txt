@@ -1,4 +1,4 @@
-$ dpm trace open tests/fixtures/reassignment/real-assign-artifact.json --color never
+$ dpm trace open examples/assign.trace.json --color never
 --- exit: 0
 --- stdout:
 Trace artifact

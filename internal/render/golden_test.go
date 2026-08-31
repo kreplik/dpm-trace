@@ -21,8 +21,8 @@ var goldenCases = []struct {
 }{
 	{"trace-a", "tests/fixtures/compare/trace-a.json", "tests/golden/open-trace-a.txt"},
 	{"trace-b", "tests/fixtures/compare/trace-b.json", "tests/golden/open-trace-b.txt"},
-	{"reassign-unassign", "tests/fixtures/reassignment/real-unassign-artifact.json", "tests/golden/open-reassign-unassign.txt"},
-	{"reassign-assign", "tests/fixtures/reassignment/real-assign-artifact.json", "tests/golden/open-reassign-assign.txt"},
+	{"reassign-unassign", "examples/unassign.trace.json", "tests/golden/open-reassign-unassign.txt"},
+	{"reassign-assign", "examples/assign.trace.json", "tests/golden/open-reassign-assign.txt"},
 }
 
 func TestRendersMatchGoldens(t *testing.T) {
@@ -56,7 +56,7 @@ func TestRendersMatchGoldens(t *testing.T) {
 // rendering layer too, since that is where a regression would show.
 func TestPayloadRendersInDocumentOrder(t *testing.T) {
 	root := repoRoot(t)
-	artifact, err := model.LoadTraceArtifact(filepath.Join(root, "tests/fixtures/reassignment/real-assign-artifact.json"))
+	artifact, err := model.LoadTraceArtifact(filepath.Join(root, "examples/assign.trace.json"))
 	if err != nil {
 		t.Fatalf("load artifact: %v", err)
 	}
