@@ -39,7 +39,7 @@ Registration requires DPM with a Daml SDK installed. If you have neither:
 
 ```bash
 curl https://get.digitalasset.com/install/install.sh | sh   # installs dpm
-dpm install 3.4.11                                          # installs an SDK
+dpm install 3.5.1                                           # installs an SDK
 ```
 
 Otherwise keep using `./dpm-trace`; it is the same binary.
