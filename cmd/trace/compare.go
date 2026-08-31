@@ -19,7 +19,7 @@ import (
 // of run_compare.
 func runCompare(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "--command-id, fetching updates by id")
+		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare <update-id-a> <update-id-b> --submitter <url> --read-as <party> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --command-id <id> --submitter <url> --act-as <party> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "")
 		return 0
 	}
 	var (
