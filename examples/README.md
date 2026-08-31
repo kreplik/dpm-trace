@@ -1,7 +1,8 @@
 # Examples
 
-Three representative Daml examples and the traces they produce: a **create**, an
-**exercise with a child create**, and an **archive (consuming exercise)**.
+Representative Daml examples and the traces they produce: a **create**, an
+**exercise with a child create**, an **archive (consuming exercise)**, and a
+**reassignment** seen from both synchronizers.
 
 Each one ships as a committed trace artifact, so you can see the output without
 a Canton node, a Daml toolchain, or a network:
@@ -10,23 +11,51 @@ a Canton node, a Daml toolchain, or a network:
 dpm trace open examples/create.trace.json
 dpm trace open examples/exercise-child-create.trace.json
 dpm trace open examples/archive.trace.json
+dpm trace open examples/unassign.trace.json
+dpm trace open examples/assign.trace.json
 ```
 
-The Daml package that produced them is in [`asset/`](asset), and the steps below
-rebuild them from it — nothing outside this repository is required, though
+The Daml package behind the first three is in [`asset/`](asset), and the steps
+below rebuild them from it — nothing outside this repository is required, though
 reproducing them needs DPM and a Java runtime. Opening the committed artifacts
 above needs neither.
 
-## The three shapes
+## The shapes
 
 | Artifact | Daml | What the trace shows |
 | --- | --- | --- |
 | `create.trace.json` | `createCmd Asset` | One create event: payload, signatory, observer, witnesses |
 | `exercise-child-create.trace.json` | `Split` | A consuming exercise with two child creates nested under it, and the tuple of new contract ids as its result |
 | `archive.trace.json` | `Burn` | A consuming exercise that archives without creating anything |
+| `unassign.trace.json` | `Iou` | The outgoing half of a reassignment: source and target synchronizer, reassignment id, counter, submitter |
+| `assign.trace.json` | `Iou` | The incoming half of the same reassignment, which additionally carries the contract's payload and stakeholders |
 
 `Asset` is signed by `issuer` and observed by `owner`, so the projections differ
 per party — which is the point of the participant-scoped labelling in the output.
+
+## The reassignment pair
+
+`unassign.trace.json` and `assign.trace.json` are two updates describing one
+contract moving between synchronizers, so they share a contract id, a
+reassignment id and a counter:
+
+```
+└── [0] UNASSIGN Iou:Iou
+    ├── contract: 00e89575764e68ce627d51fa4f136402cc3320fce88707c58a20c08ddab8768...
+    ├── reassignment: sync-a::1220e19b470d09961acb2d17952d2... -> sync-b::1220b13f96ccbe9db7875e1d6f72a...
+    ├── reassignment id: 0012200ce3d189576eed2c5bfeb7e4ee84162e6bd9b7a406e2341d110a89230...
+    ├── counter: 1
+    ├── submitter: Alice
+    └── witnesses: Alice
+```
+
+The synchronizer on the header line differs between the two — `sync-a` for the
+unassign, `sync-b` for the assign — because each update is committed on the
+synchronizer that saw that half.
+
+These were captured against a ledger with two synchronizers, which
+[`devnet-trace.conf`](devnet-trace.conf) does not set up: it runs one sequencer
+and one mediator, so the steps below reproduce the first three artifacts only.
 
 ## Reproducing them against a local Canton
 
