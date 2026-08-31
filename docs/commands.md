@@ -39,6 +39,9 @@ dpm trace <update-id> \
 The bearer token can also come from `--token`, `DPM_TRACE_TOKEN` or
 `DPM_TRACE_TOKEN_FILE`.
 
+`--visualize` opens the interactive session over the trace instead of printing
+it; see [visualizer.md](visualizer.md).
+
 Write a portable JSON artifact for downstream tools, or print it to stdout:
 
 ```bash

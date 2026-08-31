@@ -5,6 +5,7 @@ User-facing documentation for `dpm trace`.
 ## Index
 
 - [`commands.md`](commands.md) - full command and flag reference.
+- [`visualizer.md`](visualizer.md) - the interactive session: navigation, search, large values, state diff, and what a projection does not show.
 - [`REAL-UPDATE-SMOKE.md`](REAL-UPDATE-SMOKE.md) - end-to-end checklist against a real local Canton participant.
 - [`TECHNICAL-NOTES.md`](TECHNICAL-NOTES.md) - operational notes: participant scope, endpoints, event kinds, source diagnostics.
 

@@ -71,7 +71,7 @@ func NormalizeTrace(raw *Object, source, sourceURL string, parties []string) (*T
 		note = scanNote
 	}
 
-	return &Trace{
+	trace := &Trace{
 		UpdateID:  updateID,
 		Source:    source,
 		SourceURL: sourceURL,
@@ -88,7 +88,11 @@ func NormalizeTrace(raw *Object, source, sourceURL string, parties []string) (*T
 		Offset:         pickString(tx, "offset"),
 		SynchronizerID: pickString(tx, "synchronizer_id", "synchronizerId"),
 		Raw:            raw,
-	}, nil
+	}
+	if err := trace.CheckAcyclic(); err != nil {
+		return nil, err
+	}
+	return trace, nil
 }
 
 // unwrapTransaction descends through the envelopes the API and artifacts wrap

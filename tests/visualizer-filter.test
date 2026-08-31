@@ -1,0 +1,27 @@
+# The filter commands are interactive, so drive the REPL over stdin. This pins
+# the output format the reader actually sees; the unit tests cover the matching
+# rules underneath.
+
+# RUN: printf 'matches\nfilter kind exercise\nmatches\nfilter\nfilter template Nonexistent\nq\n' | %dpm open %root/tests/fixtures/compare/trace-b.json --visualize --color never | FileCheck %s
+
+# The startup banner has to advertise the commands: a reader who never types
+# `help` learns them only from here.
+# CHECK: search: filter <value>, find <value>, matches
+
+# `matches` before any filter explains itself rather than printing an empty list.
+# CHECK: no filter set
+
+# Applying a filter reports what it selected out of how many, so a reader can
+# tell "one hit" from "no hits" without walking the trace.
+# CHECK: filter: kind exercise  (1 of 2 steps)
+
+# CHECK: matches: kind exercise
+# The step number and the event id are both shown: [step] is what `j`
+# takes, the id is what `collapse` and the tree use.
+# CHECK: > [1] #2:0 EXERCISE Token:Token.Transfer
+
+# CHECK: filter cleared
+
+# A filter selecting nothing is refused, not applied -- applying it would strand
+# navigation with every step excluded and no way to see why.
+# CHECK: no events match template Nonexistent; filter not applied

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/walnuthq/dpm-trace/internal/model"
+	"github.com/walnuthq/dpm-trace/internal/source"
 )
 
 func loadTrace(t *testing.T, rel string) *model.Trace {
@@ -48,7 +49,7 @@ func TestPrintSummary(t *testing.T) {
 // `context` in the visualizer: which packages appear and what metadata is
 // available for them.
 func TestDebugContextReport(t *testing.T) {
-	got := DebugContextReport(loadTrace(t, "examples/create.trace.json"))
+	got := DebugContextReport(loadTrace(t, "examples/create.trace.json"), nil)
 	if got == "" {
 		t.Fatal("empty report")
 	}
@@ -106,5 +107,29 @@ func TestEqualStringSlices(t *testing.T) {
 	}
 	if equalStringSlices([]string{"a"}, []string{"b"}) || equalStringSlices([]string{"a"}, nil) {
 		t.Error("different slices reported equal")
+	}
+}
+
+// Source metadata is the one item in the report that can come from outside the
+// artifact. Listing it as absent while `s` was rendering a snippet read as a
+// contradiction, so the report has to reflect what was actually loaded.
+func TestDebugContextReportReflectsLoadedSources(t *testing.T) {
+	trace := loadTrace(t, "examples/create.trace.json")
+
+	without := DebugContextReport(trace, nil)
+	if !strings.Contains(without, "unless supplied with --debug-info") {
+		t.Errorf("no metadata: report does not say how to supply it:\n%s", without)
+	}
+
+	index := source.NewIndex()
+	index.LoadDebugInfo(filepath.Join("..", "..", "tests/fixtures/debug-info/token-debug-info.json"))
+	with := DebugContextReport(trace, index)
+
+	present, missing, _ := strings.Cut(with, "Not present")
+	if !strings.Contains(present, "source metadata") {
+		t.Errorf("loaded metadata is not listed as present:\n%s", with)
+	}
+	if strings.Contains(missing, "source metadata") {
+		t.Errorf("loaded metadata is still listed as missing:\n%s", with)
 	}
 }

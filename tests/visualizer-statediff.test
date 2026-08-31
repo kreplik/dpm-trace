@@ -1,0 +1,22 @@
+# The tree says what happened; the diff says what it left behind. A consuming
+# exercise is the archive -- a transaction tree carries no archived event -- so
+# the archived side is derived, which is the part worth pinning.
+
+# RUN: printf 'diff\nq\n' | %dpm open %root/examples/exercise-child-create.trace.json --visualize --color never | FileCheck %s --check-prefix SPLIT
+# RUN: printf 'diff\nq\n' | %dpm open %root/examples/create.trace.json --visualize --color never | FileCheck %s --check-prefix CREATE
+# RUN: printf 'diff\nq\n' | %dpm open %root/examples/unassign.trace.json --visualize --color never | FileCheck %s --check-prefix EMPTY
+
+# Split archives the original and creates two; the payloads tell them apart.
+# SPLIT: state diff: 2 contracts created, 1 contract archived
+# SPLIT: + created
+# SPLIT: quantity: 60
+# SPLIT: quantity: 40
+# SPLIT: x archived
+# SPLIT: visible to Issuer only; the transaction may have touched other contracts
+
+# CREATE: state diff: 1 contract created, 0 contracts archived
+# CREATE-NOT: x archived
+
+# An update touching no contract here says so, rather than printing an empty
+# panel that looks broken.
+# EMPTY: no contract was created or archived in this projection

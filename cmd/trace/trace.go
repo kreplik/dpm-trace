@@ -116,7 +116,11 @@ func runTrace(args []string) int {
 				return 2
 			}
 			i++
-			readAs = append(readAs, args[i])
+			party, ok := partyFlag(arg, args[i])
+			if !ok {
+				return 2
+			}
+			readAs = append(readAs, party)
 		case "--token":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --token requires a value")
@@ -209,7 +213,11 @@ func runTrace(args []string) int {
 				return 2
 			}
 			i++
-			actAs = append(actAs, args[i])
+			party, ok := partyFlag(arg, args[i])
+			if !ok {
+				return 2
+			}
+			actAs = append(actAs, party)
 		case "--completion-user-id":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, "error: --completion-user-id requires a value")
@@ -485,4 +493,19 @@ func printCompletionJSON(completion *model.Completion) int {
 	}
 	fmt.Println(string(encoded))
 	return 0
+}
+
+// partyFlag reads a --read-as/--party value, rejecting an empty one.
+//
+// ParseParties drops blanks, which is right for config files but wrong for a
+// flag: `--read-as "$ALICE"` with ALICE unset then silently produced a
+// narrower projection than the reader asked for, and nothing in the output
+// says which parties were requested -- only which were used. A partial
+// projection accepted in silence is the one mistake this tool must not make.
+func partyFlag(flag, value string) (string, bool) {
+	if strings.TrimSpace(value) == "" {
+		fmt.Fprintf(os.Stderr, "error: %s requires a party id\n", flag)
+		return "", false
+	}
+	return value, true
 }

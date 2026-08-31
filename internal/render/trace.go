@@ -80,6 +80,13 @@ type glyphSet struct {
 	blank    string // the column under the last child
 }
 
+// Branch, Last, Vertical and Blank expose the glyphs to other renderers, so a
+// second tree does not invent its own notation for the same nesting.
+func (g glyphSet) Branch() string   { return g.branch }
+func (g glyphSet) Last() string     { return g.last }
+func (g glyphSet) Vertical() string { return g.vertical }
+func (g glyphSet) Blank() string    { return g.blank }
+
 var (
 	unicodeGlyphs = glyphSet{branch: "\u251c\u2500\u2500 ", last: "\u2514\u2500\u2500 ", vertical: "\u2502   ", blank: "    "}
 	asciiGlyphs   = glyphSet{branch: "|-- ", last: "`-- ", vertical: "|   ", blank: "    "}
@@ -417,8 +424,13 @@ func joinField(obj map[string]any, key string) string {
 }
 
 // PrintSummary writes the header the visualizer opens with.
-// Ports print_summary.
+//
+// Parties are rendered through a Context, as everywhere else: the visualizer
+// printing a raw 70-character party id while the trace view printed
+// "Issuer (Issuer::122036f5...7213a4)" was one tool with two opinions about
+// how a party looks. Ports print_summary.
 func PrintSummary(w io.Writer, trace *model.Trace) {
+	ctx := NewContext(trace)
 	fmt.Fprintf(w, "update:      %s\n", trace.UpdateID)
 	fmt.Fprintf(w, "source:      %s (%s)\n", trace.Source, orDash(trace.SourceURL))
 	fmt.Fprintf(w, "record time: %s\n", orDash(trace.RecordTime))
@@ -426,7 +438,11 @@ func PrintSummary(w io.Writer, trace *model.Trace) {
 	fmt.Fprintf(w, "synchronizer:%s\n", orDash(trace.SynchronizerID))
 	fmt.Fprintf(w, "projection:  %s\n", trace.Projection.Note)
 	if len(trace.Projection.ReadAs) > 0 {
-		fmt.Fprintf(w, "read-as:     %s\n", strings.Join(trace.Projection.ReadAs, ", "))
+		rendered := make([]string, 0, len(trace.Projection.ReadAs))
+		for _, party := range trace.Projection.ReadAs {
+			rendered = append(rendered, ctx.PartyWithFull(party))
+		}
+		fmt.Fprintf(w, "read-as:     %s\n", strings.Join(rendered, ", "))
 	}
 	fmt.Fprintf(w, "events:      %d\n", len(trace.EventsByID))
 }
@@ -435,7 +451,7 @@ func PrintSummary(w io.Writer, trace *model.Trace) {
 //
 // The "not present" half is the point: an artifact is a participant projection,
 // and a reader must not mistake absence for evidence. Ports debug_context_report.
-func DebugContextReport(trace *model.Trace) string {
+func DebugContextReport(trace *model.Trace, index *source.Index) string {
 	seen := map[string]bool{}
 	var packageIDs []string
 	for _, ev := range trace.EventsByID {
@@ -465,10 +481,20 @@ func DebugContextReport(trace *model.Trace) string {
 	}
 
 	missing := []string{
-		"source metadata unless provided by the local project or registry",
 		"full original command envelope unless captured separately",
 		"private subtransactions outside this projection",
 		"operator logs unless attached separately",
+	}
+
+	// Source metadata is the one item here that can be supplied from outside
+	// the artifact. Listing it as absent while `s` was rendering a snippet
+	// read as a contradiction, so say which of the two is true.
+	if index != nil && index.HasSources() {
+		present = append(present, "source metadata, loaded from "+strings.Join(index.Roots, ", "))
+	} else {
+		missing = append([]string{
+			"source metadata, unless supplied with --debug-info",
+		}, missing...)
 	}
 
 	var b strings.Builder

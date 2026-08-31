@@ -146,6 +146,10 @@ func TestDispatchHandlesEveryCommand(t *testing.T) {
 		"", "n", "next", "p", "prev", "j 1", "j 99", "s", "src", "source",
 		"vars", "locals", "b Transfer", "bp", "breakpoints", "clear", "clear 1",
 		"c", "continue", "tree", "context", "json", "help",
+		"filter", "filter kind create", "filter nothing-matches-this",
+		"filter choice", "find Counter", "find nothing-matches-this", "matches",
+		"tree 0", "tree 2", "tree nonsense", "collapse", "collapse all",
+		"collapse #nope", "expand", "expand all",
 	} {
 		s, buf := newStepper(t)
 		if quit := s.Dispatch(cmd); quit {
@@ -198,5 +202,65 @@ func TestShowJSONEmitsTheCurrentEvent(t *testing.T) {
 	}
 	if event["eventId"] == nil {
 		t.Errorf("event has no id: %v", event)
+	}
+}
+
+// `vars` is the event details view, so it has to agree with the step view it
+// sits beside. It had drifted: large values were unbounded, contract ids were
+// printed whole, and fields the step view showed were missing.
+func TestVariablesAgreeWithTheStepView(t *testing.T) {
+	s, buf := newStepper(t)
+	s.ShowVariables()
+	out := buf.String()
+
+	// Shortened, as the tree and step view show it.
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "contractId:") && !strings.Contains(line, "...") {
+			if len(line) > 90 {
+				t.Errorf("contract id printed whole: %q", line)
+			}
+		}
+	}
+
+	// Fields the step view shows must not be absent here.
+	trace := s.Trace
+	ev := s.Current()
+	if len(ev.ChildEventIDs) > 0 && !strings.Contains(out, "children:") {
+		t.Errorf("children missing:\n%s", out)
+	}
+	_ = trace
+}
+
+// A large value must be bounded here too, or the bounding looks broken rather
+// than deliberate: the step view showed the same event in seventeen lines.
+func TestVariablesBoundLargeValues(t *testing.T) {
+	s, buf := bigPayloadStepper(t)
+	s.ShowVariables()
+
+	out := buf.String()
+	if lines := strings.Count(out, "\n"); lines > 30 {
+		t.Errorf("vars printed %d lines for a large payload:\n%s", lines, out)
+	}
+	if !strings.Contains(out, "hidden") {
+		t.Errorf("nothing says the value was cut:\n%s", out)
+	}
+
+	// And `payload` expands it here as well.
+	buf.Reset()
+	s.Dispatch("payload")
+	buf.Reset()
+	s.ShowVariables()
+	if strings.Contains(buf.String(), "hidden") {
+		t.Errorf("vars stayed bounded after `payload`:\n%s", buf.String())
+	}
+}
+
+// A consuming exercise says so, which is how a reader tells an archive from a
+// plain exercise without consulting the tree.
+func TestVariablesShowConsuming(t *testing.T) {
+	s, buf := stepperFor(t, "examples/exercise-child-create.trace.json")
+	s.ShowVariables()
+	if !strings.Contains(buf.String(), "consuming: true") {
+		t.Errorf("consuming missing:\n%s", buf.String())
 	}
 }

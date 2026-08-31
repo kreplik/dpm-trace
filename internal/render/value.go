@@ -167,6 +167,51 @@ func RenderPrettyValue(value any, ctx *Context) string {
 	return string(encoded)
 }
 
+// PreviewValue renders a value on a single line, truncated to maxLen.
+//
+// RenderPrettyValue falls back to indented JSON once a value outgrows one
+// line, so taking its first line yields a bare "{" for exactly the payloads a
+// preview is needed for. This keeps the leading fields instead, which is what
+// distinguishes two contracts of the same template.
+func PreviewValue(value any, ctx *Context, maxLen int) string {
+	simplified := SimplifyLFValue(value)
+	if ctx != nil {
+		simplified = ctx.RenderValue(simplified)
+	}
+
+	if obj, ok := simplified.(*model.Object); ok {
+		if obj.Len() == 0 {
+			return "{}"
+		}
+		parts := make([]string, 0, obj.Len())
+		for _, key := range obj.Keys() {
+			item, _ := obj.Get(key)
+			parts = append(parts, key+": "+oneLine(FormatScalar(item, ctx)))
+			if len(strings.Join(parts, ", ")) > maxLen {
+				break
+			}
+		}
+		return Short("{ "+strings.Join(parts, ", ")+" }", maxLen)
+	}
+
+	if list, ok := simplified.([]any); ok {
+		parts := make([]string, 0, len(list))
+		for _, item := range list {
+			parts = append(parts, oneLine(FormatScalar(item, ctx)))
+			if len(strings.Join(parts, ", ")) > maxLen {
+				break
+			}
+		}
+		return Short("["+strings.Join(parts, ", ")+"]", maxLen)
+	}
+
+	return Short(oneLine(RenderPrettyValue(simplified, ctx)), maxLen)
+}
+
+func oneLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
+}
+
 // FormatScalar renders one value the way Python's format_scalar does.
 func FormatScalar(value any, ctx *Context) string {
 	switch v := value.(type) {

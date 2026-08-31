@@ -221,3 +221,45 @@ func TestShowJSONMatchesTheArtifactEncoding(t *testing.T) {
 }
 
 func TestMain(m *testing.M) { os.Exit(m.Run()) }
+
+// The projection is stated in the header, but the header scrolls away. A
+// reader ten steps in is looking at payloads with no reminder that this is one
+// participant's view, so the prompt names the parties for the whole session.
+func TestPromptNamesTheProjectionParties(t *testing.T) {
+	s, _ := newStepper(t)
+	got := s.prompt()
+	if !strings.Contains(got, "Issuer") && !strings.Contains(got, "Alice") {
+		t.Errorf("prompt %q names no read-as party", got)
+	}
+
+	// An active filter is the other thing that changes what is on screen, so
+	// it belongs in the same place.
+	s.Dispatch("filter kind exercise")
+	if got := s.prompt(); !strings.Contains(got, "filter:") {
+		t.Errorf("prompt %q does not show the active filter", got)
+	}
+	s.Dispatch("filter")
+	if got := s.prompt(); strings.Contains(got, "filter:") {
+		t.Errorf("prompt %q still shows a cleared filter", got)
+	}
+}
+
+// A trace with no read-as must still produce a usable prompt.
+func TestPromptWithoutPartiesIsPlain(t *testing.T) {
+	var buf bytes.Buffer
+	trace := load(t, "tests/fixtures/compare/trace-b.json")
+	trace.Projection.ReadAs = nil
+	s := New(trace, render.Color{Enabled: false}, source.NewIndex(), &buf)
+	if got := s.prompt(); got != "dpm-trace> " {
+		t.Errorf("prompt = %q, want the plain form", got)
+	}
+}
+
+// The visualizer must not print a header the caller already printed.
+func TestVisualizerHeaderAppearsOnce(t *testing.T) {
+	s, buf := newStepper(t)
+	s.Run(strings.NewReader("q\n"))
+	if got := strings.Count(buf.String(), "update:"); got != 1 {
+		t.Errorf("header printed %d times, want 1:\n%s", got, buf.String())
+	}
+}
