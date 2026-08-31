@@ -92,6 +92,9 @@ func TraceFromJSON(data *Object) (*Trace, error) {
 			Note:             pickString(projection, "note"),
 		}
 	}
+	if err := trace.CheckAcyclic(); err != nil {
+		return nil, err
+	}
 	return trace, nil
 }
 
