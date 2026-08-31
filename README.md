@@ -85,6 +85,8 @@ Flags and usage in full: **[docs/commands.md](docs/commands.md)**.
 
 ## Interactive visualizer
 
+![dpm trace --visualize](docs/visualizer.gif)
+
 `--visualize` opens a session over the transaction instead of printing it:
 
 ```bash
