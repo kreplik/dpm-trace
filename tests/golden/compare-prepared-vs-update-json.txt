@@ -27,7 +27,33 @@ $ dpm trace compare --prepared tests/fixtures/compare/prepared.json --update tes
         "actingParties": [
           "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001"
         ],
-        "children": [],
+        "children": [
+          {
+            "actingParties": [],
+            "children": [],
+            "choice": null,
+            "contractId": "00ccddee001122334455667788990011ccddee0011223...",
+            "eventId": "#2:1",
+            "kind": "create",
+            "observers": [],
+            "reassignmentCounter": null,
+            "result": null,
+            "signatories": [
+              "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+            ],
+            "sourceSynchronizer": null,
+            "targetSynchronizer": null,
+            "template": "pkg2ccdd:Token:Token",
+            "value": {
+              "owner": "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+            },
+            "valueLabel": "payload",
+            "witnesses": [
+              "Alice::aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000001",
+              "Bob::bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000002"
+            ]
+          }
+        ],
         "choice": "Transfer",
         "contractId": "00ccddee001122334455667788990011ccddee0011223...",
         "eventId": "#2:0",

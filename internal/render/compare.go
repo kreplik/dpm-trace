@@ -82,9 +82,14 @@ func UpdateComparison(w io.Writer, c *model.Comparison, color Color, compact boo
 func updateComparisonFull(w io.Writer, c *model.Comparison, color Color) {
 	leftKeys := exactKeys(c.LeftRoots)
 	rightKeys := exactKeys(c.RightRoots)
+	// Keys carry kind, template, choice and contract id, so two events that
+	// match on all four but hold different values compared equal: a changed
+	// payload was reported as no visible differences.
+	nValue, nOnlyA, nOnlyB := countEventDiffs(c.LeftRoots, c.RightRoots)
 	hasDifferences := !equalCounts(c.LeftCounts, c.RightCounts) ||
 		!equalStringSlices(leftKeys, rightKeys) ||
-		len(c.TemplatesOnlyInLeft) > 0 || len(c.TemplatesOnlyInRight) > 0
+		len(c.TemplatesOnlyInLeft) > 0 || len(c.TemplatesOnlyInRight) > 0 ||
+		nValue+nOnlyA+nOnlyB > 0
 
 	fmt.Fprintln(w, color.Apply("DPM trace comparison", "bold"))
 	fmt.Fprintln(w, "  kind:   "+c.Kind)
@@ -159,9 +164,76 @@ func changedFields(lv, rv any) []string {
 	return changed
 }
 
+// changedRowFields lists every difference between two matched events: the
+// value, and the fields CompareRow has always carried but nothing compared --
+// the exercise result, the stakeholders, and reassignment metadata. Carrying a
+// field without diffing it means a transaction can change in ways the
+// comparison calls identical.
+func changedRowFields(left, right model.CompareRow) []string {
+	changed := changedFields(left.Value, right.Value)
+
+	if !comparableEqual(left.Result, right.Result) {
+		changed = append(changed, fmt.Sprintf("result: %s → %s",
+			compactValue(left.Result), compactValue(right.Result)))
+	}
+	for _, party := range []struct {
+		label      string
+		left, righ []string
+	}{
+		{"signatories", left.Signatories, right.Signatories},
+		{"observers", left.Observers, right.Observers},
+		{"witnesses", left.Witnesses, right.Witnesses},
+		{"acting", left.ActingParties, right.ActingParties},
+	} {
+		if !equalStringSlices(party.left, party.righ) {
+			changed = append(changed, fmt.Sprintf("%s: %s → %s",
+				party.label, partyListSummary(party.left), partyListSummary(party.righ)))
+		}
+	}
+	for _, field := range []struct {
+		label      string
+		left, righ string
+	}{
+		{"source synchronizer", left.SourceSynchronizer, right.SourceSynchronizer},
+		{"target synchronizer", left.TargetSynchronizer, right.TargetSynchronizer},
+	} {
+		if field.left != field.righ {
+			changed = append(changed, fmt.Sprintf("%s: %s → %s",
+				field.label, orDash(Short(field.left, 40)), orDash(Short(field.righ, 40))))
+		}
+	}
+	if !equalCounters(left.ReassignmentCounter, right.ReassignmentCounter) {
+		changed = append(changed, fmt.Sprintf("reassignment counter: %s → %s",
+			counterText(left.ReassignmentCounter), counterText(right.ReassignmentCounter)))
+	}
+	return changed
+}
+
+func equalCounters(a, b *int64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func counterText(v *int64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
 // eventValueAnnotation is the one-line form, for the compact view.
 func eventValueAnnotation(lv, rv any) string {
 	changed := changedFields(lv, rv)
+	if len(changed) == 0 {
+		return "values differ"
+	}
+	return strings.Join(changed, ", ")
+}
+
+func rowAnnotation(left, right model.CompareRow) string {
+	changed := changedRowFields(left, right)
 	if len(changed) == 0 {
 		return "values differ"
 	}
@@ -179,9 +251,17 @@ func countEventDiffs(left, right []model.CompareRow) (nValue, nOnlyA, nOnlyB int
 		switch {
 		case lok && rok:
 			if compareKey(lr) == compareKey(rr) {
-				if !comparableEqual(lr.Value, rr.Value) {
+				if len(changedRowFields(lr, rr)) > 0 {
 					nValue++
 				}
+				// Children carry the rest of the transaction. Counting only
+				// roots let a consuming exercise whose child create changed be
+				// summarised as "no differences" while the printer, which does
+				// recurse, listed that very difference underneath.
+				cValue, cOnlyA, cOnlyB := countEventDiffs(lr.Children, rr.Children)
+				nValue += cValue
+				nOnlyA += cOnlyA
+				nOnlyB += cOnlyB
 			} else {
 				nOnlyA++
 				nOnlyB++
@@ -211,14 +291,14 @@ func printEventRowCompact(w io.Writer, lr model.CompareRow, lok bool, rr model.C
 	switch {
 	case lok && rok:
 		if compareKey(lr) == compareKey(rr) {
-			if comparableEqual(lr.Value, rr.Value) {
+			if len(changedRowFields(lr, rr)) == 0 {
 				annotation := ""
 				if obj, ok := lr.Value.(*model.Object); ok && obj.Len() > 0 {
 					annotation = fmt.Sprintf("(%d fields match)", obj.Len())
 				}
 				fmt.Fprintf(w, "%s%s %-*s %s\n", indent, color.Apply("=", "green"), col, compactEventLabel(lr), annotation)
 			} else {
-				fmt.Fprintf(w, "%s%s %-*s %s\n", indent, color.Apply("~", "yellow"), col, compactEventLabel(lr), eventValueAnnotation(lr.Value, rr.Value))
+				fmt.Fprintf(w, "%s%s %-*s %s\n", indent, color.Apply("~", "yellow"), col, compactEventLabel(lr), rowAnnotation(lr, rr))
 			}
 			if len(lr.Children) > 0 || len(rr.Children) > 0 {
 				printEventRowsCompact(w, lr.Children, rr.Children, color, indent+"  ", col)
@@ -261,12 +341,21 @@ func printEventDiff(w io.Writer, left, right []model.CompareRow, color Color) {
 		rr, rok := rowAt(right, i)
 		switch {
 		case lok && rok && exactKey(lr) == exactKey(rr):
-			fmt.Fprintf(w, "  [%d] %-72s %s\n", i, eventRowText(lr), color.Apply("same", "green"))
+			// "same" is about this event; a subtree below it can still differ,
+			// and saying nothing about that reported a changed transaction as
+			// unchanged.
+			label := "same"
+			if childValue, childOnlyA, childOnlyB := countEventDiffs(lr.Children, rr.Children); childValue+childOnlyA+childOnlyB > 0 {
+				label = "same, children differ"
+			}
+			fmt.Fprintf(w, "  [%d] %-72s %s\n", i, eventRowText(lr), color.Apply(label, "green"))
+			printChildDiff(w, lr.Children, rr.Children, color)
 		case lok && rok && compareKey(lr) == compareKey(rr):
 			fmt.Fprintf(w, "  [%d] %-72s %s\n", i, eventRowText(lr), color.Apply("same shape", "yellow"))
-			for _, change := range changedFields(lr.Value, rr.Value) {
+			for _, change := range changedRowFields(lr, rr) {
 				fmt.Fprintf(w, "      %s\n", color.Apply(change, "yellow"))
 			}
+			printChildDiff(w, lr.Children, rr.Children, color)
 		case lok && rok:
 			fmt.Fprintf(w, "  [%d] baseline:  %s\n", i, eventRowText(lr))
 			fmt.Fprintf(w, "      candidate: %s\n", eventRowText(rr))
@@ -479,4 +568,31 @@ func equalStringSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// printChildDiff walks the subtree below a matched event, so a difference that
+// lives in a child is visible where the parent is reported.
+func printChildDiff(w io.Writer, left, right []model.CompareRow, color Color) {
+	n := len(left)
+	if len(right) > n {
+		n = len(right)
+	}
+	for i := 0; i < n; i++ {
+		lr, lok := rowAt(left, i)
+		rr, rok := rowAt(right, i)
+		switch {
+		case lok && rok && compareKey(lr) == compareKey(rr):
+			for _, change := range changedRowFields(lr, rr) {
+				fmt.Fprintf(w, "      %s %s\n", eventRowText(lr), color.Apply(change, "yellow"))
+			}
+			printChildDiff(w, lr.Children, rr.Children, color)
+		case lok && rok:
+			fmt.Fprintf(w, "      baseline:  %s\n", eventRowText(lr))
+			fmt.Fprintf(w, "      candidate: %s\n", eventRowText(rr))
+		case lok:
+			fmt.Fprintf(w, "      %s %s\n", eventRowText(lr), color.Apply("baseline only", "yellow"))
+		case rok:
+			fmt.Fprintf(w, "      %s %s\n", eventRowText(rr), color.Apply("candidate only", "yellow"))
+		}
+	}
 }

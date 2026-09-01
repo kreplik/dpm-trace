@@ -118,8 +118,11 @@ func ComparePreparedToTrace(prepared *Object, trace *Trace) *PreparedComparison 
 	roots := []CompareRow{}
 	for _, id := range trace.RootEventIDs {
 		if ev, ok := trace.EventsByID[id]; ok {
-			// Python passes no events_by_id here, so children are not inlined.
-			roots = append(roots, EventCompareRow(ev, nil))
+			// These rows describe the committed side, which has children: a
+			// consuming exercise and the create it produced. Building them
+			// without the event map dropped that subtree, so the same event
+			// carried its children in an update comparison and none here.
+			roots = append(roots, EventCompareRow(ev, trace.EventsByID))
 		}
 	}
 
