@@ -125,6 +125,12 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset", "completionOffset")))
 	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(c.StatusCode))
 	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(c.Message)))
+	// The parties the completion was looked up under: a completion found for a
+	// narrower set than the command was submitted with is a different answer,
+	// and the comparison is where that matters most.
+	if lookup, ok := model.ObjectField(completion.Raw, "lookup"); ok && lookup.Len() > 0 {
+		fmt.Fprintf(w, "  parties:    %s\n", partyListSummary(model.ObjectStrings(lookup, "parties")))
+	}
 
 	traceContext := completion.Get("traceContext")
 	if obj, ok := traceContext.(*model.Object); ok {

@@ -123,33 +123,49 @@ func compactEventLabel(row model.CompareRow) string {
 	return kind + " " + template
 }
 
-// eventValueAnnotation ports _event_value_annotation.
-func eventValueAnnotation(lv, rv any) string {
+// changedFields lists every field whose value differs, as "key: a → b". A
+// payload that changed in three places was reported as one, because reading
+// only the first difference makes the rest invisible -- and which fields moved
+// is the question a comparison exists to answer.
+func changedFields(lv, rv any) []string {
 	left, leftOK := lv.(*model.Object)
 	right, rightOK := rv.(*model.Object)
-	if leftOK && rightOK {
-		keys := map[string]bool{}
-		for _, key := range left.Keys() {
-			keys[key] = true
-		}
-		for _, key := range right.Keys() {
-			keys[key] = true
-		}
-		sorted := make([]string, 0, len(keys))
-		for key := range keys {
-			sorted = append(sorted, key)
-		}
-		sort.Strings(sorted)
-		for _, key := range sorted {
-			a, aOK := left.Get(key)
-			b, bOK := right.Get(key)
-			if comparableEqual(a, b) {
-				continue
-			}
-			return fmt.Sprintf("%s: %s → %s", key, compactValueOrMissing(a, aOK), compactValueOrMissing(b, bOK))
-		}
+	if !leftOK || !rightOK {
+		return nil
 	}
-	return "values differ"
+	keys := map[string]bool{}
+	for _, key := range left.Keys() {
+		keys[key] = true
+	}
+	for _, key := range right.Keys() {
+		keys[key] = true
+	}
+	sorted := make([]string, 0, len(keys))
+	for key := range keys {
+		sorted = append(sorted, key)
+	}
+	sort.Strings(sorted)
+
+	var changed []string
+	for _, key := range sorted {
+		a, aOK := left.Get(key)
+		b, bOK := right.Get(key)
+		if comparableEqual(a, b) {
+			continue
+		}
+		changed = append(changed, fmt.Sprintf("%s: %s → %s",
+			key, compactValueOrMissing(a, aOK), compactValueOrMissing(b, bOK)))
+	}
+	return changed
+}
+
+// eventValueAnnotation is the one-line form, for the compact view.
+func eventValueAnnotation(lv, rv any) string {
+	changed := changedFields(lv, rv)
+	if len(changed) == 0 {
+		return "values differ"
+	}
+	return strings.Join(changed, ", ")
 }
 
 func countEventDiffs(left, right []model.CompareRow) (nValue, nOnlyA, nOnlyB int) {
@@ -248,6 +264,9 @@ func printEventDiff(w io.Writer, left, right []model.CompareRow, color Color) {
 			fmt.Fprintf(w, "  [%d] %-72s %s\n", i, eventRowText(lr), color.Apply("same", "green"))
 		case lok && rok && compareKey(lr) == compareKey(rr):
 			fmt.Fprintf(w, "  [%d] %-72s %s\n", i, eventRowText(lr), color.Apply("same shape", "yellow"))
+			for _, change := range changedFields(lr.Value, rr.Value) {
+				fmt.Fprintf(w, "      %s\n", color.Apply(change, "yellow"))
+			}
 		case lok && rok:
 			fmt.Fprintf(w, "  [%d] baseline:  %s\n", i, eventRowText(lr))
 			fmt.Fprintf(w, "      candidate: %s\n", eventRowText(rr))
@@ -427,6 +446,13 @@ func compactValue(value any) string {
 func compactValueOrMissing(value any, present bool) string {
 	if !present {
 		return compactValue("<missing>")
+	}
+	// A party id is the value most likely to appear in a diff and the longest
+	// thing that can: printed whole, two of them push the change off the line.
+	if text, ok := value.(string); ok {
+		if _, _, isParty := SplitPartyID(text); isParty {
+			return ShortParty(text)
+		}
 	}
 	return compactValue(value)
 }

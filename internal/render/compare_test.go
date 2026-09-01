@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -97,5 +98,42 @@ func TestPreparedUpdateComparisonMatchesGoldens(t *testing.T) {
 				t.Errorf("differs from %s:\n%s", tc.golden, firstDifference(got, want))
 			}
 		})
+	}
+}
+
+// A payload that changed in three places was reported as one: the annotation
+// returned on the first differing key, so which fields actually moved -- the
+// question a comparison exists to answer -- was invisible past the first.
+func TestChangedFieldsReportsEveryDifference(t *testing.T) {
+	left := model.NewObject()
+	left.Set("issuer", "Issuer::1220aa")
+	left.Set("name", "GOLD")
+	left.Set("owner", "Alice::1220bb")
+	left.Set("quantity", "100")
+
+	right := model.NewObject()
+	right.Set("issuer", "Issuer::1220aa")
+	right.Set("name", "SILVER")
+	right.Set("owner", "Bob::1220cc")
+	right.Set("quantity", "42")
+
+	changed := changedFields(left, right)
+	if len(changed) != 3 {
+		t.Fatalf("changedFields = %v, want three entries", changed)
+	}
+	for _, want := range []string{"name: GOLD → SILVER", "quantity: 100 → 42"} {
+		if !slices.Contains(changed, want) {
+			t.Errorf("changedFields missing %q, got %v", want, changed)
+		}
+	}
+	// Party ids are shortened: printed whole, two of them push the change off
+	// the line.
+	if !strings.Contains(strings.Join(changed, " "), "Alice::1220bb → Bob::1220cc") &&
+		!strings.Contains(strings.Join(changed, " "), "...") {
+		t.Errorf("party change not rendered readably: %v", changed)
+	}
+	// An unchanged field must not appear.
+	if strings.Contains(strings.Join(changed, " "), "issuer") {
+		t.Errorf("unchanged field reported: %v", changed)
 	}
 }
