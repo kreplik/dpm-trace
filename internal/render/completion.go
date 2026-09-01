@@ -139,14 +139,14 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 		for _, key := range keys {
 			value, _ := obj.Get(key)
 			if text := scalarText(value); text != "" {
-				fmt.Fprintf(w, "  %s:  %s\n", key, Short(text, 80))
+				fmt.Fprintf(w, "  %-11s %s\n", key+":", Short(text, 80))
 			}
 		}
 	} else if traceContext != nil {
 		fmt.Fprintf(w, "  trace context: %s\n", compactValue(traceContext))
 	}
 	if sync := completion.Get("synchronizerTime", "synchronizer_time"); sync != nil {
-		fmt.Fprintf(w, "  sync time:  %s\n", scalarText(sync))
+		fmt.Fprintf(w, "  %-11s %s\n", "sync time:", scalarText(sync))
 	}
 	locations, capped := CompletionSourceDiagnostics(c.Completion, index, maxSourceLocations)
 	PrintSourceDiagnostics(w, locations, capped, index, color)
