@@ -18,7 +18,7 @@ import (
 // and the artifact must never be presented as a committed transaction.
 func runPrepare(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace prepare --submitter <url> --act-as <party> --template <id> [flags]", "Prepare a command without committing it.", submissionFlags, "")
+		commandHelp(os.Stdout, "dpm trace prepare --submitter <url> --act-as <party> --template <id> [flags]", "Prepare a command without committing it.", prepareFlags, "")
 		return 0
 	}
 	opts, spec, rc := parseSubmissionFlags("prepare", args)
@@ -126,9 +126,6 @@ type submissionOpts struct {
 	debugInfo      []string
 	dar            []string
 	damlc          string
-	scanURL        string
-	verbose        bool
-	waitSeconds    int
 	maxSourceLoc   int
 	printJSON      bool
 	allowFail      bool
@@ -139,6 +136,14 @@ type submissionOpts struct {
 func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.CommandSpec, int) {
 	opts := submissionOpts{colorMode: "auto", maxSourceLoc: 5}
 	var spec ledger.CommandSpec
+
+	// The two commands share this parser but not their flag sets, so each
+	// accepts exactly what its own help lists. Swallowing a flag the command
+	// never reads makes it look like it did something.
+	accepted := acceptedFlags(prepareFlags)
+	if name == "submit" {
+		accepted = acceptedFlags(submitFlags)
+	}
 
 	needsValue := func(i int, flag string) (string, bool) {
 		if i+1 >= len(args) {
@@ -152,6 +157,10 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 		arg := args[i]
 		var value string
 		var ok bool
+		if strings.HasPrefix(arg, "-") && !accepted[arg] {
+			fmt.Fprintf(os.Stderr, "error: unknown flag %q for dpm trace %s\n", arg, name)
+			return opts, spec, 2
+		}
 		switch arg {
 		case "--print-json":
 			opts.printJSON = true
@@ -160,7 +169,7 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 			opts.allowFail = true
 			continue
 		case "-v", "--verbose":
-			opts.verbose = true
+			opts.full = true
 			continue
 		case "--full":
 			opts.full = true
@@ -214,15 +223,9 @@ func parseSubmissionFlags(name string, args []string) (submissionOpts, ledger.Co
 			opts.dar = append(opts.dar, value)
 		case "--damlc":
 			opts.damlc = value
-		case "--scan-url":
-			opts.scanURL = value
 		case "--out":
 			// Alias of --export, as add_common_connection_args declares it.
 			opts.export = value
-		case "--wait":
-			if n, err := strconv.Atoi(value); err == nil {
-				opts.waitSeconds = n
-			}
 		case "--max-source-locations":
 			if n, err := strconv.Atoi(value); err == nil {
 				opts.maxSourceLoc = n

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -513,5 +514,117 @@ func TestSubmitExportWritesTheResponse(t *testing.T) {
 	}
 	if decoded["code"] != "DAML_FAILURE" {
 		t.Errorf("exported %v, want the rejection body", decoded)
+	}
+}
+
+// A command that accepts a flag it never reads makes the flag look like it did
+// something. prepare and submit share a parser but not a purpose, so each
+// accepts exactly what its own help lists -- the parser derives its set from
+// that listing, and this pins both ends of it.
+func TestSubmissionFlagsMatchEachCommand(t *testing.T) {
+	submitOnly := []string{
+		"--allow-fail", "--full", "-v", "--verbose", "--log-file", "--color",
+		"--daml-yaml", "--dar", "--damlc", "--debug-info", "--source-root",
+		"--max-source-locations",
+	}
+	shared := []string{
+		"--submitter", "--act-as", "--read-as", "--party", "--token",
+		"--token-file", "--config", "--template", "--contract-id", "--choice",
+		"--arg", "--args-json", "--args-file", "--commands", "--command-json",
+		"--command-id", "--user-id", "--export", "--out", "--print-json",
+		"--synchronizer-id",
+	}
+	// Neither command reads these: submitting through Scan is not a thing, and
+	// submit-and-wait already waits.
+	rejectedByBoth := []string{"--wait", "--scan-url"}
+
+	rejects := func(run func([]string) int, flag string) bool {
+		t.Helper()
+		_, stderr, _ := capture(t, func() int {
+			return run([]string{"--submitter", "http://127.0.0.1:1", flag, "x"})
+		})
+		return strings.Contains(stderr, "unknown flag "+strconv.Quote(flag))
+	}
+
+	for _, flag := range submitOnly {
+		if rejects(runSubmit, flag) {
+			t.Errorf("submit rejects %s, which it acts on", flag)
+		}
+		if !rejects(runPrepare, flag) {
+			t.Errorf("prepare accepts %s, which only submit acts on", flag)
+		}
+	}
+	for _, flag := range shared {
+		if rejects(runSubmit, flag) {
+			t.Errorf("submit rejects %s", flag)
+		}
+		if flag == "--synchronizer-id" {
+			continue
+		}
+		if rejects(runPrepare, flag) {
+			t.Errorf("prepare rejects %s", flag)
+		}
+	}
+	for _, flag := range rejectedByBoth {
+		if !rejects(runSubmit, flag) || !rejects(runPrepare, flag) {
+			t.Errorf("%s is accepted but neither command acts on it", flag)
+		}
+	}
+}
+
+// -v is an alias for --full, so it must reach the same option.
+func TestVerboseIsAnAliasForFull(t *testing.T) {
+	for _, flag := range []string{"-v", "--verbose", "--full"} {
+		opts, _, code := parseSubmissionFlags("submit", []string{flag})
+		if code != 0 {
+			t.Fatalf("%s exited %d", flag, code)
+		}
+		if !opts.full {
+			t.Errorf("%s did not set full", flag)
+		}
+	}
+}
+
+// -v means --full everywhere it exists, and help says so: an alias nobody can
+// find is the same as no alias.
+func TestVerboseAliasIsUniformAndDocumented(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		help func() int
+	}{
+		{"submit", func() int { return runSubmit([]string{"--help"}) }},
+		{"compare", func() int { return runCompare([]string{"--help"}) }},
+	} {
+		stdout, _, code := capture(t, tc.help)
+		if code != 0 {
+			t.Fatalf("%s --help exited %d", tc.name, code)
+		}
+		var row string
+		for _, line := range strings.Split(stdout, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "-v, --verbose") {
+				row = strings.TrimSpace(line)
+			}
+		}
+		if row == "" {
+			t.Errorf("%s --help does not list -v, --verbose", tc.name)
+		} else if !strings.Contains(row, "--full") {
+			t.Errorf("%s --help does not name the --full alias: %q", tc.name, row)
+		}
+	}
+
+	// compare renders the same thing either way.
+	artifact := repoPath("examples", "transfer.trace.json")
+	drifted := repoPath("examples", "transfer-drifted.trace.json")
+	var rendered []string
+	for _, flag := range []string{"-v", "--verbose", "--full"} {
+		out, _, _ := capture(t, func() int {
+			return runCompare([]string{artifact, drifted, flag, "--color", "never"})
+		})
+		rendered = append(rendered, out)
+	}
+	for i, out := range rendered[1:] {
+		if out != rendered[0] {
+			t.Errorf("compare renders differently for spelling %d", i+1)
+		}
 	}
 }

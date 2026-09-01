@@ -18,7 +18,7 @@ import (
 // is how integration tests capture a rejection.
 func runSubmit(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace submit --submitter <url> --act-as <party> --template <id> [flags]", "Submit a command and print the resulting update id.", submissionFlags, "")
+		commandHelp(os.Stdout, "dpm trace submit --submitter <url> --act-as <party> --template <id> [flags]", "Submit a command and print the resulting update id.", submitFlags, "")
 		return 0
 	}
 	opts, spec, rc := parseSubmissionFlags("submit", args)
@@ -51,6 +51,9 @@ func runSubmit(args []string) int {
 		"commands":  commands,
 		"actAs":     actAs,
 		"readAs":    readAs,
+	}
+	if opts.synchronizerID != "" {
+		request["synchronizerId"] = opts.synchronizerID
 	}
 	if userID := ledger.UserID(opts.userID, opts.ledgerURL, opts.token, opts.tokenFile); userID != "" {
 		request["userId"] = userID

@@ -262,7 +262,7 @@ func runCompare(args []string) int {
 				return 2
 			}
 		case "-v", "--verbose":
-			// Accepted for parity; compare has no extra output to gate on it.
+			full = true
 		default:
 			// Without this guard an unknown flag becomes a positional and is
 			// fetched as an update id, so a typo reports "update not found".
