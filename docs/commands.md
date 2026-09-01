@@ -115,6 +115,46 @@ participant *would* commit if the submission were signed and sent. No contract
 exists, no party has been notified, and the prepared hash is not an update id.
 `dpm trace open prepared.json` reopens it later.
 
+## submit
+
+Submit a command and print the update id it produced, so there is something to
+trace:
+
+```bash
+UPDATE_ID=$(dpm trace submit --submitter <url> --act-as '<party-id>' \
+  --template '#pkg:Asset:Asset' --arg owner='<party-id>' --arg quantity=100)
+
+dpm trace "$UPDATE_ID" --submitter <url> --read-as '<party-id>'
+```
+
+It takes the same command flags as `prepare` — `--template`, `--choice`,
+`--contract-id`, `--arg`, `--args-json`, `--args-file`, `--commands`,
+`--command-json` — and differs only in committing rather than stopping at the
+prepared transaction. A submission carries one or more commands and produces
+one transaction, so one update id comes back however many commands went in.
+
+When a submission is rejected there is no update id, and `submit` prints the
+rejection instead: the status, the error and the choice it failed in. `-v`
+renders the whole completion rather than the summary, and `--allow-fail` exits
+0 so a script expecting a failure does not abort. Both apply only to that
+rejection output — a submission that commits prints its update id and nothing
+else. `--export` writes the raw response, the submission's own JSON rather than
+a trace artifact, which is how a failure gets captured for `--completion-file`
+later.
+
+`prepare` and `submit` take the same command flags but not the same options.
+The flags that render a rejection — `-v`/`--verbose` (also spelled `--full`),
+`--allow-fail`, `--log-file`, `--color` and the source diagnostics — belong to
+`submit`, since `prepare` never produces a completion. Each command rejects
+what the other owns rather than accepting and ignoring it.
+
+Both take `--synchronizer-id` to pick the synchronizer to submit or prepare
+against. Given one the participant cannot reach, it says so:
+
+```
+✗ submission failed  INVALID_PRESCRIBED_SYNCHRONIZER_ID
+```
+
 ## --command-id and --completion-file
 
 A submission that fails never becomes a transaction, so it has no update id and
@@ -164,7 +204,7 @@ dpm trace compare --prepared prepared.json --command-id <id> --submitter <url> -
 dpm trace compare --prepared prepared.json --completion-file completion.json
 ```
 
-`--full` prints the verbose form; the default is compact. `--print-json` emits
+`-v` prints the verbose form; the default is compact. `--print-json` emits
 the comparison for scripting.
 
 ### What can be compared
