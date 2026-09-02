@@ -77,7 +77,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 		fmt.Fprintln(w)
 
 		fmt.Fprintf(w, "  A  command %s   (prepared)\n", Short(orDashValue(c.Left.CommandID), 20))
-		completionID := Short(orDashValue(completion.String("commandId", "command_id")), 20)
+		completionID := Short(orDashValue(completion.CommandID()), 20)
 		offset := orDashFalsy(completion.Get("offset", "completionOffset"))
 		if committed {
 			updateID := Short(completion.String("updateId", "update_id"), 12)
@@ -93,7 +93,7 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 		}
 
 		var ctxParts []string
-		if submission := completion.String("submissionId", "submission_id"); submission != "" {
+		if submission := completion.SubmissionID(); submission != "" {
 			ctxParts = append(ctxParts, "submission "+Short(submission, 20))
 		}
 		if sync := scalarText(completion.Get("synchronizerTime", "synchronizer_time")); sync != "" {
@@ -119,17 +119,17 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 	if c.CommandIDMatch {
 		marker = " " + color.Apply("match", "green")
 	}
-	fmt.Fprintf(w, "  command id: %s%s\n", orDash(completion.CommandID()), marker)
-	fmt.Fprintf(w, "  submission: %s\n", orDash(completion.SubmissionID()))
-	fmt.Fprintf(w, "  update id:  %s\n", Short(orDashValue(completion.String("updateId", "update_id")), 80))
-	fmt.Fprintf(w, "  offset:     %s\n", orDashFalsy(completion.Get("offset", "completionOffset")))
-	fmt.Fprintf(w, "  status:     %s\n", orDashIfNil(c.StatusCode))
-	fmt.Fprintf(w, "  message:    %s\n", orDash(scalarText(c.Message)))
+	fmt.Fprintf(w, "  %-12s %s%s\n", "command id:", orDash(completion.CommandID()), marker)
+	fmt.Fprintf(w, "  %-12s %s\n", "submission:", orDash(completion.SubmissionID()))
+	fmt.Fprintf(w, "  %-12s %s\n", "update id:", Short(orDashValue(completion.String("updateId", "update_id")), 80))
+	fmt.Fprintf(w, "  %-12s %s\n", "offset:", orDashFalsy(completion.Get("offset", "completionOffset")))
+	fmt.Fprintf(w, "  %-12s %s\n", "status:", orDashIfNil(c.StatusCode))
+	fmt.Fprintf(w, "  %-12s %s\n", "message:", orDash(scalarText(c.Message)))
 	// The parties the completion was looked up under: a completion found for a
 	// narrower set than the command was submitted with is a different answer,
 	// and the comparison is where that matters most.
 	if lookup, ok := model.ObjectField(completion.Raw, "lookup"); ok && lookup.Len() > 0 {
-		fmt.Fprintf(w, "  parties:    %s\n", partyListSummary(model.ObjectStrings(lookup, "parties")))
+		fmt.Fprintf(w, "  %-12s %s\n", "parties:", partyListSummary(model.ObjectStrings(lookup, "parties")))
 	}
 
 	traceContext := completion.Get("traceContext")
@@ -139,14 +139,14 @@ func PreparedCompletionComparison(w io.Writer, c *model.CompletionComparison, co
 		for _, key := range keys {
 			value, _ := obj.Get(key)
 			if text := scalarText(value); text != "" {
-				fmt.Fprintf(w, "  %-11s %s\n", key+":", Short(text, 80))
+				fmt.Fprintf(w, "  %-12s %s\n", key+":", Short(text, 80))
 			}
 		}
 	} else if traceContext != nil {
 		fmt.Fprintf(w, "  trace context: %s\n", compactValue(traceContext))
 	}
 	if sync := completion.Get("synchronizerTime", "synchronizer_time"); sync != nil {
-		fmt.Fprintf(w, "  %-11s %s\n", "sync time:", scalarText(sync))
+		fmt.Fprintf(w, "  %-12s %s\n", "sync time:", scalarText(sync))
 	}
 	locations, capped := CompletionSourceDiagnostics(c.Completion, index, maxSourceLocations)
 	PrintSourceDiagnostics(w, locations, capped, index, color)

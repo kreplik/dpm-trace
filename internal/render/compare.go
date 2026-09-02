@@ -177,29 +177,29 @@ func changedRowFields(left, right model.CompareRow) []string {
 			compactValue(left.Result), compactValue(right.Result)))
 	}
 	for _, party := range []struct {
-		label      string
-		left, righ []string
+		label       string
+		left, right []string
 	}{
 		{"signatories", left.Signatories, right.Signatories},
 		{"observers", left.Observers, right.Observers},
 		{"witnesses", left.Witnesses, right.Witnesses},
 		{"acting", left.ActingParties, right.ActingParties},
 	} {
-		if !equalStringSlices(party.left, party.righ) {
+		if !equalStringSlices(party.left, party.right) {
 			changed = append(changed, fmt.Sprintf("%s: %s → %s",
-				party.label, partyListSummary(party.left), partyListSummary(party.righ)))
+				party.label, partyListSummary(party.left), partyListSummary(party.right)))
 		}
 	}
 	for _, field := range []struct {
-		label      string
-		left, righ string
+		label       string
+		left, right string
 	}{
 		{"source synchronizer", left.SourceSynchronizer, right.SourceSynchronizer},
 		{"target synchronizer", left.TargetSynchronizer, right.TargetSynchronizer},
 	} {
-		if field.left != field.righ {
+		if field.left != field.right {
 			changed = append(changed, fmt.Sprintf("%s: %s → %s",
-				field.label, orDash(Short(field.left, 40)), orDash(Short(field.righ, 40))))
+				field.label, orDash(Short(field.left, 40)), orDash(Short(field.right, 40))))
 		}
 	}
 	if !equalCounters(left.ReassignmentCounter, right.ReassignmentCounter) {
@@ -294,7 +294,7 @@ func printEventRowCompact(w io.Writer, lr model.CompareRow, lok bool, rr model.C
 			if len(changedRowFields(lr, rr)) == 0 {
 				annotation := ""
 				if obj, ok := lr.Value.(*model.Object); ok && obj.Len() > 0 {
-					annotation = fmt.Sprintf("(%d fields match)", obj.Len())
+					annotation = fieldsMatchLabel(obj.Len())
 				}
 				fmt.Fprintf(w, "%s%s %-*s %s\n", indent, color.Apply("=", "green"), col, compactEventLabel(lr), annotation)
 			} else {
@@ -595,4 +595,11 @@ func printChildDiff(w io.Writer, left, right []model.CompareRow, color Color) {
 			fmt.Fprintf(w, "      %s %s\n", eventRowText(rr), color.Apply("candidate only", "yellow"))
 		}
 	}
+}
+
+func fieldsMatchLabel(n int) string {
+	if n == 1 {
+		return "(1 field matches)"
+	}
+	return fmt.Sprintf("(%d fields match)", n)
 }

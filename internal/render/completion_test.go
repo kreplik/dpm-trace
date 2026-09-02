@@ -229,3 +229,26 @@ func TestComparePreparedToRejectionMatchesTheCommandID(t *testing.T) {
 		t.Error("identical command ids were not reported as a match")
 	}
 }
+
+// The blob is a formatted map: a key merely ending in the one being looked for
+// must not match, or a participant-supplied field could shadow the real one.
+func TestRejectionContextKeysAreMatchedWholly(t *testing.T) {
+	raw := `{
+		"code": "DAML_FAILURE",
+		"context": {
+			"commands": "{parentCommandId: 'wrong-1', xcommandId: 'wrong-2', commandId: 'right-1', submissionId: 'right-2'}"
+		}
+	}`
+	obj, err := model.Decode([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &model.Completion{Raw: model.NormalizeCompletion(obj)}
+
+	if got := c.CommandID(); got != "right-1" {
+		t.Errorf("CommandID = %q, want right-1", got)
+	}
+	if got := c.SubmissionID(); got != "right-2" {
+		t.Errorf("SubmissionID = %q, want right-2", got)
+	}
+}

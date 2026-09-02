@@ -77,15 +77,23 @@ func (c *Completion) SubmissionID() string {
 	return commandFieldFromContext(c.Raw, "submissionId")
 }
 
+// The blob is a formatted map, so a key is preceded by its opening brace or a
+// separator: without that boundary a key merely ending in the one being looked
+// for would match first.
+var commandContextFields = map[string]*regexp.Regexp{
+	"commandId":    regexp.MustCompile(`(?:^|[{,\s])commandId:\s*'?([^,}']+)`),
+	"submissionId": regexp.MustCompile(`(?:^|[{,\s])submissionId:\s*'?([^,}']+)`),
+}
+
 // commandFieldFromContext reads one field out of the formatted
 // `context.commands` blob a rejection carries.
 func commandFieldFromContext(raw *Object, field string) string {
-	context, ok := ObjectField(raw, "context")
+	pattern, ok := commandContextFields[field]
 	if !ok {
 		return ""
 	}
-	pattern, err := regexp.Compile(regexp.QuoteMeta(field) + `:\s*'?([^,}']+)`)
-	if err != nil {
+	context, ok := ObjectField(raw, "context")
+	if !ok {
 		return ""
 	}
 	match := pattern.FindStringSubmatch(ObjectString(context, "commands"))

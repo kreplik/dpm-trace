@@ -628,3 +628,80 @@ func TestVerboseAliasIsUniformAndDocumented(t *testing.T) {
 		}
 	}
 }
+
+// compare hand-rolled its parser, so it accepted flags its help never listed
+// and silently ignored two it did. It now uses the same derivation as prepare
+// and submit: the parser's set comes from the help listing.
+func TestCompareFlagsMatchItsHelp(t *testing.T) {
+	stdout, _, code := capture(t, func() int { return runCompare([]string{"--help"}) })
+	if code != 0 {
+		t.Fatalf("compare --help exited %d", code)
+	}
+	documented := map[string]bool{}
+	for _, line := range strings.Split(stdout, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.HasPrefix(fields[0], "-") {
+			continue
+		}
+		documented[strings.TrimSuffix(fields[0], ",")] = true
+	}
+
+	// Used by the source index, and previously undocumented.
+	for _, flag := range []string{
+		"--daml-yaml", "--source-root", "--debug-info", "--damlc",
+		"--max-source-locations", "--completion-timeout-ms", "--completion-user-id",
+	} {
+		if !documented[flag] {
+			t.Errorf("compare --help omits %s, which it acts on", flag)
+		}
+	}
+
+	// Neither the fetcher nor anything else read these.
+	for _, flag := range []string{"--wait", "--source"} {
+		if documented[flag] {
+			t.Errorf("compare --help documents %s, which nothing reads", flag)
+		}
+		_, stderr, _ := capture(t, func() int {
+			return runCompare([]string{"a.json", "b.json", flag, "x"})
+		})
+		if !strings.Contains(stderr, "unknown flag "+strconv.Quote(flag)) {
+			t.Errorf("compare accepts %s, which nothing reads", flag)
+		}
+	}
+}
+
+// completionLookup.fetch hardcoded the window and dropped the four fields the
+// struct carries, so `compare --command-id X --completion-limit 500` searched
+// the default window anyway -- a documented flag that did nothing.
+func TestCompareCompletionLookupCarriesItsWindow(t *testing.T) {
+	var query, body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.RawQuery
+		raw, _ := io.ReadAll(r.Body)
+		body = string(raw)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[]`)
+	}))
+	defer server.Close()
+
+	_, _, _ = capture(t, func() int {
+		return runCompare([]string{
+			"--prepared", repoPath("examples", "transfer.prepared.json"),
+			"--command-id", "c1", "--submitter", server.URL, "--act-as", "Alice::1220aa",
+			"--begin-exclusive", "42", "--completion-limit", "500",
+			"--completion-timeout-ms", "250", "--completion-user-id", "someone",
+		})
+	})
+
+	if !strings.Contains(query, "limit=500") {
+		t.Errorf("query = %q, want limit=500", query)
+	}
+	if !strings.Contains(query, "stream_idle_timeout_ms=250") {
+		t.Errorf("query = %q, want the requested timeout", query)
+	}
+	for _, want := range []string{"42", "someone"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("request body does not carry %s: %s", want, body)
+		}
+	}
+}

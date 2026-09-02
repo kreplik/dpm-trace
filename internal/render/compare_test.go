@@ -188,6 +188,13 @@ func TestCompletionLabelsShareOneColumn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load completion: %v", err)
 	}
+	// Real completions carry the W3C keys, and "traceparent:" is longer than
+	// the fixture's "spanId:" -- a column sized to the short keys misaligns on
+	// every actual participant.
+	traceContext := model.NewObject()
+	traceContext.Set("traceparent", "00-aedfad6959ad1b5adee03ab2840ef676-75fbb804d315c200-01")
+	traceContext.Set("tracestate", "vendor=x")
+	completion.Raw.Set("traceContext", traceContext)
 
 	var buf bytes.Buffer
 	PreparedCompletionComparison(&buf, model.ComparePreparedToCompletion(prepared, completion),
