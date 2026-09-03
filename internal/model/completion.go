@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -51,6 +52,55 @@ func NormalizeCompletion(raw *Object) *Object {
 		return NewObject()
 	}
 	return completion
+}
+
+// CommandID returns the submitted command id.
+//
+// A rejection -- the shape a failed submission actually arrives in -- carries
+// no top-level commandId: the participant records the submission under
+// `context.commands`, formatted rather than structured. Reading only the top
+// level reported no command id for exactly the submissions this tool exists to
+// explain, and left a prepared/completion comparison unable to say the two
+// were the same command.
+func (c *Completion) CommandID() string {
+	if id := c.String("commandId", "command_id"); id != "" {
+		return id
+	}
+	return commandFieldFromContext(c.Raw, "commandId")
+}
+
+// SubmissionID returns the submission id, with the same fallback.
+func (c *Completion) SubmissionID() string {
+	if id := c.String("submissionId", "submission_id"); id != "" {
+		return id
+	}
+	return commandFieldFromContext(c.Raw, "submissionId")
+}
+
+// The blob is a formatted map, so a key is preceded by its opening brace or a
+// separator: without that boundary a key merely ending in the one being looked
+// for would match first.
+var commandContextFields = map[string]*regexp.Regexp{
+	"commandId":    regexp.MustCompile(`(?:^|[{,\s])commandId:\s*'?([^,}']+)`),
+	"submissionId": regexp.MustCompile(`(?:^|[{,\s])submissionId:\s*'?([^,}']+)`),
+}
+
+// commandFieldFromContext reads one field out of the formatted
+// `context.commands` blob a rejection carries.
+func commandFieldFromContext(raw *Object, field string) string {
+	pattern, ok := commandContextFields[field]
+	if !ok {
+		return ""
+	}
+	context, ok := ObjectField(raw, "context")
+	if !ok {
+		return ""
+	}
+	match := pattern.FindStringSubmatch(ObjectString(context, "commands"))
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
 }
 
 // Get exposes a field of the underlying completion object.
@@ -118,7 +168,7 @@ func ComparePreparedToCompletion(prepared *Object, completion *Completion) *Comp
 	code, message := completion.StatusFields()
 	request, _ := pickObject(prepared, "request")
 	preparedID := pickString(request, "commandId")
-	completionID := completion.String("commandId", "command_id")
+	completionID := completion.CommandID()
 
 	return &CompletionComparison{
 		Kind:                     KindPreparedVsCompletion,
@@ -141,10 +191,10 @@ func (c *CompletionComparison) JSON() map[string]any {
 		"kind": c.Kind,
 		"left": c.Left.json(),
 		"right": map[string]any{
-			"commandId":        nilIfBlank(c.Completion.String("commandId", "command_id")),
+			"commandId":        nilIfBlank(c.Completion.CommandID()),
 			"updateId":         nilIfBlank(c.Completion.String("updateId", "update_id")),
-			"offset":           c.Completion.Get("offset"),
-			"submissionId":     nilIfBlank(c.Completion.String("submissionId", "submission_id")),
+			"offset":           c.Completion.Get("offset", "completionOffset"),
+			"submissionId":     nilIfBlank(c.Completion.SubmissionID()),
 			"statusCode":       c.StatusCode,
 			"message":          c.Message,
 			"source":           c.Completion.Get("source"),
@@ -227,6 +277,10 @@ func CorrelationTerms(completion *Object) map[string]bool {
 		"submissionId", "submission_id", "traceId", "correlationId"} {
 		add(pick(completion, key))
 	}
+	// A rejection keeps these inside context.commands, and the command id is
+	// the term an operator greps a participant log for.
+	add(commandFieldFromContext(completion, "commandId"))
+	add(commandFieldFromContext(completion, "submissionId"))
 	if status, ok := pickObject(completion, "status"); ok {
 		add(pick(status, "traceId"))
 		add(pick(status, "correlationId"))
@@ -273,4 +327,32 @@ func osErrorText(err error, path string) string {
 		return fmt.Sprintf("[Errno 13] Permission denied: '%s'", path)
 	}
 	return err.Error()
+}
+
+// LooksLikeCompletion reports whether a decoded object is completion data:
+// either a completion record, or the error body a rejected submission returns.
+func LooksLikeCompletion(obj *Object) bool {
+	if obj == nil {
+		return false
+	}
+	for _, key := range []string{"completionResponse", "completion", "status", "errorCategory", "grpcCodeValue"} {
+		if _, ok := obj.Get(key); ok {
+			return true
+		}
+	}
+	if _, ok := obj.Get("code"); ok {
+		if _, ok := obj.Get("cause"); ok {
+			return true
+		}
+	}
+	// A successful completion carries no status: it is identified by a command
+	// id alongside the fields the ledger stamps on it.
+	if _, ok := obj.Get("commandId"); ok {
+		for _, key := range []string{"offset", "submissionId", "synchronizerTime", "updateId"} {
+			if _, ok := obj.Get(key); ok {
+				return true
+			}
+		}
+	}
+	return false
 }

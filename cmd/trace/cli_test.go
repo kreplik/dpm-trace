@@ -2,9 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -365,5 +369,339 @@ func TestPartyFlagsRejectAnEmptyValue(t *testing.T) {
 				t.Errorf("stderr = %q, want a party-id error", stderr)
 			}
 		})
+	}
+}
+
+// A prepared artifact is the other thing --export writes. Refusing to reopen
+// it meant a prepared command could only ever be diffed against something,
+// never looked at again -- which is most of the point of exporting it.
+func TestOpenRendersAPreparedArtifact(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, stderr, code := capture(t, func() int { return runOpen([]string{prepared}) })
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+
+	for _, want := range []string{
+		"Prepared command",
+		"committed:    no",       // labelled prepared, not committed
+		"dpm-trace-prepare-001",  // the command id
+		"create Counter:Counter", // the command itself, not just a count
+		"owner=Alice",            // and its arguments
+		"non-committing prepare call",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+func TestOpenPreparedPrintJSON(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, code := capture(t, func() int { return runOpen([]string{prepared, "--print-json"}) })
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(stdout), &decoded); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	if decoded["schema"] != "dpm-trace/prepared-artifact/v0" {
+		t.Errorf("schema = %v", decoded["schema"])
+	}
+}
+
+// A live participant returns a cost estimation and a hashing scheme version;
+// the older fixture carries neither. "cost: returned" said a field existed
+// without saying what it was.
+func TestOpenPreparedReportsCostAndHashing(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared-with-cost.json")
+	stdout, _, code := capture(t, func() int { return runOpen([]string{prepared}) })
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	for _, want := range []string{
+		"hashing:      HASHING_SCHEME_VERSION_V2",
+		"cost:         0 traffic (request 0, response 0)",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// An artifact without those fields must not grow empty lines for them.
+func TestOpenPreparedOmitsAbsentCostAndHashing(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, _ := capture(t, func() int { return runOpen([]string{prepared}) })
+	for _, absent := range []string{"hashing:", "cost:"} {
+		if strings.Contains(stdout, absent) {
+			t.Errorf("reported %q for an artifact that has none:\n%s", absent, stdout)
+		}
+	}
+}
+
+// --visualize must not be silently ignored: a prepared command has no tree, so
+// say so rather than printing the summary as though the flag were absent.
+func TestOpenPreparedExplainsWhyThereIsNoSession(t *testing.T) {
+	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
+	stdout, _, _ := capture(t, func() int { return runOpen([]string{prepared, "--visualize"}) })
+	if !strings.Contains(stdout, "no transaction tree to step through") {
+		t.Errorf("--visualize was ignored without explanation:\n%s", stdout)
+	}
+}
+
+func TestOpenPointsAtCompletionFile(t *testing.T) {
+	for _, artifact := range []string{
+		repoPath("tests", "fixtures", "compare", "completion-fail.json"),
+		repoPath("tests", "fixtures", "compare", "completion-ok.json"),
+	} {
+		_, stderr, code := capture(t, func() int { return runOpen([]string{artifact}) })
+		if code == 0 {
+			t.Errorf("%s: open accepted completion data", artifact)
+		}
+		if !strings.Contains(stderr, "--completion-file") {
+			t.Errorf("%s: error does not name the right flag: %s", artifact, stderr)
+		}
+	}
+}
+
+func TestOpenRejectsAFileWithNoSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "plain.json")
+	if err := os.WriteFile(path, []byte(`{"hello": "world"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, code := capture(t, func() int { return runOpen([]string{path}) })
+	if code == 0 {
+		t.Error("open accepted a file with no schema")
+	}
+	if !strings.Contains(stderr, "no schema field") || strings.Contains(stderr, "None") {
+		t.Errorf("unhelpful error: %s", stderr)
+	}
+}
+
+// submit parsed --export but only prepare ever used it, so the flag was
+// advertised in --help and silently ignored. The rejection path is the one
+// that matters: --completion-file reads the file back.
+func TestSubmitExportWritesTheResponse(t *testing.T) {
+	var body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, body)
+	}))
+	defer server.Close()
+	body = `{"code":"DAML_FAILURE","cause":"boom","errorCategory":9}`
+
+	export := filepath.Join(t.TempDir(), "rejection.json")
+	_, _, code := capture(t, func() int {
+		return runSubmit([]string{
+			"--submitter", server.URL, "--act-as", "Alice::1220aa",
+			"--template", "pkg:M:T", "--arg", "x=1",
+			"--allow-fail", "--export", export,
+		})
+	})
+	if code != 0 {
+		t.Fatalf("--allow-fail did not exit 0: %d", code)
+	}
+
+	written, err := os.ReadFile(export)
+	if err != nil {
+		t.Fatalf("--export wrote nothing: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(written, &decoded); err != nil {
+		t.Fatalf("exported file is not JSON: %v", err)
+	}
+	if decoded["code"] != "DAML_FAILURE" {
+		t.Errorf("exported %v, want the rejection body", decoded)
+	}
+}
+
+// A command that accepts a flag it never reads makes the flag look like it did
+// something. prepare and submit share a parser but not a purpose, so each
+// accepts exactly what its own help lists -- the parser derives its set from
+// that listing, and this pins both ends of it.
+func TestSubmissionFlagsMatchEachCommand(t *testing.T) {
+	submitOnly := []string{
+		"--allow-fail", "--full", "-v", "--verbose", "--log-file", "--color",
+		"--daml-yaml", "--dar", "--damlc", "--debug-info", "--source-root",
+		"--max-source-locations",
+	}
+	shared := []string{
+		"--submitter", "--act-as", "--read-as", "--party", "--token",
+		"--token-file", "--config", "--template", "--contract-id", "--choice",
+		"--arg", "--args-json", "--args-file", "--commands", "--command-json",
+		"--command-id", "--user-id", "--export", "--out", "--print-json",
+		"--synchronizer-id",
+	}
+	// Neither command reads these: submitting through Scan is not a thing, and
+	// submit-and-wait already waits.
+	rejectedByBoth := []string{"--wait", "--scan-url"}
+
+	rejects := func(run func([]string) int, flag string) bool {
+		t.Helper()
+		_, stderr, _ := capture(t, func() int {
+			return run([]string{"--submitter", "http://127.0.0.1:1", flag, "x"})
+		})
+		return strings.Contains(stderr, "unknown flag "+strconv.Quote(flag))
+	}
+
+	for _, flag := range submitOnly {
+		if rejects(runSubmit, flag) {
+			t.Errorf("submit rejects %s, which it acts on", flag)
+		}
+		if !rejects(runPrepare, flag) {
+			t.Errorf("prepare accepts %s, which only submit acts on", flag)
+		}
+	}
+	for _, flag := range shared {
+		if rejects(runSubmit, flag) {
+			t.Errorf("submit rejects %s", flag)
+		}
+		if flag == "--synchronizer-id" {
+			continue
+		}
+		if rejects(runPrepare, flag) {
+			t.Errorf("prepare rejects %s", flag)
+		}
+	}
+	for _, flag := range rejectedByBoth {
+		if !rejects(runSubmit, flag) || !rejects(runPrepare, flag) {
+			t.Errorf("%s is accepted but neither command acts on it", flag)
+		}
+	}
+}
+
+// -v is an alias for --full, so it must reach the same option.
+func TestVerboseIsAnAliasForFull(t *testing.T) {
+	for _, flag := range []string{"-v", "--verbose", "--full"} {
+		opts, _, code := parseSubmissionFlags("submit", []string{flag})
+		if code != 0 {
+			t.Fatalf("%s exited %d", flag, code)
+		}
+		if !opts.full {
+			t.Errorf("%s did not set full", flag)
+		}
+	}
+}
+
+// -v means --full everywhere it exists, and help says so: an alias nobody can
+// find is the same as no alias.
+func TestVerboseAliasIsUniformAndDocumented(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		help func() int
+	}{
+		{"submit", func() int { return runSubmit([]string{"--help"}) }},
+		{"compare", func() int { return runCompare([]string{"--help"}) }},
+	} {
+		stdout, _, code := capture(t, tc.help)
+		if code != 0 {
+			t.Fatalf("%s --help exited %d", tc.name, code)
+		}
+		var row string
+		for _, line := range strings.Split(stdout, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "-v, --verbose") {
+				row = strings.TrimSpace(line)
+			}
+		}
+		if row == "" {
+			t.Errorf("%s --help does not list -v, --verbose", tc.name)
+		} else if !strings.Contains(row, "--full") {
+			t.Errorf("%s --help does not name the --full alias: %q", tc.name, row)
+		}
+	}
+
+	// compare renders the same thing either way.
+	artifact := repoPath("examples", "transfer.trace.json")
+	drifted := repoPath("examples", "transfer-drifted.trace.json")
+	var rendered []string
+	for _, flag := range []string{"-v", "--verbose", "--full"} {
+		out, _, _ := capture(t, func() int {
+			return runCompare([]string{artifact, drifted, flag, "--color", "never"})
+		})
+		rendered = append(rendered, out)
+	}
+	for i, out := range rendered[1:] {
+		if out != rendered[0] {
+			t.Errorf("compare renders differently for spelling %d", i+1)
+		}
+	}
+}
+
+// compare hand-rolled its parser, so it accepted flags its help never listed
+// and silently ignored two it did. It now uses the same derivation as prepare
+// and submit: the parser's set comes from the help listing.
+func TestCompareFlagsMatchItsHelp(t *testing.T) {
+	stdout, _, code := capture(t, func() int { return runCompare([]string{"--help"}) })
+	if code != 0 {
+		t.Fatalf("compare --help exited %d", code)
+	}
+	documented := map[string]bool{}
+	for _, line := range strings.Split(stdout, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.HasPrefix(fields[0], "-") {
+			continue
+		}
+		documented[strings.TrimSuffix(fields[0], ",")] = true
+	}
+
+	// Used by the source index, and previously undocumented.
+	for _, flag := range []string{
+		"--daml-yaml", "--source-root", "--debug-info", "--damlc",
+		"--max-source-locations", "--completion-timeout-ms", "--completion-user-id",
+	} {
+		if !documented[flag] {
+			t.Errorf("compare --help omits %s, which it acts on", flag)
+		}
+	}
+
+	// Neither the fetcher nor anything else read these.
+	for _, flag := range []string{"--wait", "--source"} {
+		if documented[flag] {
+			t.Errorf("compare --help documents %s, which nothing reads", flag)
+		}
+		_, stderr, _ := capture(t, func() int {
+			return runCompare([]string{"a.json", "b.json", flag, "x"})
+		})
+		if !strings.Contains(stderr, "unknown flag "+strconv.Quote(flag)) {
+			t.Errorf("compare accepts %s, which nothing reads", flag)
+		}
+	}
+}
+
+// completionLookup.fetch hardcoded the window and dropped the four fields the
+// struct carries, so `compare --command-id X --completion-limit 500` searched
+// the default window anyway -- a documented flag that did nothing.
+func TestCompareCompletionLookupCarriesItsWindow(t *testing.T) {
+	var query, body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.RawQuery
+		raw, _ := io.ReadAll(r.Body)
+		body = string(raw)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[]`)
+	}))
+	defer server.Close()
+
+	_, _, _ = capture(t, func() int {
+		return runCompare([]string{
+			"--prepared", repoPath("examples", "transfer.prepared.json"),
+			"--command-id", "c1", "--submitter", server.URL, "--act-as", "Alice::1220aa",
+			"--begin-exclusive", "42", "--completion-limit", "500",
+			"--completion-timeout-ms", "250", "--completion-user-id", "someone",
+		})
+	})
+
+	if !strings.Contains(query, "limit=500") {
+		t.Errorf("query = %q, want limit=500", query)
+	}
+	if !strings.Contains(query, "stream_idle_timeout_ms=250") {
+		t.Errorf("query = %q, want the requested timeout", query)
+	}
+	for _, want := range []string{"42", "someone"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("request body does not carry %s: %s", want, body)
+		}
 	}
 }

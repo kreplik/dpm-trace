@@ -102,6 +102,32 @@ transaction.
 
 **[docs/visualizer.md](docs/visualizer.md)** covers the session in full.
 
+## Prepared transactions, failures and diffs
+
+![dpm trace compare](docs/m3.gif)
+
+Not every submission becomes a transaction, and not every question is about one
+transaction:
+
+```bash
+dpm trace submit --submitter <url> --act-as '<party-id>' ...    # commit one, get its id
+dpm trace prepare --submitter <url> --act-as '<party-id>' ...   # compute it without committing
+dpm trace --command-id <command-id>                             # a failed submission
+dpm trace --completion-file completion.json                     # a captured failure
+dpm trace compare a.trace.json b.trace.json                     # what differs
+```
+
+A failed submission has no update id, so `dpm trace <update-id>` cannot find
+it — completion data is where its outcome lives, and a captured completion file
+reads back with no ledger at all.
+
+`compare` answers what changed: between what was prepared and what committed,
+between a prepared command and the completion it produced, or between two
+committed transactions. It names every field that moved.
+
+**[docs/commands.md](docs/commands.md)** covers all of it, including
+[what can and cannot be compared](docs/commands.md#what-cannot-be-compared).
+
 ## Examples
 
 [`examples/`](examples) covers the four event kinds — a create, an exercise

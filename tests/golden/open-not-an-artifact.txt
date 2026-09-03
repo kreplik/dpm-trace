@@ -3,4 +3,4 @@ $ dpm trace open tests/fixtures/reassignment/real-assign-update.json
 --- stdout:
 
 --- stderr:
-error: unsupported trace artifact schema in <root>/tests/fixtures/reassignment/real-assign-update.json: None
+error: <root>/tests/fixtures/reassignment/real-assign-update.json has no schema field, so it is not a trace artifact

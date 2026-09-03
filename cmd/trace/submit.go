@@ -18,7 +18,7 @@ import (
 // is how integration tests capture a rejection.
 func runSubmit(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace submit --submitter <url> --act-as <party> --template <id> [flags]", "Submit a command and print the resulting update id.", submissionFlags, "")
+		commandHelp(os.Stdout, "dpm trace submit --submitter <url> --act-as <party> --template <id> [flags]", "Submit a command and print the resulting update id.", submitFlags, "")
 		return 0
 	}
 	opts, spec, rc := parseSubmissionFlags("submit", args)
@@ -52,6 +52,9 @@ func runSubmit(args []string) int {
 		"actAs":     actAs,
 		"readAs":    readAs,
 	}
+	if opts.synchronizerID != "" {
+		request["synchronizerId"] = opts.synchronizerID
+	}
 	if userID := ledger.UserID(opts.userID, opts.ledgerURL, opts.token, opts.tokenFile); userID != "" {
 		request["userId"] = userID
 	}
@@ -68,6 +71,9 @@ func runSubmit(args []string) int {
 	}
 
 	if !ok {
+		if code := writeSubmitExport(opts.export, response); code != 0 {
+			return code
+		}
 		if opts.printJSON {
 			encoded, encodeErr := model.Encode(response)
 			if encodeErr != nil {
@@ -110,6 +116,9 @@ func runSubmit(args []string) int {
 		return 1
 	}
 
+	if code := writeSubmitExport(opts.export, response); code != 0 {
+		return code
+	}
 	if opts.printJSON {
 		encoded, err := model.Encode(response)
 		if err != nil {
@@ -132,5 +141,25 @@ func runSubmit(args []string) int {
 		return 1
 	}
 	fmt.Println(updateID)
+	return 0
+}
+
+// writeSubmitExport saves the participant's response. A rejection is the case
+// that matters: --completion-file reads the file back, and without this the
+// only way to keep one was to redirect --print-json.
+func writeSubmitExport(path string, response *model.Object) int {
+	if path == "" {
+		return 0
+	}
+	encoded, err := model.Encode(response)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stderr, "wrote %s\n", path)
 	return 0
 }

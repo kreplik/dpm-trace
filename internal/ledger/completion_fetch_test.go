@@ -74,3 +74,23 @@ func TestFetchCompletionValidatesArguments(t *testing.T) {
 		t.Errorf("non-numeric offset = %v", err)
 	}
 }
+
+func TestFetchCompletionNotFoundNamesTheLikelyCause(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `[]`)
+	}))
+	defer server.Close()
+
+	_, err := New(server.URL, "").FetchCompletion(CompletionLookup{
+		CommandID: "cmd-1",
+		Parties:   []string{"Alice::1220aa"},
+	})
+	if err == nil {
+		t.Fatal("missing completion returned no error")
+	}
+	for _, want := range []string{"never reaches the ledger", "--allow-fail", "--completion-file", "--begin-exclusive", "--completion-limit"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not mention %q: %v", want, err)
+		}
+	}
+}

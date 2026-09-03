@@ -19,7 +19,7 @@ import (
 // of run_compare.
 func runCompare(args []string) int {
 	if wantsHelp(args) {
-		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "--command-id, fetching updates by id")
+		commandHelp(os.Stdout, "dpm trace compare <a.json> <b.json> [flags]\n  dpm trace compare <update-id-a> <update-id-b> --submitter <url> --read-as <party> [flags]\n  dpm trace compare --prepared <prepared.json> --update <trace.json> [flags]\n  dpm trace compare --prepared <prepared.json> --command-id <id> --submitter <url> --act-as <party> [flags]\n  dpm trace compare --prepared <prepared.json> --completion-file <completion.json> [flags]", "Compare prepared transactions, committed updates, or completions.", compareFlags, "")
 		return 0
 	}
 	var (
@@ -44,15 +44,22 @@ func runCompare(args []string) int {
 		printJSON          bool
 		full               bool
 		colorMode          = "auto"
-		sourceMode         = "auto"
 		completionUserID   string
 		beginExclusive     string
 		completionLimit    = 100
 		completionTimeout  = 1000
 		maxSourceLocations = 5
-		waitSeconds        int
 	)
+	// Same contract as prepare and submit: the parser accepts exactly what this
+	// command's help lists, so a flag cannot be swallowed without being
+	// documented, or documented without working.
+	accepted := acceptedFlags(compareFlags)
+
 	for i := 0; i < len(args); i++ {
+		if arg := args[i]; strings.HasPrefix(arg, "-") && !accepted[arg] {
+			fmt.Fprintf(os.Stderr, "error: unknown flag %q for dpm trace compare\n", arg)
+			return 2
+		}
 		switch arg := args[i]; arg {
 		case "--print-json":
 			printJSON = true
@@ -239,30 +246,8 @@ func runCompare(args []string) int {
 			if n, err := strconv.Atoi(args[i]); err == nil {
 				maxSourceLocations = n
 			}
-		case "--wait":
-			if i+1 >= len(args) {
-				fmt.Fprintln(os.Stderr, "error: --wait requires a value")
-				return 2
-			}
-			i++
-			if n, err := strconv.Atoi(args[i]); err == nil {
-				waitSeconds = n
-			}
-		case "--source":
-			if i+1 >= len(args) {
-				fmt.Fprintln(os.Stderr, "error: --source requires a value")
-				return 2
-			}
-			i++
-			switch args[i] {
-			case "auto", "scan", "ledger":
-				sourceMode = args[i]
-			default:
-				fmt.Fprintf(os.Stderr, "error: --source must be auto, scan or ledger, got %q\n", args[i])
-				return 2
-			}
 		case "-v", "--verbose":
-			// Accepted for parity; compare has no extra output to gate on it.
+			full = true
 		default:
 			// Without this guard an unknown flag becomes a positional and is
 			// fetched as an update id, so a typo reports "update not found".
@@ -304,7 +289,6 @@ func runCompare(args []string) int {
 	fetch := traceFetcher{
 		ledgerURL: ledgerURL, scanURL: scanURL, readAs: readAs,
 		token: token, tokenFile: tokenFile,
-		sourceMode: sourceMode, waitSeconds: waitSeconds,
 	}
 	lookup := completionLookup{
 		ledgerURL: ledgerURL, actAs: actAs, readAs: readAs,
@@ -354,13 +338,11 @@ func runCompare(args []string) int {
 // that path, otherwise an update id fetched from a participant.
 // Ports fetch_trace_for_compare.
 type traceFetcher struct {
-	ledgerURL   string
-	scanURL     string
-	readAs      []string
-	token       string
-	tokenFile   string
-	sourceMode  string
-	waitSeconds int
+	ledgerURL string
+	scanURL   string
+	readAs    []string
+	token     string
+	tokenFile string
 }
 
 func (f traceFetcher) trace(target string) (*model.Trace, error) {
@@ -505,9 +487,11 @@ func (l completionLookup) fetch() (*model.Completion, error) {
 	parties = append(parties, l.actAs...)
 	parties = append(parties, l.readAs...)
 	return ledger.New(l.ledgerURL, resolvedToken).FetchCompletion(ledger.CompletionLookup{
-		CommandID: l.commandID,
-		Parties:   ledger.ParseParties(parties),
-		Limit:     100,
-		TimeoutMs: 1000,
+		CommandID:      l.commandID,
+		Parties:        ledger.ParseParties(parties),
+		UserID:         l.userID,
+		BeginExclusive: l.beginExclusive,
+		Limit:          l.limit,
+		TimeoutMs:      l.timeoutMs,
 	})
 }

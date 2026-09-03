@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -53,7 +54,10 @@ func commandRows(commands []commandDoc) [][2]string {
 
 // rootHelp documents the whole tool.
 var listedCommands = []commandDoc{
-	{"open", "Reopen an exported trace artifact."},
+	{"open", "Reopen an exported trace or prepared artifact."},
+	{"compare", "Compare prepared transactions, updates, or completions."},
+	{"prepare", "Prepare a command without committing it."},
+	{"submit", "Submit a command and print the resulting update id."},
 	{"install-plugin", "Register this binary as a DPM component."},
 }
 
@@ -62,6 +66,8 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  dpm trace <update-id> [flags]")
+	fmt.Fprintln(w, "  dpm trace --command-id <id> [flags]")
+	fmt.Fprintln(w, "  dpm trace --completion-file <file> [flags]")
 	fmt.Fprintln(w, "  dpm trace <command> [flags]")
 
 	writeSection(w, "Commands", commandRows(listedCommands))
@@ -71,15 +77,17 @@ func rootHelp(w io.Writer) {
 	fmt.Fprintln(w, "\nExamples:")
 	for _, example := range []string{
 		"dpm trace <update-id> --submitter http://localhost:7575 --read-as '<party>'",
-		"dpm trace open trace.json",
 		"dpm trace open trace.json --visualize",
+		"dpm trace --completion-file completion.json --daml-yaml ./daml.yaml",
+		"dpm trace compare --prepared prepared.json --update <update-id>",
 		"dpm trace <update-id> --export trace.json",
 	} {
 		fmt.Fprintf(w, "  %s\n", example)
 	}
 
 	fmt.Fprintln(w, "\nOutput is participant-scoped: it is one participant's projection, not a")
-	fmt.Fprintln(w, "global Canton transaction.")
+	fmt.Fprintln(w, "global Canton transaction. A failed submission has no update id, so those")
+	fmt.Fprintln(w, "workflows use completion data instead.")
 }
 
 var traceFlags = []flagDoc{
@@ -101,6 +109,8 @@ var traceFlags = []flagDoc{
 	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
 	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
 	{"--command-id ID", "Look up a failed submission by command id."},
+	{"--begin-exclusive N", "Offset to search completions from. Defaults to 0."},
+	{"--completion-limit N", "Completions to search. Defaults to 100."},
 	{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
 	{"--explain-apis", "Explain Scan API vs Ledger API."},
 	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
@@ -133,22 +143,33 @@ var compareFlags = []flagDoc{
 	{"--submitter URL", "Ledger JSON API base URL, to fetch updates by id."},
 	{"--scan-url URL", "Scan API base URL, to fetch updates by id."},
 	{"--read-as PARTY", "Party to read as. Repeatable. Alias of --party."},
+	{"--act-as PARTY", "Submitting party, for completion lookup. Repeatable."},
 	{"--token TOKEN", "Bearer token for the Ledger JSON API."},
 	{"--token-file PATH", "Bearer token file. Alias of --access-token-file."},
 	{"--dar PATH", "Local DAR. Recorded only; damlc inspect is not ported."},
 	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
-	{"--update PATH", "Committed trace artifact to compare against."},
+	{"--update PATH", "Committed trace artifact, or an update id, to compare against."},
+	{"--command-id ID", "Look up the completion for a command id on the participant."},
 	{"--completion-file PATH", "Captured completion to compare against."},
-	{"--full", "Verbose comparison instead of the compact view."},
+	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
+	{"--begin-exclusive N", "Offset to search completions from. Defaults to 0."},
+	{"--completion-limit N", "Completions to search. Defaults to 100."},
+	{"--completion-timeout-ms N", "Idle timeout for the completion stream. Defaults to 1000."},
+	{"--completion-user-id ID", "Ledger API user id for the completion lookup."},
+	{"--daml-yaml PATH", "daml.yaml for local source diagnostics. Repeatable."},
+	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
+	{"--damlc PATH", "damlc or daml executable for inspection. Defaults to daml."},
+	{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
+	{"-v, --verbose", "Verbose comparison instead of the compact view. Alias of --full."},
 	{"--print-json", "Print the comparison JSON and exit."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
 }
 
-var submissionFlags = []flagDoc{
-	{"--submitter URL", "Ledger JSON API base URL. Alias of --ledger-url, --participant-url."},
-	{"--act-as PARTY", "Submitting party. Repeatable. Required."},
-	{"--read-as PARTY", "Additional read party. Repeatable."},
+// commandFlags are the flags that build the command itself, shared by prepare
+// and submit.
+var commandFlags = []flagDoc{
 	{"--template ID", "Template id for a create or exercise."},
 	{"--contract-id ID", "Contract id for an exercise."},
 	{"--choice NAME", "Choice name for an exercise."},
@@ -159,18 +180,52 @@ var submissionFlags = []flagDoc{
 	{"--command-json JSON", "Commands as JSON."},
 	{"--command-id ID", "Command id. Generated when omitted."},
 	{"--user-id ID", "Ledger API user id."},
+}
+
+var connectionFlags = []flagDoc{
+	{"--submitter URL", "Ledger JSON API base URL. Alias of --ledger-url, --participant-url."},
+	{"--act-as PARTY", "Submitting party. Repeatable. Required."},
+	{"--read-as PARTY", "Additional read party. Repeatable. Alias of --party."},
 	{"--token TOKEN", "Bearer token for the Ledger JSON API."},
 	{"--token-file PATH", "Bearer token file. Alias of --access-token-file."},
-	{"--export PATH", "Write the artifact to a file."},
-	{"--print-json", "Print the JSON and exit."},
-	{"--source MODE", "auto, scan or ledger. Defaults to auto."},
-	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
-	{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
-	{"--command-id ID", "Look up a failed submission by command id."},
-	{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
-	{"--explain-apis", "Explain Scan API vs Ledger API."},
 	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
+}
+
+var outputFlags = []flagDoc{
+	{"--export PATH", "Write the artifact to a file. Alias of --out."},
+	{"--print-json", "Print the JSON and exit."},
 	{"-h, --help", "Show this help."},
+}
+
+// prepareFlags and submitFlags share a parser but not a purpose: prepare stops
+// before committing, so the flags that render a rejection do nothing for it,
+// and only prepare chooses a synchronizer.
+var prepareFlags = concatFlags(connectionFlags,
+	[]flagDoc{{"--synchronizer-id ID", "Synchronizer to prepare against."}},
+	commandFlags, outputFlags)
+
+var submitFlags = concatFlags(connectionFlags,
+	[]flagDoc{{"--synchronizer-id ID", "Synchronizer to submit to."}},
+	commandFlags,
+	[]flagDoc{
+		{"--allow-fail", "Exit 0 when the submission is rejected."},
+		{"-v, --verbose", "Render the whole completion instead of the failure summary. Alias of --full."},
+		{"--daml-yaml PATH", "daml.yaml for local source diagnostics. Repeatable."},
+		{"--dar PATH", "Local DAR, verified with damlc inspect. Repeatable."},
+		{"--damlc PATH", "damlc or daml executable for inspection. Defaults to daml."},
+		{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
+		{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+		{"--log-file PATH", "Operator log to correlate with the completion. Repeatable."},
+		{"--max-source-locations N", "Maximum diagnostics to resolve. Defaults to 5."},
+		{"--color MODE", "auto, always or never. Defaults to auto."},
+	}, outputFlags)
+
+func concatFlags(groups ...[]flagDoc) []flagDoc {
+	var all []flagDoc
+	for _, group := range groups {
+		all = append(all, group...)
+	}
+	return all
 }
 
 var installPluginFlags = []flagDoc{
@@ -188,4 +243,35 @@ func wantsHelp(args []string) bool {
 		}
 	}
 	return false
+}
+
+// flagAliases maps an accepted spelling to the flag it stands for. Each is
+// named in its target's usage text rather than given a row of its own.
+var flagAliases = map[string]string{
+	"--ledger-url":        "--submitter",
+	"--participant-url":   "--submitter",
+	"--party":             "--read-as",
+	"--access-token-file": "--token-file",
+	"--out":               "--export",
+	"--full":              "--verbose",
+}
+
+// acceptedFlags turns a help listing into the set a parser accepts, so a
+// command cannot quietly swallow a flag it never reads: whatever is not
+// documented for that command is rejected.
+func acceptedFlags(docs []flagDoc) map[string]bool {
+	accepted := map[string]bool{"-h": true, "--help": true}
+	for _, doc := range docs {
+		for _, word := range strings.Fields(strings.ReplaceAll(doc.name, ",", " ")) {
+			if strings.HasPrefix(word, "-") {
+				accepted[word] = true
+			}
+		}
+	}
+	for alias, target := range flagAliases {
+		if accepted[target] {
+			accepted[alias] = true
+		}
+	}
+	return accepted
 }
