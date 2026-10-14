@@ -426,9 +426,12 @@ func decodeLFValue(data []byte, depth int) (any, error) {
 	return nil, nil
 }
 
-// decodeOptional follows the Daml-LF JSON encoding: None is null and Some(v) is
-// v, except below another Optional, where None is [] and Some(v) is [v] -- so
-// Some(None) and None stay distinguishable.
+// decodeOptional follows the JSON Ledger API: None is null and Some(v) is v,
+// except in a chain of nested Optionals, where every level takes the array
+// form -- None is [] and Some(v) is [v]. Some(Some "x") is [["x"]].
+//
+// A top-level None carries no type, so it cannot tell whether it heads such a
+// chain; it decodes as null where the JSON Ledger API reports [].
 func decodeOptional(data []byte, depth int, nested bool) (any, error) {
 	if depth > maxValueDepth {
 		return nil, errors.New("value nested too deeply")
@@ -459,6 +462,7 @@ func decodeOptional(data []byte, depth int, nested bool) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		return []any{value}, nil
 	} else {
 		value, err = decodeLFValue(inner, depth+1)
 		if err != nil {
