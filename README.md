@@ -143,7 +143,9 @@ ledger, so it has no completion to find.
 
 `compare` answers what changed: between what was prepared and what committed,
 between a prepared command and the completion it produced, or between two
-committed transactions. It names every field that moved.
+committed transactions. It names every field that moved, in child events as
+well as in the command itself: the prepared side is the full transaction the
+participant computed, not only the command you sent.
 
 **[docs/commands.md](docs/commands.md)** covers all of it, including
 [what can and cannot be compared](docs/commands.md#what-cannot-be-compared).
