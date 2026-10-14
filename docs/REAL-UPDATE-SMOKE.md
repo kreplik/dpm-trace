@@ -8,14 +8,14 @@ Do not commit concrete local values from your workspace.
 - DPM, which brings both the Canton jar and the Daml toolchain. Install it with
   `curl https://get.digitalasset.com/install/install.sh | sh`, then
   `dpm install 3.5.1`.
-- A Java runtime, to run Canton.
+- Java 17 or newer, to run Canton.
 
 ## Boot
 
 ```bash
 (cd examples/asset && dpm build)
 
-CANTON=$(ls ~/.dpm/cache/components/canton-open-source/*/lib/canton-open-source-*.jar | sort -V | tail -1)
+CANTON=~/.dpm/cache/components/canton-open-source/3.5.1/lib/canton-open-source-3.5.1.jar
 
 java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
   -jar "$CANTON" daemon \
