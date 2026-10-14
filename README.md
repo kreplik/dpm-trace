@@ -44,6 +44,14 @@ dpm install 3.5.1                                           # installs an SDK
 
 Otherwise keep using `./dpm-trace`; it is the same binary.
 
+### Requirements
+
+| To | You need |
+| --- | --- |
+| Open committed artifacts, read and compare captured files | the binary only |
+| Trace, prepare and submit against a participant | a reachable JSON Ledger API (Canton 3.x) |
+| Build the example DAR and run a local Canton | DPM with SDK 3.5.1 (`dpm install 3.5.1`) and Java 17 or newer |
+
 ## Usage
 
 An update id identifies a committed transaction on a participant, in the format
@@ -170,8 +178,8 @@ ledger to reach and no Daml toolchain to install.
 
 [`examples/README.md`](examples/README.md) shows how to reproduce the first
 three against a local Canton, and how the same commands work against a remote
-participant. That does need more: a Java runtime, a Canton jar, and a Daml SDK
-to build the example package's DAR. The reassignment pair needs two
+participant. That needs DPM with SDK 3.5.1 and Java 17 or newer (see
+[Requirements](#requirements)). The reassignment pair needs two
 synchronizers, which the shipped config does not set up.
 
 ## Notes

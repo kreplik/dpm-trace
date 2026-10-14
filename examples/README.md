@@ -17,8 +17,8 @@ dpm trace open examples/assign.trace.json
 
 The Daml package behind the first three is in [`asset/`](asset), and the steps
 below rebuild them from it — nothing outside this repository is required, though
-reproducing them needs DPM and a Java runtime. Opening the committed artifacts
-above needs neither.
+reproducing them needs DPM with SDK 3.5.1 and Java 17 or newer. Opening the
+committed artifacts above needs neither.
 
 ## The shapes
 
@@ -69,7 +69,7 @@ Everything below needs only this repository and a Canton jar.
 # Build the example package (examples/asset), from the repo root:
 (cd examples/asset && dpm build)
 
-CANTON=$(ls ~/.dpm/cache/components/canton-open-source/*/lib/canton-open-source-*.jar | sort -V | tail -1)
+CANTON=~/.dpm/cache/components/canton-open-source/3.5.1/lib/canton-open-source-3.5.1.jar
 
 java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
   -jar "$CANTON" daemon \
