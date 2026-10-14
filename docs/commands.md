@@ -179,9 +179,24 @@ Either way the view states the absence rather than inventing an id:
 ```
 
 **A command rejected during interpretation never reaches the ledger**, so it
-produces no completion at all and `--command-id` will not find it. That is not
-a bug in the lookup: there is nothing to find. Capture the submission response
+produces no completion at all and `--command-id` will not find it because there is nothing to find. Capture the submission response
 and use `--completion-file`.
+
+| Failure | Example | `--command-id` | `--completion-file` |
+| --- | --- | --- | --- |
+| During interpretation | a failed `assert` (`DAML_FAILURE`), `CONTRACT_NOT_FOUND`, missing authorization | no completion | yes |
+| After sequencing | contention over the same contract, a contract archived by a concurrent transaction, a mediator timeout | yes | yes |
+
+`--completion-file` therefore works for every rejection, which is why the
+failure summary `submit` prints suggests it:
+
+```
+  Next
+    dpm trace compare --prepared <prepared.json> --completion-file failure.json
+```
+
+That is the line when `--export failure.json` was given. Without `--export`
+there is no file yet, so the summary says to rerun with it first.
 
 `--log-file` correlates a completion with operator logs, matching on command
 id, submission id, trace id and correlation id. It is optional and local; the

@@ -112,14 +112,34 @@ transaction:
 ```bash
 dpm trace submit --submitter <url> --act-as '<party-id>' ...    # commit one, get its id
 dpm trace prepare --submitter <url> --act-as '<party-id>' ...   # compute it without committing
-dpm trace --command-id <command-id>                             # a failed submission
-dpm trace --completion-file completion.json                     # a captured failure
+dpm trace --completion-file failure.json                        # a rejection captured with submit --export
+dpm trace --command-id <command-id>                             # a rejection that reached the ledger
 dpm trace compare a.trace.json b.trace.json                     # what differs
 ```
 
 A failed submission has no update id, so `dpm trace <update-id>` cannot find
 it — completion data is where its outcome lives, and a captured completion file
 reads back with no ledger at all.
+
+Which of the two to use depends on where the submission failed:
+
+| Failure | Example | Completion on the ledger? | Read it with |
+| --- | --- | --- | --- |
+| During interpretation, before anything is sequenced | a failed `assert`, a contract archived before you submitted (`CONTRACT_NOT_FOUND`), missing authorization | no | `--completion-file` |
+| After sequencing, during confirmation | contention over the same contract, a contract archived by a concurrent transaction, a mediator timeout | yes | `--command-id` or `--completion-file` |
+
+Most failures you meet while developing are the first kind, so capture the
+rejection when you submit:
+
+```bash
+dpm trace submit --submitter <url> --act-as '<party-id>' ... --export failure.json
+dpm trace --completion-file failure.json
+dpm trace compare --prepared prepared.json --completion-file failure.json
+```
+
+`--command-id` asks the participant's completion stream, and only works for
+the second kind: a command rejected during interpretation never reaches the
+ledger, so it has no completion to find.
 
 `compare` answers what changed: between what was prepared and what committed,
 between a prepared command and the completion it produced, or between two
