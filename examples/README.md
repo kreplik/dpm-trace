@@ -66,7 +66,7 @@ and allocates the parties:
 Everything below needs only this repository and a Canton jar.
 
 ```bash
-# Build the example package (examples/asset), from the repo root:
+# The release archive ships the DAR. From a clone, or after changing the Daml, build it:
 (cd examples/asset && dpm build)
 
 CANTON=~/.dpm/cache/components/canton-open-source/3.5.1/lib/canton-open-source-3.5.1.jar
