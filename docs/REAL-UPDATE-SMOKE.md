@@ -13,25 +13,11 @@ Do not commit concrete local values from your workspace.
 ## Boot
 
 ```bash
-(cd examples/asset && dpm build)
-
-CANTON=~/.dpm/cache/components/canton-open-source/3.5.1/lib/canton-open-source-3.5.1.jar
-
-java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
-  -jar "$CANTON" daemon \
-  -c examples/devnet-trace.conf \
-  --bootstrap examples/devnet-trace.bootstrap.canton --no-tty
+source examples/up.sh
 ```
 
-The bootstrap uploads the DAR, allocates the parties, and prints the ready
-banner. Read the party ids off the participant:
-
-```bash
-export LEDGER=http://127.0.0.1:6113
-curl -s $LEDGER/v2/parties | python3 -m json.tool | grep '"party"'
-export ISSUER='Issuer::1220...'
-export ALICE='Alice::1220...'
-```
+This boots Canton in the background, uploads the DAR, allocates the parties and
+exports `LEDGER`, `ISSUER`, `ALICE` and `BOB`.
 
 ## Smoke
 
@@ -74,8 +60,5 @@ Expected: `EXERCISE Asset:Asset.Burn` with `consuming: true` and `x1 archive`.
 ## Teardown
 
 ```bash
-pkill -f 'canton-open-source-.*\.jar'
+./examples/up.sh down
 ```
-
-`java` can be a shim, so killing the shell job may leave the JVM holding the
-ports; match on the jar.

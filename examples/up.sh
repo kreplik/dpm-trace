@@ -57,6 +57,8 @@ down() {
     sleep 1
   done
   kill -9 "$pid" 2>/dev/null || true
+  # A java shim that forks rather than execs leaves the JVM behind.
+  pkill -f -- "-c $HERE/devnet-trace.conf" 2>/dev/null || true
   rm -f "$PID_FILE" "$ENV_FILE"
   echo "stopped Canton (pid $pid)" >&2
 }
