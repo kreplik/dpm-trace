@@ -197,8 +197,8 @@ and use `--completion-file`.
 
 | Failure | Example | `--command-id` | `--completion-file` |
 | --- | --- | --- | --- |
-| During interpretation | a failed `assert` (`DAML_FAILURE`), `CONTRACT_NOT_FOUND`, missing authorization | no completion | yes |
-| After sequencing | contention over the same contract, a contract archived by a concurrent transaction, a mediator timeout | yes | yes |
+| Before sequencing | a failed `assert` (`DAML_FAILURE`), `CONTRACT_NOT_FOUND`, missing authorization, a reused command id (`DUPLICATE_COMMAND`) | no completion | yes |
+| After sequencing | contention over the same contract (`LOCAL_VERDICT_LOCKED_CONTRACTS`), a contract archived by a concurrent transaction, a mediator timeout | yes | yes |
 
 `--completion-file` therefore works for every rejection, which is why the
 failure summary `submit` prints suggests it:
