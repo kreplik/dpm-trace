@@ -133,8 +133,8 @@ Which of the two to use depends on where the submission failed:
 
 | Failure | Example | Completion on the ledger? | Read it with |
 | --- | --- | --- | --- |
-| During interpretation, before anything is sequenced | a failed `assert`, a contract archived before you submitted (`CONTRACT_NOT_FOUND`), missing authorization | no | `--completion-file` |
-| After sequencing, during confirmation | contention over the same contract, a contract archived by a concurrent transaction, a mediator timeout | yes | `--command-id` or `--completion-file` |
+| Before anything is sequenced | a failed `assert`, a contract archived before you submitted (`CONTRACT_NOT_FOUND`), missing authorization, any other interpretation error, a reused command id (`DUPLICATE_COMMAND`) | no | `--completion-file` |
+| After sequencing, during confirmation | contention over the same contract (`LOCAL_VERDICT_LOCKED_CONTRACTS`), a contract archived by a concurrent transaction, a mediator timeout, any other rejection after sequencing | yes | `--command-id` or `--completion-file` |
 
 Most failures you meet while developing are the first kind, so capture the
 rejection when you submit:
@@ -145,9 +145,21 @@ dpm trace --completion-file failure.json
 dpm trace compare --prepared prepared.json --completion-file failure.json
 ```
 
-`--command-id` asks the participant's completion stream, and only works for
-the second kind: a command rejected during interpretation never reaches the
-ledger, so it has no completion to find.
+`--command-id` asks the participant's completion stream, so it only finds the
+second kind, but it needs nothing captured: it works for a command your
+application submitted. Two submissions racing for the same contract, for
+example:
+
+```bash
+dpm trace --command-id <command-id> --submitter <url> --act-as '<party-id>'
+#   result:     completion failed
+#   status:     10
+#   message:    LOCAL_VERDICT_LOCKED_CONTRACTS(2,...): Rejected transaction is referring to locked contracts
+dpm trace compare --prepared prepared.json --command-id <command-id> --submitter <url> --act-as '<party-id>'
+```
+
+A command rejected before sequencing has no completion to find. For a reused
+command id, the lookup finds the original submission, not the rejection.
 
 `compare` answers what changed: between what was prepared and what committed,
 between a prepared command and the completion it produced, or between two
