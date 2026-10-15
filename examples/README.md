@@ -59,34 +59,19 @@ and one mediator, so the steps below reproduce the first three artifacts only.
 
 ## Reproducing them against a local Canton
 
-The repo ships a Canton config for exactly this — [`devnet-trace.conf`](devnet-trace.conf),
-two participants with fixed ports — plus a bootstrap script that uploads the DAR
-and allocates the parties:
-
-Everything below needs only this repository and a Canton jar.
+[`up.sh`](up.sh) boots [`devnet-trace.conf`](devnet-trace.conf) — two
+participants with fixed ports — in the background, uploads the DAR, allocates
+the parties and exports their ids:
 
 ```bash
-# The release archive ships the DAR. From a clone, or after changing the Daml, build it:
-(cd examples/asset && dpm build)
-
-CANTON=~/.dpm/cache/components/canton-open-source/3.5.1/lib/canton-open-source-3.5.1.jar
-
-java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
-  -jar "$CANTON" daemon \
-  -c examples/devnet-trace.conf \
-  --bootstrap examples/devnet-trace.bootstrap.canton --no-tty
-# => === dpm-trace examples ready: participant1 http://127.0.0.1:6113, participant2 http://127.0.0.1:6123 ===
+source examples/up.sh   # sets LEDGER, ISSUER, ALICE, BOB
 ```
 
-Read the allocated party ids off the participant:
+The same exports are kept in `examples/.env` for other shells.
 
-```bash
-LEDGER=http://127.0.0.1:6113
-curl -s $LEDGER/v2/parties | python3 -m json.tool | grep '"party"'
-
-ISSUER='Issuer::1220...'     # from the output above
-ALICE='Alice::1220...'
-```
+It uses the shipped DAR (building it with `dpm build` if missing) and the Canton
+3.5.1 jar from the DPM cache, or `$CANTON_JAR`. Canton logs to
+`examples/.up/canton.log`; stop it with `./examples/up.sh down`.
 
 Beware `.dpm-trace.json`: config discovery walks up from the current directory,
 so a file with placeholder values will silently supply them — a placeholder

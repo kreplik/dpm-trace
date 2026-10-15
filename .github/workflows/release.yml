@@ -62,3 +62,4 @@ jobs:
           tar xzf dist/dpm-trace_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
           "$RUNNER_TEMP/dpm-trace" --version
           test -s "$RUNNER_TEMP/examples/asset/.daml/dist/asset-tests-1.0.0.dar"
+          test -x "$RUNNER_TEMP/examples/up.sh"

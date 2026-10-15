@@ -57,6 +57,7 @@ archives:
       # The Canton config both READMEs tell the reader to boot.
       - examples/devnet-trace.conf
       - examples/devnet-trace.bootstrap.canton
+      - examples/up.sh
 
 checksum:
   name_template: checksums.txt
