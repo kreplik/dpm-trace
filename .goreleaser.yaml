@@ -53,7 +53,7 @@ archives:
       - examples/asset/daml.yaml
       - examples/asset/daml/*
       # Built by release.yml, so the examples run without building the Daml.
-      - examples/asset/.daml/dist/asset-tests-1.0.0.dar
+      - examples/asset/.daml/dist/asset-1.0.0.dar
       # The Canton config both READMEs tell the reader to boot.
       - examples/devnet-trace.conf
       - examples/devnet-trace.bootstrap.canton

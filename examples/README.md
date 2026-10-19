@@ -82,7 +82,7 @@ these commands outside a directory that has one, or pass `--config`.
 
 ```bash
 CREATE_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ISSUER" \
-  --template '#asset-tests:Asset:Asset' \
+  --template '#asset:Asset:Asset' \
   --arg issuer="$ISSUER" --arg owner="$ALICE" --arg name=GOLD --arg quantity=100)
 
 dpm trace "$CREATE_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
@@ -97,7 +97,7 @@ CID=$(dpm trace "$CREATE_ID" --submitter "$LEDGER" --read-as "$ISSUER" --print-j
   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(next(e["contractId"] for e in d["eventsById"].values() if e.get("contractId")))')
 
 SPLIT_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Split \
+  --template '#asset:Asset:Asset' --choice Split \
   --contract-id "$CID" --arg splitQuantity=40)
 
 dpm trace "$SPLIT_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
@@ -113,7 +113,7 @@ BURN_CID=$(dpm trace "$SPLIT_ID" --submitter "$LEDGER" --read-as "$ISSUER" --pri
   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(next(e["contractId"] for e in d["eventsById"].values() if e.get("kind")=="create"))')
 
 BURN_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Burn --contract-id "$BURN_CID")
+  --template '#asset:Asset:Asset' --choice Burn --contract-id "$BURN_CID")
 
 dpm trace "$BURN_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
   --export examples/archive.trace.json

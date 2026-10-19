@@ -28,7 +28,7 @@ reaches the ledger as `non expected character 0x2e in Daml-LF Party`.
 ```bash
 # committed update
 UPDATE_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ISSUER" \
-  --template '#asset-tests:Asset:Asset' \
+  --template '#asset:Asset:Asset' \
   --arg issuer="$ISSUER" --arg owner="$ALICE" --arg name=GOLD --arg quantity=100)
 dpm trace "$UPDATE_ID" --submitter "$LEDGER" --read-as "$ISSUER"
 
@@ -51,7 +51,7 @@ needs a fresh one:
 CID=$(dpm trace "$UPDATE_ID" --submitter "$LEDGER" --read-as "$ISSUER" --print-json \
   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(next(e["contractId"] for e in d["eventsById"].values() if e.get("contractId")))')
 BURN_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Burn --contract-id "$CID")
+  --template '#asset:Asset:Asset' --choice Burn --contract-id "$CID")
 dpm trace "$BURN_ID" --submitter "$LEDGER" --read-as "$ISSUER"
 ```
 
