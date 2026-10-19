@@ -28,7 +28,7 @@ fi
 
 command -v dpm >/dev/null 2>&1 || { echo "error: dpm not found on PATH" >&2; exit 2; }
 
-DAR="$HERE/asset/.daml/dist/asset-tests-1.0.0.dar"
+DAR="$HERE/asset/.daml/dist/asset-1.0.0.dar"
 if [[ ! -f "$DAR" ]]; then
   echo "building the example DAR ..."
   (cd "$HERE/asset" && dpm build >/dev/null)
@@ -100,29 +100,29 @@ first_create() {
 }
 
 step "1/5  Create — one event, with signatory, observer and payload"
-CREATE_ID="$(submit --act-as "$ISSUER" --template '#asset-tests:Asset:Asset' \
+CREATE_ID="$(submit --act-as "$ISSUER" --template '#asset:Asset:Asset' \
   --arg issuer="$ISSUER" --arg owner="$ALICE" --arg name=GOLD --arg quantity=100)"
 trace "$CREATE_ID"
 CID="$(first_create "$CREATE_ID")"
 
 step "2/5  Exercise with child creates — Split 100 into 60 and 40"
-SPLIT_ID="$(submit --act-as "$ALICE" --template '#asset-tests:Asset:Asset' \
+SPLIT_ID="$(submit --act-as "$ALICE" --template '#asset:Asset:Asset' \
   --choice Split --contract-id "$CID" --arg splitQuantity=40)"
 trace "$SPLIT_ID"
 SPLIT_CID="$(first_create "$SPLIT_ID")"
 
 step "3/5  Consuming exercise — Burn archives without creating anything"
-BURN_ID="$(submit --act-as "$ALICE" --template '#asset-tests:Asset:Asset' \
+BURN_ID="$(submit --act-as "$ALICE" --template '#asset:Asset:Asset' \
   --choice Burn --contract-id "$SPLIT_CID")"
 trace "$BURN_ID"
 
 step "4/5  A rejected submission, mapped back to the Daml that rejected it"
-FAIL_ID="$(submit --act-as "$ISSUER" --template '#asset-tests:Asset:Asset' \
+FAIL_ID="$(submit --act-as "$ISSUER" --template '#asset:Asset:Asset' \
   --arg issuer="$ISSUER" --arg owner="$ALICE" --arg name=SILVER --arg quantity=100)"
 FAIL_CID="$(first_create "$FAIL_ID")"
 COMPLETION="$(mktemp -t dpm-trace-demo-completion)"
 "${DPM[@]}" submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Withdraw \
+  --template '#asset:Asset:Asset' --choice Withdraw \
   --contract-id "$FAIL_CID" --arg amount=500 \
   --allow-fail --print-json >"$COMPLETION"
 "${DPM[@]}" --completion-file "$COMPLETION" --daml-yaml "$HERE/asset/daml.yaml" --color auto
@@ -131,10 +131,10 @@ rm -f "$COMPLETION"
 step "5/5  Prepared vs committed — did the ledger do what was asked?"
 PREPARED="$(mktemp -t dpm-trace-demo-prepared)"
 "${DPM[@]}" prepare --submitter "$LEDGER" --act-as "$ALICE" --read-as "$BOB" \
-  --template '#asset-tests:Asset:Asset' --choice Transfer \
+  --template '#asset:Asset:Asset' --choice Transfer \
   --contract-id "$FAIL_CID" --arg newOwner="$BOB" --export "$PREPARED" >/dev/null
 TRANSFER_ID="$(submit --act-as "$ALICE" --read-as "$BOB" \
-  --template '#asset-tests:Asset:Asset' --choice Transfer \
+  --template '#asset:Asset:Asset' --choice Transfer \
   --contract-id "$FAIL_CID" --arg newOwner="$BOB")"
 TRACE_OUT="$(mktemp -t dpm-trace-demo-trace)"
 "${DPM[@]}" "$TRANSFER_ID" --submitter "$LEDGER" --read-as "$ISSUER" --export "$TRACE_OUT" >/dev/null

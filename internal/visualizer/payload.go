@@ -40,6 +40,9 @@ func eventBlocks(ev *model.Event) []payloadBlock {
 func (s *Stepper) writeBlock(block payloadBlock, ctx *render.Context) {
 	fmt.Fprintln(s.out, s.Color.Apply(block.label+":", "cyan"))
 	text := render.IndentText(render.RenderPrettyValue(block.value, ctx))
+	if id, ok := block.value.(string); ok {
+		text += ctx.LocalSuffix(id)
+	}
 	lines := strings.Split(text, "\n")
 
 	if s.ExpandPayloads || len(lines) <= payloadPreviewLines {

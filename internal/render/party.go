@@ -12,11 +12,31 @@ import (
 // Ports RenderContext.
 type Context struct {
 	PartyAliases map[string]string
+	// LocalContracts are ids a prepared transaction creates. The ledger
+	// assigns the real ids at commit, so these never exist on it.
+	LocalContracts map[string]bool
 }
 
 // NewContext builds the alias table for a trace.
 func NewContext(trace *model.Trace) *Context {
-	return &Context{PartyAliases: BuildPartyAliases(trace)}
+	ctx := &Context{PartyAliases: BuildPartyAliases(trace)}
+	if trace.Source == model.SourcePreparedTransaction {
+		ctx.LocalContracts = map[string]bool{}
+		for _, ev := range trace.EventsByID {
+			if ev.Kind == model.KindCreate && ev.ContractID != "" {
+				ctx.LocalContracts[ev.ContractID] = true
+			}
+		}
+	}
+	return ctx
+}
+
+// LocalSuffix labels a contract id that exists only in a prepared transaction.
+func (c *Context) LocalSuffix(contractID string) string {
+	if c != nil && c.LocalContracts[contractID] {
+		return " (local; assigned at commit)"
+	}
+	return ""
 }
 
 // Party returns the alias for a party id, or the id unchanged.

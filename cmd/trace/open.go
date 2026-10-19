@@ -128,9 +128,9 @@ func dedupe(values []string) []string {
 	return out
 }
 
-// openPrepared renders a prepared-command artifact. A prepared command has no
-// events, witnesses or contract ids, so there is no tree: what it has is the
-// commands and the authority they were prepared under.
+// openPrepared renders a prepared-command artifact: the commands, the authority
+// they were prepared under and, when the artifact carries one, the transaction
+// the participant would commit, which --visualize steps through.
 func openPrepared(artifact *model.Object, printJSON, visualize bool, colorMode string) int {
 	if printJSON {
 		encoded, err := model.Encode(artifact)
@@ -141,10 +141,19 @@ func openPrepared(artifact *model.Object, printJSON, visualize bool, colorMode s
 		fmt.Println(string(encoded))
 		return 0
 	}
+	if visualize {
+		if tx, err := model.PreparedTransactionOf(artifact); err == nil {
+			trace := tx.Trace(nil)
+			trace.SourceURL = model.ObjectString(artifact, "sourceUrl")
+			color := render.ColorFromMode(colorMode, isTTY())
+			visualizer.New(trace, color, source.NewIndex(), os.Stdout).Run(os.Stdin)
+			return 0
+		}
+	}
 	fmt.Println(render.PreparedArtifactSummary(artifact.ToMap()))
 	if visualize {
-		fmt.Println("\nThere is no transaction tree to step through: this command was " +
-			"prepared, not committed. Submit it, then visualize the resulting update.")
+		fmt.Println("\nThere is no transaction tree to step through: this artifact carries " +
+			"no prepared transaction. Submit the command, then visualize the resulting update.")
 	}
 	return 0
 }

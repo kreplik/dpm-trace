@@ -50,7 +50,7 @@ Otherwise keep using `./dpm-trace`; it is the same binary.
 | --- | --- |
 | Open committed artifacts, read and compare captured files | the binary only |
 | Trace, prepare and submit against a participant | a reachable JSON Ledger API (Canton 3.x) |
-| Build the example DAR and run a local Canton | DPM with SDK 3.5.1 (`dpm install 3.5.1`) and Java 17 or newer |
+| Build the example DAR and run a local Canton | DPM (tested with 1.0.21) with SDK 3.5.1 (`dpm install 3.5.1`) and Java 17 or newer |
 
 ## Usage
 

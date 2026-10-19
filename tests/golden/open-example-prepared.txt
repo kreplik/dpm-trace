@@ -22,9 +22,9 @@ Transaction (as the participant would commit it)
       ├── consuming: true
       ├── actors: Alice
       ├── argument: { newOwner: Bob }
-      ├── result: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e
+      ├── result: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e (local; assigned at commit)
       └── [1] CREATE Asset:Asset
-          ├── contract: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e
+          ├── contract: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e (local; assigned at commit)
           ├── signatories: Issuer
           ├── observers: Bob
           └── payload: { issuer: Issuer, owner: Bob, name: SILVER, quantity: 100 }

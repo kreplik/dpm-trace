@@ -28,6 +28,9 @@ jobs:
           # shallow clone produces a release named after the wrong commit.
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
+          # The DAR step pipes an installer into sh; it must not find the
+          # release token in .git/config. goreleaser gets it from its env.
+          persist-credentials: false
 
       - uses: actions/setup-go@v5
         with:
@@ -61,5 +64,5 @@ jobs:
         run: |
           tar xzf dist/dpm-trace_*_linux_amd64.tar.gz -C "$RUNNER_TEMP"
           "$RUNNER_TEMP/dpm-trace" --version
-          test -s "$RUNNER_TEMP/examples/asset/.daml/dist/asset-tests-1.0.0.dar"
+          test -s "$RUNNER_TEMP/examples/asset/.daml/dist/asset-1.0.0.dar"
           test -x "$RUNNER_TEMP/examples/up.sh"
