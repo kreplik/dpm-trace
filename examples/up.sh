@@ -18,8 +18,7 @@ fi
 if [ -n "${_up_self:-}" ]; then
   _up_out="$(bash "$_up_self" "$@")" && eval "$_up_out"
   _up_rc=$?
-  unset _up_self _up_out
-  return "$_up_rc"
+  eval "unset _up_self _up_out _up_rc; return $_up_rc"
 fi
 
 set -euo pipefail
@@ -84,10 +83,16 @@ check_java() {
 }
 
 party() {
-  curl -sf "$1/v2/parties" | python3 -c '
+  local parties
+  parties="$(curl -sf "$1/v2/parties")" || return 0
+  printf '%s' "$parties" | python3 -c '
 import sys, json
 hint = sys.argv[1] + "::"
-print(next((p["party"] for p in json.load(sys.stdin).get("partyDetails", []) if p["party"].startswith(hint)), ""))
+try:
+    details = json.load(sys.stdin).get("partyDetails", [])
+except ValueError:
+    details = []
+print(next((p["party"] for p in details if p["party"].startswith(hint)), ""))
 ' "$2"
 }
 
@@ -146,8 +151,10 @@ up() {
     [[ -n "$issuer" && -n "$alice" && -n "$bob" ]] && break
     sleep 1
   done
-  [[ -n "$issuer" && -n "$alice" && -n "$bob" ]] \
-    || die "Canton is up but the Issuer, Alice and Bob parties were not found"
+  if [[ -z "$issuer" || -z "$alice" || -z "$bob" ]]; then
+    down >/dev/null 2>&1
+    die "Canton is up but the Issuer, Alice and Bob parties were not found on $LEDGER and $LEDGER2; log: $LOG"
+  fi
 
   cat >"$ENV_FILE" <<EOF
 export LEDGER='$LEDGER'
