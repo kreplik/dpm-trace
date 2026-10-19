@@ -1,0 +1,5 @@
+# Every SDK version named in the repo matches the one examples/asset/daml.yaml
+# pins.
+# RUN: %python %root/tests/check-sdk-version.py %root | FileCheck %s
+
+# CHECK: sdk-version checks passed
