@@ -662,8 +662,8 @@ func decodeEnum(data []byte) (any, error) {
 // place. With no readAs parties, every node is visible and none has witnesses.
 func (tx *PreparedTransaction) Trace(readAs []string) *Trace {
 	trace := &Trace{
-		Source:         "prepared-transaction",
-		Projection:     Projection{Source: "prepared-transaction", ReadAs: readAs},
+		Source:         SourcePreparedTransaction,
+		Projection:     Projection{Source: SourcePreparedTransaction, ReadAs: readAs, Note: preparedNote},
 		RootEventIDs:   []string{},
 		EventsByID:     map[string]*Event{},
 		SynchronizerID: tx.SynchronizerID,

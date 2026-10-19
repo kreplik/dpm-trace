@@ -127,7 +127,12 @@ const (
 const (
 	scanNote        = "Public Scan projection. Event ids may be Scan-indexed and are not the same as a participant projection."
 	participantNote = "Authorized participant projection. Private data outside these party rights is not available."
+	preparedNote    = "Prepared, not committed: the transaction the participant would commit. Created contract ids are local until commit."
 )
+
+// SourcePreparedTransaction marks a trace decoded from a prepared transaction
+// rather than read from the ledger.
+const SourcePreparedTransaction = "prepared-transaction"
 
 // Event returns the event with the given id, if present.
 func (t *Trace) Event(id string) (*Event, bool) {

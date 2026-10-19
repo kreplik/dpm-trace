@@ -221,7 +221,7 @@ func (s *Stepper) ShowCurrent() {
 		fmt.Fprintln(s.out, render.LabelValue("source",
 			fmt.Sprintf("%s  (%s)", source.FormatPath(*loc), loc.Label), color))
 	}
-	fmt.Fprintln(s.out, render.LabelValue("contract", render.Short(ev.ContractID, 32), color))
+	fmt.Fprintln(s.out, render.LabelValue("contract", render.Short(ev.ContractID, 32)+ctx.LocalSuffix(ev.ContractID), color))
 	if ev.Choice != "" {
 		fmt.Fprintln(s.out, render.LabelValue("choice",
 			fmt.Sprintf("%s  consuming=%s", ev.Choice, boolText(ev.Consuming)), color))

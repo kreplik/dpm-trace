@@ -441,13 +441,43 @@ func TestOpenPreparedOmitsAbsentCostAndHashing(t *testing.T) {
 	}
 }
 
-// --visualize must not be silently ignored: a prepared command has no tree, so
-// say so rather than printing the summary as though the flag were absent.
+// --visualize must not be silently ignored: an artifact without a prepared
+// transaction has no tree, so say so rather than printing the summary as though
+// the flag were absent.
 func TestOpenPreparedExplainsWhyThereIsNoSession(t *testing.T) {
 	prepared := repoPath("tests", "fixtures", "compare", "prepared.json")
 	stdout, _, _ := capture(t, func() int { return runOpen([]string{prepared, "--visualize"}) })
 	if !strings.Contains(stdout, "no transaction tree to step through") {
 		t.Errorf("--visualize was ignored without explanation:\n%s", stdout)
+	}
+}
+
+func TestOpenPreparedVisualizesTheTransaction(t *testing.T) {
+	prepared := repoPath("examples", "transfer.prepared.json")
+	stdin, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close()
+	realIn := os.Stdin
+	os.Stdin = stdin
+	defer func() { os.Stdin = realIn }()
+
+	stdout, _, code := capture(t, func() int { return runOpen([]string{prepared, "--visualize", "--color", "never"}) })
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	for _, want := range []string{
+		"projection:  Prepared, not committed",
+		"choice: Transfer",
+		"(local; assigned at commit)",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "no transaction tree to step through") {
+		t.Errorf("stepped through a tree and also said there is none:\n%s", stdout)
 	}
 }
 
