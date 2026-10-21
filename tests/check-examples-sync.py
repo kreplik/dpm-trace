@@ -20,19 +20,12 @@ from pathlib import Path
 MIRRORED = {
     "daml.yaml": "daml.yaml",
     "daml/Asset.daml": "daml/Asset.daml",
+    "daml/Test.daml": "daml/Test.daml",
 }
 
 
-# The example copies Asset.daml but not the Script tests, so its daml.yaml
-# leaves out the dependency only those tests use.
-TESTS_ONLY = {
-    "daml.yaml": {"  - daml-script"},
-}
-
-
-def _norm(text: str, drop: set[str] = frozenset()) -> str:
-    lines = text.replace("\r\n", "\n").rstrip().split("\n")
-    return "\n".join(line for line in lines if line not in drop) + "\n"
+def _norm(text: str) -> str:
+    return text.replace("\r\n", "\n").rstrip() + "\n"
 
 
 def main() -> int:
@@ -60,8 +53,7 @@ def main() -> int:
         if not local.is_file():
             errors.append(f"example file missing: {local}")
             continue
-        drop = TESTS_ONLY.get(relative, set())
-        if _norm(canonical.read_text(encoding="utf-8"), drop) != _norm(local.read_text(encoding="utf-8")):
+        if _norm(canonical.read_text(encoding="utf-8")) != _norm(local.read_text(encoding="utf-8")):
             errors.append(f"{local} drifts from {canonical} (canonical). Copy the sibling file over.")
 
     if errors:

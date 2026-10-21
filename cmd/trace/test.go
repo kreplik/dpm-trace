@@ -130,7 +130,6 @@ func runTest(args []string) int {
 			opts.MaxSourceLocations = parsed
 		case "--dar":
 			// Recorded for --integration, which uses it instead of building.
-			// damlc-inspect verification of failures is still unported.
 			darPaths = append(darPaths, value)
 		case "--damlc":
 			damlc = value
@@ -274,6 +273,19 @@ var testFlags = []flagDoc{
 	{"--daml-yaml PATH", "daml.yaml for source diagnostics. Defaults to the package's."},
 	{"--max-source-locations N", "Maximum diagnostics per failure. Defaults to 6."},
 	{"--keep-artifacts", "Keep the temporary run directory."},
+	{"--dar PATH", "Local DAR, verified with damlc inspect. With --integration it is deployed instead of building. Repeatable."},
+	{"--integration DIR", "Run the integration tests in DIR against a local Canton that dpm trace starts and stops."},
+	{"--canton-jar PATH", "Canton JAR to start for --integration."},
+	{"--parties Name@N,...", "Parties to allocate and the participant each is placed on, e.g. Alice@1,Bob@2."},
+	{"--lit PATH", "lit executable for --integration. Defaults to lit."},
+	{"--sequencer-type TYPE", "Sequencer type of the local Canton. Defaults to bft."},
+	{"--canton-timeout SECONDS", "How long to wait for the local Canton to be ready."},
+	{"--verbose", "Pass -vv to lit for per-test output."},
+	{"--init", "Scaffold itests/, unittests/ and a CI workflow in the package instead of running tests."},
+	{"--no-unittests", "With --init, skip unittests/."},
+	{"--no-ci", "With --init, skip the CI workflow."},
+	{"--itests-dir DIR", "With --init, the integration test directory. Defaults to itests."},
+	{"--unittests-dir DIR", "With --init, the unit test directory. Defaults to unittests."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
 }

@@ -58,6 +58,7 @@ var listedCommands = []commandDoc{
 	{"compare", "Compare prepared transactions, updates, or completions."},
 	{"prepare", "Prepare a command without committing it."},
 	{"submit", "Submit a command and print the resulting update id."},
+	{"test", "Run Daml Script tests, or integration tests against a local Canton."},
 	{"install-plugin", "Register this binary as a DPM component."},
 }
 
