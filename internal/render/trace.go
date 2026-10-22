@@ -177,7 +177,7 @@ func EventDetailLines(ev *model.Event, color Color, ctx *Context, index *source.
 		}
 	}
 	if ev.ContractID != "" {
-		lines = append(lines, LabelValue("contract", Short(ev.ContractID, 66), color))
+		lines = append(lines, LabelValue("contract", Short(ev.ContractID, 66)+ctx.LocalSuffix(ev.ContractID), color))
 	}
 	if ev.Consuming != nil && ev.Kind == model.KindExercise {
 		lines = append(lines, LabelValue("consuming", strconv.FormatBool(*ev.Consuming), color))
@@ -207,7 +207,9 @@ func EventDetailLines(ev *model.Event, color Color, ctx *Context, index *source.
 	if ev.Payload != nil {
 		lines = append(lines, BlockLines("payload", ev.Payload, color, ctx)...)
 	}
-	if ev.Result != nil {
+	if id, ok := ev.Result.(string); ok && ctx.LocalSuffix(id) != "" {
+		lines = append(lines, LabelValue("result", Short(id, 66)+ctx.LocalSuffix(id), color))
+	} else if ev.Result != nil {
 		lines = append(lines, BlockLines("result", ev.Result, color, ctx)...)
 	}
 	return lines
@@ -415,8 +417,30 @@ func PreparedArtifactSummary(artifact map[string]any) string {
 		}
 	}
 
+	if response != nil {
+		if tx, err := model.PreparedTransactionFromResponse(response); err == nil {
+			lines = append(lines, "", "Transaction (as the participant would commit it)")
+			lines = append(lines, preparedTreeLines(tx)...)
+		}
+	}
+
 	lines = append(lines, "", "This is prepared transaction data from a non-committing prepare call.")
 	return strings.Join(lines, "\n")
+}
+
+// preparedTreeLines draws a prepared transaction with the tree `dpm trace`
+// draws a committed one, so the two read the same way.
+func preparedTreeLines(tx *model.PreparedTransaction) []string {
+	trace := tx.Trace(nil)
+	if len(trace.RootEventIDs) == 0 {
+		return []string{"  no events"}
+	}
+	var b strings.Builder
+	ctx := NewContext(trace)
+	for i, eventID := range trace.RootEventIDs {
+		eventTree(&b, trace, eventID, "  ", i == len(trace.RootEventIDs)-1, Color{}, ctx, nil)
+	}
+	return strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
 }
 
 func stringField(obj map[string]any, key string) string {
@@ -458,7 +482,7 @@ func joinField(obj map[string]any, key string) string {
 // how a party looks. Ports print_summary.
 func PrintSummary(w io.Writer, trace *model.Trace) {
 	ctx := NewContext(trace)
-	fmt.Fprintf(w, "update:      %s\n", trace.UpdateID)
+	fmt.Fprintf(w, "update:      %s\n", orDash(trace.UpdateID))
 	fmt.Fprintf(w, "source:      %s (%s)\n", trace.Source, orDash(trace.SourceURL))
 	fmt.Fprintf(w, "record time: %s\n", orDash(trace.RecordTime))
 	fmt.Fprintf(w, "offset:      %s\n", orDash(trace.Offset))

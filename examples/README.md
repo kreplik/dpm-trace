@@ -17,8 +17,8 @@ dpm trace open examples/assign.trace.json
 
 The Daml package behind the first three is in [`asset/`](asset), and the steps
 below rebuild them from it — nothing outside this repository is required, though
-reproducing them needs DPM and a Java runtime. Opening the committed artifacts
-above needs neither.
+reproducing them needs DPM with SDK 3.5.1 and Java 17 or newer. Opening the
+committed artifacts above needs neither.
 
 ## The shapes
 
@@ -59,34 +59,19 @@ and one mediator, so the steps below reproduce the first three artifacts only.
 
 ## Reproducing them against a local Canton
 
-The repo ships a Canton config for exactly this — [`devnet-trace.conf`](devnet-trace.conf),
-two participants with fixed ports — plus a bootstrap script that uploads the DAR
-and allocates the parties:
-
-Everything below needs only this repository and a Canton jar.
+[`up.sh`](up.sh) boots [`devnet-trace.conf`](devnet-trace.conf) — two
+participants with fixed ports — in the background, uploads the DAR, allocates
+the parties and exports their ids:
 
 ```bash
-# Build the example package (examples/asset), from the repo root:
-(cd examples/asset && dpm build)
-
-CANTON=$(ls ~/.dpm/cache/components/canton-open-source/*/lib/canton-open-source-*.jar | sort -V | tail -1)
-
-java -Ddpm.dar-path="$PWD/examples/asset/.daml/dist/asset-tests-1.0.0.dar" \
-  -jar "$CANTON" daemon \
-  -c examples/devnet-trace.conf \
-  --bootstrap examples/devnet-trace.bootstrap.canton --no-tty
-# => === dpm-trace examples ready: participant1 http://127.0.0.1:6113, participant2 http://127.0.0.1:6123 ===
+source examples/up.sh   # sets LEDGER, ISSUER, ALICE, BOB
 ```
 
-Read the allocated party ids off the participant:
+The same exports are kept in `examples/.env` for other shells.
 
-```bash
-LEDGER=http://127.0.0.1:6113
-curl -s $LEDGER/v2/parties | python3 -m json.tool | grep '"party"'
-
-ISSUER='Issuer::1220...'     # from the output above
-ALICE='Alice::1220...'
-```
+It uses the shipped DAR (building it with `dpm build` if missing) and the Canton
+3.5.1 jar from the DPM cache, or `$CANTON_JAR`. Canton logs to
+`examples/.up/canton.log`; stop it with `./examples/up.sh down`.
 
 Beware `.dpm-trace.json`: config discovery walks up from the current directory,
 so a file with placeholder values will silently supply them — a placeholder
@@ -97,7 +82,7 @@ these commands outside a directory that has one, or pass `--config`.
 
 ```bash
 CREATE_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ISSUER" \
-  --template '#asset-tests:Asset:Asset' \
+  --template '#asset:Asset:Asset' \
   --arg issuer="$ISSUER" --arg owner="$ALICE" --arg name=GOLD --arg quantity=100)
 
 dpm trace "$CREATE_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
@@ -112,7 +97,7 @@ CID=$(dpm trace "$CREATE_ID" --submitter "$LEDGER" --read-as "$ISSUER" --print-j
   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(next(e["contractId"] for e in d["eventsById"].values() if e.get("contractId")))')
 
 SPLIT_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Split \
+  --template '#asset:Asset:Asset' --choice Split \
   --contract-id "$CID" --arg splitQuantity=40)
 
 dpm trace "$SPLIT_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
@@ -128,7 +113,7 @@ BURN_CID=$(dpm trace "$SPLIT_ID" --submitter "$LEDGER" --read-as "$ISSUER" --pri
   | python3 -c 'import sys,json; d=json.load(sys.stdin); print(next(e["contractId"] for e in d["eventsById"].values() if e.get("kind")=="create"))')
 
 BURN_ID=$(dpm trace submit --submitter "$LEDGER" --act-as "$ALICE" \
-  --template '#asset-tests:Asset:Asset' --choice Burn --contract-id "$BURN_CID")
+  --template '#asset:Asset:Asset' --choice Burn --contract-id "$BURN_CID")
 
 dpm trace "$BURN_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
   --export examples/archive.trace.json

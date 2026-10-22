@@ -100,7 +100,7 @@ dpm trace prepare --submitter <url> --act-as '<party-id>' \
 Commands can also come from a file (`--commands commands.json`), a JSON string
 (`--command-json`), or `--arg key=value` pairs.
 
-The result is labelled for what it is:
+The result is labelled for what it is (header shortened):
 
 ```
 Prepared command
@@ -108,12 +108,31 @@ Prepared command
   command id:   dpm-trace-prepare-04427c1b4565
   prepared hash:FtItr2nW1XjyV+FNOyU16Wib3D1ccZrWewE42KtyBwE=
   hashing:      HASHING_SCHEME_VERSION_V2
+
+Transaction (as the participant would commit it)
+  └── [0] EXERCISE Asset:Asset.Transfer
+      ├── contract: 0059f0a55ba182af89abbf3213b2df6bbdeaba0409a9d41080573864051d7e5...
+      ├── consuming: true
+      ├── actors: Alice
+      ├── argument: { newOwner: Bob }
+      ├── result: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e (local; assigned at commit)
+      └── [1] CREATE Asset:Asset
+          ├── contract: 006735a2d9b35ffbaf26328c528d4e30574c6a27788b8d492ef3ae2ac1b4acce6e (local; assigned at commit)
+          ├── signatories: Issuer
+          ├── observers: Bob
+          └── payload: { issuer: Issuer, owner: Bob, name: SILVER, quantity: 100 }
 ```
+
+The transaction is decoded from the participant's `preparedTransaction`, so it
+shows every event the command would produce, children included, not only the
+command you sent.
 
 **Nothing has happened on the ledger.** A prepared transaction is what the
 participant *would* commit if the submission were signed and sent. No contract
 exists, no party has been notified, and the prepared hash is not an update id.
-`dpm trace open prepared.json` reopens it later.
+A created contract's id is local: the ledger assigns the real one at commit, so
+it cannot be looked up. `dpm trace open prepared.json` reopens it later, and
+`--visualize` steps through it.
 
 ## submit
 
@@ -179,9 +198,24 @@ Either way the view states the absence rather than inventing an id:
 ```
 
 **A command rejected during interpretation never reaches the ledger**, so it
-produces no completion at all and `--command-id` will not find it. That is not
-a bug in the lookup: there is nothing to find. Capture the submission response
-and use `--completion-file`.
+produces no completion at all and `--command-id` will not find it because there
+is nothing to find. Capture the submission response and use `--completion-file`.
+
+| Failure | Example | `--command-id` | `--completion-file` |
+| --- | --- | --- | --- |
+| Before sequencing | a failed `assert` (`DAML_FAILURE`), `CONTRACT_NOT_FOUND`, missing authorization, a reused command id (`DUPLICATE_COMMAND`) | no completion | yes |
+| After sequencing | contention over the same contract (`LOCAL_VERDICT_LOCKED_CONTRACTS`), a contract archived by a concurrent transaction, a mediator timeout | yes | yes |
+
+`--completion-file` therefore works for every rejection, which is why the
+failure summary `submit` prints suggests it:
+
+```
+  Next
+    dpm trace compare --prepared <prepared.json> --completion-file failure.json
+```
+
+That is the line when `--export failure.json` was given. Without `--export`
+there is no file yet, so the summary says to rerun with it first.
 
 `--log-file` correlates a completion with operator logs, matching on command
 id, submission id, trace id and correlation id. It is optional and local; the
@@ -218,8 +252,27 @@ are reported per event:
     ~ exercise Asset:Asset.Transfer    newOwner: Bob::1220bc0a... → Mallory::1220ffff...
 ```
 
-**Between a prepared command and a committed update:** the command id, the
-commands themselves, and whether what committed matches what was prepared.
+**Between a prepared command and a committed update:** the whole transaction,
+event by event. The prepared side is the transaction the participant computed,
+decoded from the artifact's `preparedTransaction`, so a difference in a child
+event is reported as well as one in the command itself:
+
+```
+  Events
+    = exercise Asset:Asset.Transfer                      (1 field matches)
+      ~ create Asset:Asset                                 quantity: 100 → 1
+```
+
+The prepared transaction is projected the way the committed one was: only the
+events the committed trace's `--read-as` parties witness, without fetches or
+rolled-back subtrees, which a committed transaction does not report. Contracts
+the transaction creates get a new id each time a command is interpreted, so
+they are compared by position — the first contract created on one side against
+the first on the other.
+
+An artifact without a decodable `preparedTransaction` falls back to comparing
+the commands against the root events, and the output says that child events
+were not compared.
 
 **Between a prepared command and a completion:** the command id (reported as
 `match` when they are the same submission), completion status, error details,
@@ -252,3 +305,13 @@ outside that projection rather than absent from the ledger.
 
 **Prepared hashes are not comparable across hashing schemes.** The prepared
 hash is only meaningful alongside its `HASHING_SCHEME_VERSION`.
+
+**Created contracts are numbered only where the projection sees them.** A
+visible event can hold the id of a contract created in a subtree the `--read-as`
+parties do not witness. Neither side numbers that contract, so its local
+prepared id against the committed one is reported as a difference.
+
+**A top-level `None` of a nested Optional reads as `null` on the prepared
+side.** The JSON Ledger API writes it as `[]`, but the prepared transaction does
+not carry the type that says it is nested, so a field of type
+`Optional (Optional a)` set to `None` is reported as `null → []`.
