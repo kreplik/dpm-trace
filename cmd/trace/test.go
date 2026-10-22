@@ -22,7 +22,7 @@ import (
 func runTest(args []string) int {
 	if wantsHelp(args) {
 		commandHelp(os.Stdout, "dpm trace test <package-dir> [flags]",
-			"Run Daml Script unit tests, render each script's transaction tree, and map failures to source.",
+			"Run Daml Script unit tests, or lit integration tests against a local Canton, and map failures to source.",
 			testFlags, "")
 		return 0
 	}
@@ -129,8 +129,7 @@ func runTest(args []string) int {
 			}
 			opts.MaxSourceLocations = parsed
 		case "--dar":
-			// Recorded for --integration, which uses it instead of building.
-			// damlc-inspect verification of failures is still unported.
+			// Unit mode inspects every DAR; --integration deploys the first instead of building.
 			darPaths = append(darPaths, value)
 		case "--damlc":
 			damlc = value
@@ -174,10 +173,8 @@ func runTest(args []string) int {
 		integrationOpts.Daml = opts.Daml
 		integrationOpts.DAR = firstOrEmpty(darPaths)
 		integrationOpts.KeepArtifacts = opts.KeepArtifacts
-		// The generated lit.cfg.py builds %dpm from DPM_TRACE_IT_DPM,
-		// so the suite drives the Python implementation. Point it at the
-		// interpreter and source tree the same way run_integration_tests does;
-		// switching %dpm to this binary would change what the suite tests.
+		// %dpm runs this binary; the interpreter and source tree are forwarded
+		// only for suites whose own scripts need them.
 		integrationOpts.Python = os.Getenv("DPM_TRACE_IT_PYTHON")
 		if integrationOpts.Python == "" {
 			integrationOpts.Python = os.Getenv("DPM_TRACE_PYTHON")
@@ -230,7 +227,7 @@ func runTest(args []string) int {
 	// run_test defaults --damlc to --daml, so a package built with one
 	// toolchain is inspected with the same one.
 	for _, path := range darPaths {
-		index.LoadDARInspect(path, orDefaultString(damlc, orDefaultString(opts.Daml, "daml")))
+		index.LoadDARInspect(path, orDefaultString(damlc, orDefaultString(opts.Daml, "dpm")))
 	}
 
 	result, err := testrunner.Run(os.Stderr, opts, index)
@@ -265,15 +262,33 @@ func runTest(args []string) int {
 }
 
 var testFlags = []flagDoc{
-	{"--daml PATH", "Toolchain to run: daml, damlc or dpm. Defaults to daml."},
+	{"--daml PATH", "Toolchain to run: dpm, daml or damlc. Defaults to dpm."},
 	{"-p, --test-pattern PAT", "Run only tests matching a pattern."},
 	{"--files PATH", "Restrict to specific source files. Repeatable."},
 	{"--junit PATH", "Also write JUnit XML for CI."},
 	{"--print-json", "Print the dpm-trace/test-report/v0 report and exit."},
 	{"--no-trees", "Summary and failures only, for compact CI logs."},
-	{"--daml-yaml PATH", "daml.yaml for source diagnostics. Defaults to the package's."},
+	{"--daml-yaml PATH", "daml.yaml for source diagnostics. Repeatable. Defaults to the package's."},
+	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--max-source-locations N", "Maximum diagnostics per failure. Defaults to 6."},
 	{"--keep-artifacts", "Keep the temporary run directory."},
+	{"--dar PATH", "Local DAR to verify failures with damlc inspect. Repeatable."},
+	{"--damlc PATH", "dpm, daml or damlc executable for inspection. Defaults to --daml."},
+	{"--integration DIR", "Run the integration tests in DIR against a local Canton that dpm trace starts and stops."},
+	{"--canton-jar PATH", "Canton JAR to start for --integration. Defaults to $DPM_TRACE_CANTON_JAR."},
+	{"--dar PATH", "With --integration, deploy the first DAR instead of building."},
+	{"--parties Name@N,...", "Parties to allocate and the participant each is placed on, e.g. Alice@1,Bob@2. Defaults to Alice,Bob."},
+	{"--lit PATH", "lit executable for --integration. Defaults to lit."},
+	{"--sequencer-type TYPE", "Sequencer type of the local Canton. Defaults to bft."},
+	{"--canton-timeout SECONDS", "How long to wait for the local Canton to be ready. Defaults to 180."},
+	{"--verbose", "Pass -vv to lit for per-test output."},
+	{"--init", "Scaffold itests/, unittests/ and a CI workflow in the package instead of running tests."},
+	{"--no-unittests", "With --init, skip unittests/."},
+	{"--no-ci", "With --init, skip the CI workflow."},
+	{"--itests-dir DIR", "With --init, the integration test directory. Defaults to itests."},
+	{"--unittests-dir DIR", "With --init, the unit test directory. Defaults to unittests."},
+	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
 }

@@ -283,7 +283,7 @@ func runCompare(args []string) int {
 		index.LoadSourceRoot(root)
 	}
 	for _, path := range dar {
-		index.LoadDARInspect(path, orDefaultString(damlc, "daml"))
+		index.LoadDARInspect(path, orDefaultString(damlc, "dpm"))
 	}
 
 	fetch := traceFetcher{

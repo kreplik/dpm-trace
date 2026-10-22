@@ -1,0 +1,39 @@
+-- Copyright (c) 2026 Walnut. Apache-2.0.
+--
+-- A DELIBERATELY failing Daml Script test, used to demonstrate how
+-- `dpm trace test` reports a failure: it maps the failed test back to source --
+-- both the test call site and the contract invariant that rejected it.
+--
+-- This module is not part of the passing gate. CI runs it as a separate,
+-- non-blocking step (see .github/workflows/ci.yml) so the failure output is
+-- visible without failing the build. Run it directly with:
+--
+--   dpm build --all
+--   dpm trace test unittests --files daml/FailureDemo.daml \
+--     --daml-yaml unittests/daml.yaml --daml-yaml daml.yaml --dar .daml/dist/asset-1.0.0.dar
+module FailureDemo where
+
+import Daml.Script
+import Asset
+
+-- The bug: this uses `submit` (expecting success), but splitting off 0 is
+-- rejected by the `assertMsg` guard inside Asset.Split, so the script fails.
+testOverSplitRejected : Script ()
+testOverSplitRejected = do
+  issuer <- allocateParty "Issuer"
+  alice <- allocateParty "Alice"
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  _ <- submit alice do
+    exerciseCmd cid Split with splitQuantity = 0
+  pure ()
+
+testInsufficientBalance : Script ()
+testInsufficientBalance = do
+  issuer <- allocateParty "Issuer"
+  alice <- allocateParty "Alice"
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100    
+  _ <- submit alice do
+    exerciseCmd cid Withdraw with amount = 150
+  pure()  

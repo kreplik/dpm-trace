@@ -1,0 +1,12 @@
+sdk-version: 3.5.1
+name: asset-unittests
+source: daml
+version: 1.0.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+# Script tests live in their own package so the asset DAR does not pull in
+# daml-script. Build it first with `dpm build --all`.
+data-dependencies:
+  - ../.daml/dist/asset-1.0.0.dar

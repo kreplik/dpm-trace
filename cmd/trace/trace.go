@@ -328,7 +328,7 @@ func runTrace(args []string) int {
 	// "local source".
 	if len(dar) > 0 {
 		for _, path := range dar {
-			index.LoadDARInspect(path, orDefaultString(damlc, "daml"))
+			index.LoadDARInspect(path, orDefaultString(damlc, "dpm"))
 		}
 	}
 	color := render.ColorFromMode(colorMode, isTTY())

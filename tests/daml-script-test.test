@@ -1,10 +1,14 @@
 # Opt-in: runs `dpm trace test` against the sibling Daml package (DPM_TRACE_DAML_TESTS_DIR) with a
 # real Daml toolchain. Enable with:
 #
-#   DPM_TRACE_RUN_DAML_TEST=1 DPM_TRACE_DAML=<daml> lit tests/daml-script-test.test
+#   DPM_TRACE_RUN_DAML_TEST=1 DPM_TRACE_DAML=dpm lit tests/daml-script-test.test
+#
+# DPM_TRACE_DAML defaults to dpm; the legacy daml assistant cannot resolve SDK 3.5.1.
 #
 # REQUIRES: daml-test
-# RUN: %dpm test %daml-tests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
+# The Script tests are their own package on top of the asset DAR, so build both first.
+# RUN: cd %daml-tests && %daml build --all
+# RUN: %dpm test %daml-tests/unittests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
 
 # CHECK: DPM trace test
 # CHECK: all 10 passed

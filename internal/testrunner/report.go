@@ -1,4 +1,4 @@
-// Package testrunner implements `dpm trace test`: it wraps `daml test`, decodes
+// Package testrunner implements `dpm trace test`: it wraps `dpm test`, decodes
 // the per-script transaction trees and renders a report that gates CI.
 //
 // Two contracts must not change, per #7: a non-zero exit on any test failure,

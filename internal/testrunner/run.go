@@ -43,13 +43,13 @@ func (r Result) Failed() bool {
 	return false
 }
 
-// Command builds the `daml test` invocation. Ports daml_test_command.
+// Command builds the test invocation for --daml (dpm, daml or damlc). Ports daml_test_command.
 func Command(opts Options, junitPath, txnsDir, tableDir string) []string {
 	// Expanded here as the integration runner does: "~/.daml/bin/daml" is a
 	// path the shell would have expanded, and exec will not.
 	executable := expandUser(opts.Daml)
 	if executable == "" {
-		executable = "daml"
+		executable = "dpm"
 	}
 	name := filepath.Base(executable)
 
@@ -128,7 +128,7 @@ func ChildEnv(extra map[string]string) []string {
 	return out
 }
 
-// Run executes `daml test` and assembles the results. Ports run_test.
+// Run executes the test command and assembles the results. Ports run_test.
 func Run(stderr io.Writer, opts Options, index *source.Index) (Result, error) {
 	work, err := os.MkdirTemp("", "dpm-trace-test-")
 	if err != nil {
@@ -158,7 +158,7 @@ func Run(stderr io.Writer, opts Options, index *source.Index) (Result, error) {
 		// Belt and braces: the UTF-8 locale in ChildEnv handles the known
 		// abort, so this fires only for some other JUnit-generation failure.
 		// Logged rather than silent, so a real compile failure is not masked.
-		fmt.Fprintln(stderr, "warning: first `daml test` run produced no JUnit; retrying without "+
+		fmt.Fprintln(stderr, "warning: first test run produced no JUnit; retrying without "+
 			"transaction/table output (trees will be unavailable).")
 		command = Command(opts, junitPath, "", "")
 		stdout, _ = runCommand(command, opts.Root, env)

@@ -1,0 +1,114 @@
+-- Copyright (c) 2026 Walnut. Apache-2.0.
+--
+-- Daml Script unit tests for the Asset contract.
+--
+-- These are ordinary `daml test` scripts: they run on a fresh in-memory ledger,
+-- need no Canton infrastructure, and are the workload `dpm trace test` operates
+-- on. The suite mixes happy paths (`submit`) with guarded rejections
+-- (`submitMustFail`) so a CI run exercises creates, consuming exercises,
+-- archives, ensure-clauses, authorization, and in-choice assertions.
+module Test where
+
+import Daml.Script
+import DA.Assert ((===))
+import Asset
+
+-- | Allocate the standard cast used by every test.
+setup : Script (Party, Party, Party)
+setup = do
+  issuer <- allocateParty "Issuer"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  pure (issuer, alice, bob)
+
+-- | Happy path: the issuer issues an asset to Alice.
+testIssue : Script ()
+testIssue = do
+  (issuer, alice, _) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  Some asset <- queryContractId alice cid
+  asset.quantity === 100
+  asset.owner === alice
+
+-- | Happy path: Alice transfers the asset to Bob.
+--   Transfer is consuming, so this archives the original and creates a new one.
+testTransfer : Script ()
+testTransfer = do
+  (issuer, alice, bob) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  newCid <- submit alice do
+    exerciseCmd cid Transfer with newOwner = bob
+  Some asset <- queryContractId bob newCid
+  asset.owner === bob
+
+-- | Happy path: Alice splits a 100 asset into 70 + 30.
+testSplit : Script ()
+testSplit = do
+  (issuer, alice, _) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  (kept, piece) <- submit alice do
+    exerciseCmd cid Split with splitQuantity = 30
+  Some keptAsset <- queryContractId alice kept
+  Some pieceAsset <- queryContractId alice piece
+  keptAsset.quantity === 70
+  pieceAsset.quantity === 30
+
+-- | Guard: an asset with a non-positive quantity is rejected by `ensure`.
+testCannotIssueZero : Script ()
+testCannotIssueZero = do
+  (issuer, alice, _) <- setup
+  submitMustFail issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 0
+
+-- | Guard: a stranger cannot transfer someone else's asset (authorization).
+testStrangerCannotTransfer : Script ()
+testStrangerCannotTransfer = do
+  (issuer, alice, bob) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  submitMustFail bob do
+    exerciseCmd cid Transfer with newOwner = bob
+
+-- | Guard: Split rejects a degenerate split via an in-choice assertion.
+testBadSplitFails : Script ()
+testBadSplitFails = do
+  (issuer, alice, _) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  submitMustFail alice do
+    exerciseCmd cid Split with splitQuantity = 0
+
+-- | Guard: Double-spending is rejected by the ledger.
+testDoubleSpending : Script ()
+testDoubleSpending = do
+  (issuer, alice, bob) <- setup  
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  newCid <- submit alice do
+    exerciseCmd cid Transfer with newOwner = bob
+  submitMustFail alice do
+    exerciseCmd cid Burn
+
+-- | Guard: Authorization is enforced.
+testAuthFail : Script ()
+testAuthFail = do
+  (issuer, alice, bob) <- setup
+  cid <- submit issuer do
+    createCmd Asset with issuer; owner = alice; name = "GOLD"; quantity = 100
+  submitMustFail bob do
+    exerciseCmd cid Burn
+
+-- | Guard: The AssetRegistry enforces uniqueness of asset names.
+testDuplicateKey : Script ()
+testDuplicateKey = do
+  (issuer, alice, _) <- setup
+  registryCid <- submit issuer do
+    createCmd AssetRegistry with issuer = issuer, activeIds = []
+
+  (registryCid2, token1Cid) <- submit issuer do
+    exerciseCmd registryCid IssueAsset with owner = alice, name = "GOLD", quantity = 100
+  submitMustFail issuer do
+    exerciseCmd registryCid2 IssueAsset with owner = alice, name = "GOLD", quantity = 50
