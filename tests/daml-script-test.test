@@ -4,7 +4,9 @@
 #   DPM_TRACE_RUN_DAML_TEST=1 DPM_TRACE_DAML=<daml> lit tests/daml-script-test.test
 #
 # REQUIRES: daml-test
-# RUN: %dpm test %daml-tests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
+# The Script tests are their own package on top of the asset DAR, so build both first.
+# RUN: cd %daml-tests && %daml build --all
+# RUN: %dpm test %daml-tests/unittests --files daml/Test.daml --daml %daml --no-trees --color never | FileCheck %s
 
 # CHECK: DPM trace test
 # CHECK: all 10 passed

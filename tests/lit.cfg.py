@@ -47,6 +47,8 @@ for key in (
     "DPM_TRACE_CANTON_JAR",
     "DPM_TRACE_DAML_HELPER",
     "DPM_TRACE_PYTHON",
+    # daml test starts a JVM; on macOS /usr/bin/java needs JAVA_HOME.
+    "JAVA_HOME",
 ):
     if key in os.environ:
         config.environment[key] = os.environ[key]

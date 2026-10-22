@@ -22,7 +22,7 @@ import (
 func runTest(args []string) int {
 	if wantsHelp(args) {
 		commandHelp(os.Stdout, "dpm trace test <package-dir> [flags]",
-			"Run Daml Script unit tests, render each script's transaction tree, and map failures to source.",
+			"Run Daml Script unit tests, or lit integration tests against a local Canton, and map failures to source.",
 			testFlags, "")
 		return 0
 	}
@@ -270,22 +270,27 @@ var testFlags = []flagDoc{
 	{"--junit PATH", "Also write JUnit XML for CI."},
 	{"--print-json", "Print the dpm-trace/test-report/v0 report and exit."},
 	{"--no-trees", "Summary and failures only, for compact CI logs."},
-	{"--daml-yaml PATH", "daml.yaml for source diagnostics. Defaults to the package's."},
+	{"--daml-yaml PATH", "daml.yaml for source diagnostics. Repeatable. Defaults to the package's."},
+	{"--source-root PATH", "Local Daml source root for diagnostics. Repeatable."},
+	{"--debug-info PATH", "daml-debug-info/v1 file for source positions. Repeatable."},
 	{"--max-source-locations N", "Maximum diagnostics per failure. Defaults to 6."},
 	{"--keep-artifacts", "Keep the temporary run directory."},
-	{"--dar PATH", "Local DAR, verified with damlc inspect. With --integration it is deployed instead of building. Repeatable."},
+	{"--dar PATH", "Local DAR to verify failures with damlc inspect. Repeatable."},
+	{"--damlc PATH", "damlc or daml executable for inspection. Defaults to --daml."},
 	{"--integration DIR", "Run the integration tests in DIR against a local Canton that dpm trace starts and stops."},
 	{"--canton-jar PATH", "Canton JAR to start for --integration."},
+	{"--dar PATH", "With --integration, deploy this DAR instead of building. Repeatable."},
 	{"--parties Name@N,...", "Parties to allocate and the participant each is placed on, e.g. Alice@1,Bob@2."},
 	{"--lit PATH", "lit executable for --integration. Defaults to lit."},
 	{"--sequencer-type TYPE", "Sequencer type of the local Canton. Defaults to bft."},
-	{"--canton-timeout SECONDS", "How long to wait for the local Canton to be ready."},
+	{"--canton-timeout SECONDS", "How long to wait for the local Canton to be ready. Defaults to 180."},
 	{"--verbose", "Pass -vv to lit for per-test output."},
 	{"--init", "Scaffold itests/, unittests/ and a CI workflow in the package instead of running tests."},
 	{"--no-unittests", "With --init, skip unittests/."},
 	{"--no-ci", "With --init, skip the CI workflow."},
 	{"--itests-dir DIR", "With --init, the integration test directory. Defaults to itests."},
 	{"--unittests-dir DIR", "With --init, the unit test directory. Defaults to unittests."},
+	{"--config PATH", "Config JSON. Defaults to .dpm-trace.json in this directory or a parent."},
 	{"--color MODE", "auto, always or never. Defaults to auto."},
 	{"-h, --help", "Show this help."},
 }

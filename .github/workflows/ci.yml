@@ -60,8 +60,9 @@ jobs:
           sdk="$(sed -n 's/^sdk-version: *//p' examples/asset/daml.yaml)"
           curl -sSL https://get.digitalasset.com/install/install.sh | sh -s "$sdk"
           echo "$HOME/.dpm/bin" >> "$GITHUB_PATH"
+      # --all also compiles the unittests package, so a broken Script test fails here.
       - name: Build examples/asset
-        run: cd examples/asset && dpm build
+        run: cd examples/asset && dpm build --all
 
   lit:
     name: lit

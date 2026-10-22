@@ -46,9 +46,11 @@ Key areas to orient in the tree:
 - DPM component: `internal/plugin` -- `Install` writes the component into the DPM home and registers it in the SDK manifest.
 - Spawning daml/damlc/canton: `testrunner.ChildEnv` (drops `DPM_RESOLUTION_FILE`, forces a UTF-8 locale).
 
-A worked example package for the test runner (Asset contract + Script tests +
-CI workflow + regression demo) lives in the sibling `daml-contracts` directory;
-`examples/` in this repo carries a copy plus committed trace artifacts.
+A worked example package for the test runner (Asset contract, Script tests in
+a separate `unittests/` package, `itests/`, CI workflow, regression demo) lives
+in the sibling `daml-contracts` directory; `examples/asset` in this repo is a
+copy kept in sync by `tests/check-examples-sync.py`. The Script tests depend on
+the asset DAR, so build with `dpm build --all` before running them.
 
 ## Development Rules
 

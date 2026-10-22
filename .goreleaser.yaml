@@ -51,7 +51,10 @@ archives:
       - examples/README.md
       # Source for the example package, so the DAR can be rebuilt.
       - examples/asset/daml.yaml
+      - examples/asset/multi-package.yaml
       - examples/asset/daml/*
+      - examples/asset/unittests/daml.yaml
+      - examples/asset/unittests/daml/*
       # Built by release.yml, so the examples run without building the Daml.
       - examples/asset/.daml/dist/asset-1.0.0.dar
       # The Canton config both READMEs tell the reader to boot.

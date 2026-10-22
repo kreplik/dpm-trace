@@ -16,12 +16,23 @@ import os
 import sys
 from pathlib import Path
 
-# Sibling path -> path under examples/asset.
-MIRRORED = {
-    "daml.yaml": "daml.yaml",
-    "daml/Asset.daml": "daml/Asset.daml",
-    "daml/Test.daml": "daml/Test.daml",
-}
+# Files copied as-is from the sibling into examples/asset.
+MIRRORED_FILES = ("daml.yaml", "multi-package.yaml", "daml/Asset.daml")
+# Directories copied whole. Hidden entries (.daml) are build output.
+MIRRORED_DIRS = ("unittests",)
+
+
+def _files_under(root: Path) -> set[str]:
+    if not root.is_dir():
+        return set()
+    found = set()
+    for path in root.rglob("*"):
+        relative = path.relative_to(root)
+        if any(part.startswith(".") or part == "__pycache__" for part in relative.parts):
+            continue
+        if path.is_file():
+            found.add(relative.as_posix())
+    return found
 
 
 def _norm(text: str) -> str:
@@ -43,10 +54,18 @@ def main() -> int:
         )
         return 0
 
+    example = repo_root / "examples" / "asset"
+    mirrored = list(MIRRORED_FILES)
     errors: list[str] = []
-    for relative, mirrored in MIRRORED.items():
+    for directory in MIRRORED_DIRS:
+        canonical_files = _files_under(sibling / directory)
+        for extra in sorted(_files_under(example / directory) - canonical_files):
+            errors.append(f"{example / directory / extra} has no canonical copy in {sibling / directory}. Remove it.")
+        mirrored += [f"{directory}/{name}" for name in sorted(canonical_files)]
+
+    for relative in mirrored:
         canonical = sibling / relative
-        local = repo_root / "examples" / "asset" / mirrored
+        local = example / relative
         if not canonical.is_file():
             errors.append(f"canonical file missing: {canonical}")
             continue

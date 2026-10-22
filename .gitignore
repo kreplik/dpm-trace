@@ -11,6 +11,7 @@ tests/.lit/
 
 # Daml build output for the examples package
 examples/asset/.daml/
+examples/asset/unittests/.daml/
 
 # Written by examples/up.sh
 examples/.env
