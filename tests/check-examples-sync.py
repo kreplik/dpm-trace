@@ -17,7 +17,14 @@ import sys
 from pathlib import Path
 
 # Files copied as-is from the sibling into examples/asset.
-MIRRORED_FILES = ("daml.yaml", "multi-package.yaml", "daml/Asset.daml")
+MIRRORED_FILES = (
+    "daml.yaml",
+    "multi-package.yaml",
+    "daml/Asset.daml",
+    # One integration test, enough to run the --integration example in the docs.
+    "itests/lit.cfg.py",
+    "itests/asset-create.test",
+)
 # Directories copied whole. Hidden entries (.daml) are build output.
 MIRRORED_DIRS = ("unittests",)
 
