@@ -100,7 +100,7 @@ func runSubmit(args []string) int {
 				index.LoadSourceRoot(root)
 			}
 			for _, path := range opts.dar {
-				index.LoadDARInspect(path, orDefaultString(opts.damlc, "daml"))
+				index.LoadDARInspect(path, orDefaultString(opts.damlc, "dpm"))
 			}
 			completion.Raw = model.AttachLogMatches(completion.Raw, opts.logFile)
 			color := render.ColorFromMode(opts.colorMode, isTTY())

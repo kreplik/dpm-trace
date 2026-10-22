@@ -45,7 +45,7 @@ if not dpm:
         "`dpm trace test --integration <dir>`")
 
 config.substitutions.append(("%daml-yaml", os.environ.get("DPM_TRACE_IT_DAML_YAML", "")))
-config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_IT_DAML", "daml")))
+config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_IT_DAML", "dpm")))
 # %ledger2 must precede %ledger -- otherwise "%ledger" matches inside "%ledger2".
 config.substitutions.append(("%ledger2", os.environ.get("DPM_TRACE_IT_LEDGER2", "")))
 config.substitutions.append(("%ledger", ledger))

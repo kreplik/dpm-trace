@@ -122,6 +122,25 @@ dpm trace "$BURN_ID" --submitter "$LEDGER" --read-as "$ISSUER" \
 A consuming choice is how an archive appears in a participant projection: the
 event is the `EXERCISE ... consuming: true`, not a separate archive event.
 
+## Running the tests
+
+`asset/` also carries Script unit tests in `unittests/` and lit integration
+tests in `itests/`. The unit tests sit in their own package so the asset DAR
+does not pull in `daml-script`; they depend on that DAR, so build both first:
+
+```bash
+cd examples/asset
+dpm build --all
+dpm trace test unittests --files daml/Test.daml \
+  --daml-yaml unittests/daml.yaml --daml-yaml daml.yaml \
+  --dar .daml/dist/asset-1.0.0.dar
+dpm trace test . --integration itests --canton-jar <path-to-canton.jar>
+```
+
+`unittests/daml/FailureDemo.daml` fails on purpose to show a source-mapped
+failure, so without `--files daml/Test.daml` the run exits 1. The asset
+`daml.yaml` and DAR let failures map into `Asset.daml`.
+
 ## Against an authorized remote participant
 
 The command shape is identical; a remote endpoint additionally needs a bearer

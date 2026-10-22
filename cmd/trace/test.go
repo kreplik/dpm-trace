@@ -129,7 +129,7 @@ func runTest(args []string) int {
 			}
 			opts.MaxSourceLocations = parsed
 		case "--dar":
-			// Recorded for --integration, which uses it instead of building.
+			// Unit mode inspects every DAR; --integration deploys the first instead of building.
 			darPaths = append(darPaths, value)
 		case "--damlc":
 			damlc = value
@@ -173,10 +173,8 @@ func runTest(args []string) int {
 		integrationOpts.Daml = opts.Daml
 		integrationOpts.DAR = firstOrEmpty(darPaths)
 		integrationOpts.KeepArtifacts = opts.KeepArtifacts
-		// The generated lit.cfg.py builds %dpm from DPM_TRACE_IT_DPM,
-		// so the suite drives the Python implementation. Point it at the
-		// interpreter and source tree the same way run_integration_tests does;
-		// switching %dpm to this binary would change what the suite tests.
+		// %dpm runs this binary; the interpreter and source tree are forwarded
+		// only for suites whose own scripts need them.
 		integrationOpts.Python = os.Getenv("DPM_TRACE_IT_PYTHON")
 		if integrationOpts.Python == "" {
 			integrationOpts.Python = os.Getenv("DPM_TRACE_PYTHON")
@@ -229,7 +227,7 @@ func runTest(args []string) int {
 	// run_test defaults --damlc to --daml, so a package built with one
 	// toolchain is inspected with the same one.
 	for _, path := range darPaths {
-		index.LoadDARInspect(path, orDefaultString(damlc, orDefaultString(opts.Daml, "daml")))
+		index.LoadDARInspect(path, orDefaultString(damlc, orDefaultString(opts.Daml, "dpm")))
 	}
 
 	result, err := testrunner.Run(os.Stderr, opts, index)
@@ -264,7 +262,7 @@ func runTest(args []string) int {
 }
 
 var testFlags = []flagDoc{
-	{"--daml PATH", "Toolchain to run: daml, damlc or dpm. Defaults to daml."},
+	{"--daml PATH", "Toolchain to run: dpm, daml or damlc. Defaults to dpm."},
 	{"-p, --test-pattern PAT", "Run only tests matching a pattern."},
 	{"--files PATH", "Restrict to specific source files. Repeatable."},
 	{"--junit PATH", "Also write JUnit XML for CI."},
@@ -276,11 +274,11 @@ var testFlags = []flagDoc{
 	{"--max-source-locations N", "Maximum diagnostics per failure. Defaults to 6."},
 	{"--keep-artifacts", "Keep the temporary run directory."},
 	{"--dar PATH", "Local DAR to verify failures with damlc inspect. Repeatable."},
-	{"--damlc PATH", "damlc or daml executable for inspection. Defaults to --daml."},
+	{"--damlc PATH", "dpm, daml or damlc executable for inspection. Defaults to --daml."},
 	{"--integration DIR", "Run the integration tests in DIR against a local Canton that dpm trace starts and stops."},
-	{"--canton-jar PATH", "Canton JAR to start for --integration."},
-	{"--dar PATH", "With --integration, deploy this DAR instead of building. Repeatable."},
-	{"--parties Name@N,...", "Parties to allocate and the participant each is placed on, e.g. Alice@1,Bob@2."},
+	{"--canton-jar PATH", "Canton JAR to start for --integration. Defaults to $DPM_TRACE_CANTON_JAR."},
+	{"--dar PATH", "With --integration, deploy the first DAR instead of building."},
+	{"--parties Name@N,...", "Parties to allocate and the participant each is placed on, e.g. Alice@1,Bob@2. Defaults to Alice,Bob."},
 	{"--lit PATH", "lit executable for --integration. Defaults to lit."},
 	{"--sequencer-type TYPE", "Sequencer type of the local Canton. Defaults to bft."},
 	{"--canton-timeout SECONDS", "How long to wait for the local Canton to be ready. Defaults to 180."},

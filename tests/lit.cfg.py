@@ -30,8 +30,8 @@ config.substitutions.append((
     "%daml-tests",
     os.environ.get("DPM_TRACE_DAML_TESTS_DIR", "").strip() or os.path.join(os.path.dirname(repo_root), "daml-contracts"),
 ))
-config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_DAMLC", "daml")))
-config.substitutions.append(("%daml", os.environ.get("DPM_TRACE_DAML", "daml")))
+config.substitutions.append(("%damlc", os.environ.get("DPM_TRACE_DAMLC", "dpm")))
+config.substitutions.append(("%daml", os.environ.get("DPM_TRACE_DAML", "dpm")))
 
 for key in (
     "HOME",

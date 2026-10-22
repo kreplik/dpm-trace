@@ -102,7 +102,7 @@ Run the inspect-backed source diagnostic test when touching source mapping:
 
 ```bash
 DPM_TRACE_RUN_DAMLC_INSPECT=1 \
-DPM_TRACE_DAMLC=daml \
+DPM_TRACE_DAMLC=dpm \
 lit tests/completion-source-inspect.test
 ```
 
@@ -113,19 +113,8 @@ sibling `daml-contracts` package:
 
 ```bash
 DPM_TRACE_RUN_DAML_TEST=1 \
-DPM_TRACE_DAML=daml \
+DPM_TRACE_DAML=dpm \
 lit tests/daml-script-test.test
-```
-
-Run the local Canton integration test only when Canton, Daml, and daml-helper paths are available:
-
-```bash
-DPM_TRACE_RUN_REAL_CANTON=1 \
-DPM_TRACE_DAML=daml \
-DPM_TRACE_DAMLC=daml \
-DPM_TRACE_CANTON_JAR=<path-to-canton.jar> \
-DPM_TRACE_DAML_HELPER=<path-to-daml-helper> \
-lit tests/real-canton-failed-completion.test
 ```
 
 ## Path Hygiene

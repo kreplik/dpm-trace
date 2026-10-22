@@ -210,3 +210,11 @@ func TestParseJUnitAcceptsBothDocumentShapes(t *testing.T) {
 		}
 	}
 }
+
+// The legacy daml assistant cannot resolve 3.x SDKs, so an unset --daml runs dpm.
+func TestCommandDefaultsToDpm(t *testing.T) {
+	command := Command(Options{}, "/tmp/j.xml", "", "")
+	if command[0] != "dpm" || command[1] != "test" {
+		t.Errorf("default toolchain: %q", command)
+	}
+}

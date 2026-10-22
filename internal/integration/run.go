@@ -61,14 +61,13 @@ func Run(stdout, stderr io.Writer, opts Options) (int, error) {
 		return 2, fmt.Errorf("--canton-jar (or DPM_TRACE_CANTON_JAR) must point at a Canton jar")
 	}
 
-	daml := expandUser(orDefault(opts.Daml, "daml"))
+	daml := expandUser(orDefault(opts.Daml, "dpm"))
 	lit := orDefault(opts.Lit, "lit")
 	placements := ParsePlacements(orDefault(opts.Parties, "Alice,Bob"))
 	participants := MaxParticipant(placements)
 
-	// The suite invokes %dpm. Point it at this binary: the generated lit.cfg.py
-	// prefers DPM_TRACE_IT_DPM and only falls back to the Python module, so a
-	// Go run needs no interpreter at all.
+	// The suite invokes %dpm. The generated lit.cfg.py reads it from
+	// DPM_TRACE_IT_DPM and fails without it, so point it at this binary.
 	self, err := os.Executable()
 	if err != nil {
 		return 2, err
@@ -183,8 +182,7 @@ func Run(stdout, stderr io.Writer, opts Options) (int, error) {
 		"DPM_TRACE_IT_DAML_YAML": filepath.Join(opts.Root, "daml.yaml"),
 		"DPM_TRACE_IT_DPM":       self,
 	}
-	// Only forwarded when supplied: a suite pinned to the Python implementation
-	// can still opt in, but a Go run does not need an interpreter.
+	// Only forwarded when supplied, for suites whose own scripts need Python.
 	if opts.Python != "" {
 		extra["DPM_TRACE_IT_PYTHON"] = opts.Python
 	}

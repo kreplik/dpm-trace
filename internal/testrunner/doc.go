@@ -1,4 +1,4 @@
-// Package testrunner implements `dpm trace test`: it wraps `daml test`, decodes
+// Package testrunner implements `dpm trace test`: it wraps `dpm test`, decodes
 // the per-script transaction trees and renders a report that gates CI.
 //
 // Ported from the original Python implementation: test_main, run_test, daml_test_command,
